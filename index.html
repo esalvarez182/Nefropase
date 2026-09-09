@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>NefroPase - Hemodiálisis en la Nube</title>
+  <title>NefroPase Cloud - Hemodiálisis</title>
   
   <style>
     :root {
@@ -19,13 +19,13 @@
       --warn: #d97706;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-    body { background-color: var(--bg); color: var(--text); padding-bottom: 80px; -webkit-tap-highlight-color: transparent; }
+    body { background-color: var(--bg); color: var(--text); padding-bottom: 90px; -webkit-tap-highlight-color: transparent; }
     
-    /* App Navigation Top */
+    /* Top App Bar */
     .app-header {
       background: var(--primary);
       color: #fff;
-      padding: 14px 18px;
+      padding: 12px 18px;
       position: sticky;
       top: 0;
       z-index: 100;
@@ -34,11 +34,11 @@
       justify-content: space-between;
       align-items: center;
     }
-    .app-header h1 { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .app-header h1 { font-size: 17.5px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
     .status-pill {
       font-size: 11px;
       background: rgba(255,255,255,0.2);
-      padding: 3px 8px;
+      padding: 3px 9px;
       border-radius: 12px;
       display: flex;
       align-items: center;
@@ -46,26 +46,79 @@
     }
     .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; }
 
-    /* Day & Shift Bar */
+    /* Control Bar */
     .control-strip {
       background: #fff;
       border-bottom: 1px solid var(--border);
-      padding: 10px 14px;
+      padding: 10px 16px;
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 10px;
       align-items: center;
       justify-content: space-between;
     }
     .day-selector-group { display: flex; align-items: center; gap: 6px; }
     .day-selector-group select, .day-selector-group input {
-      padding: 7px 10px;
+      padding: 6px 10px;
       border: 1px solid #94a3b8;
       border-radius: 6px;
       font-size: 13px;
       font-weight: 600;
       outline: none;
       background: #f8fafc;
+    }
+
+    /* Direct PC Paste Panel */
+    .pc-paste-container {
+      max-width: 900px;
+      margin: 12px auto 0;
+      padding: 0 14px;
+    }
+    .paste-card {
+      background: #eff6ff;
+      border: 1.5px dashed #93c5fd;
+      border-radius: 8px;
+      padding: 12px 14px;
+      transition: all 0.2s ease;
+    }
+    .paste-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .paste-card-header h2 {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #1e3a8a;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .paste-box {
+      min-height: 80px;
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      padding: 10px;
+      background: #ffffff;
+      font-size: 12px;
+      color: #334155;
+      outline: none;
+    }
+    .paste-box:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(30,64,175,0.15); }
+    .paste-box:empty::before {
+      content: "Copia la tabla desde tu archivo (Ctrl + C) y pégala aquí directamente (Ctrl + V)...";
+      color: #94a3b8;
+    }
+    .paste-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+      flex-wrap: wrap;
+      gap: 6px;
     }
 
     /* Shift Tabs */
@@ -77,10 +130,13 @@
       gap: 4px;
       overflow-x: auto;
       margin: 12px 14px 4px;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
     }
     .shift-btn {
       flex: 1;
-      padding: 8px 10px;
+      padding: 7px 10px;
       font-size: 12px;
       font-weight: 600;
       border: none;
@@ -97,10 +153,10 @@
       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
 
-    /* Main Content */
+    /* Main Container */
     .container { max-width: 900px; margin: 0 auto; padding: 10px 14px; }
 
-    /* Mobile Visit Cards */
+    /* Patient Cards */
     .patient-card {
       background: var(--card);
       border: 1px solid var(--border);
@@ -108,7 +164,7 @@
       margin-bottom: 12px;
       padding: 14px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-      transition: border-color 0.2s;
+      transition: all 0.2s ease;
     }
     .patient-card.saved { border-left: 5px solid var(--accent); }
     
@@ -146,10 +202,6 @@
       border-radius: 6px;
       margin-left: 6px;
     }
-    .btn-danger { background: #dc2626; color: #fff; }
-    .btn-danger:hover { background: #b91c1c; }
-    .btn-warn { background: #d97706; color: #fff; }
-    .btn-warn:hover { background: #b45309; }
 
     .card-header {
       display: flex;
@@ -160,7 +212,7 @@
     .card-title { font-size: 14.5px; font-weight: 700; color: #0f172a; }
     .card-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
-    /* Grid for quick input fields */
+    /* Inputs Grid */
     .inputs-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -173,11 +225,12 @@
     .field-item { display: flex; flex-direction: column; gap: 3px; }
     .field-item label { font-size: 11px; font-weight: 600; color: #475569; }
     .field-item input {
-      padding: 7px 8px;
+      padding: 6px 8px;
       border: 1px solid #cbd5e1;
       border-radius: 6px;
-      font-size: 13px;
+      font-size: 12.5px;
       outline: none;
+      background: #fff;
     }
     .field-item input:focus { border-color: var(--primary); background: #f0f9ff; }
 
@@ -212,28 +265,35 @@
     .card-actions {
       display: flex;
       justify-content: flex-end;
-      gap: 8px;
+      gap: 6px;
       margin-top: 10px;
+      flex-wrap: wrap;
     }
     button {
       cursor: pointer;
       border: none;
       border-radius: 6px;
-      padding: 8px 14px;
-      font-size: 13px;
+      padding: 7px 12px;
+      font-size: 12.5px;
       font-weight: 600;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       transition: all 0.15s;
     }
+    button:active { transform: scale(0.98); }
     .btn-save { background: var(--primary); color: #fff; }
     .btn-save:hover { background: var(--primary-dark); }
     .btn-action { background: var(--accent); color: #fff; }
     .btn-action:hover { background: var(--accent-dark); }
     .btn-light { background: #e2e8f0; color: #1e293b; }
+    .btn-light:hover { background: #cbd5e1; }
+    .btn-danger { background: #dc2626; color: #fff; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-warn { background: #d97706; color: #fff; }
+    .btn-warn:hover { background: #b45309; }
 
-    /* Bottom Action Bar for PC / Note Generation */
+    /* Bottom Fixed Bar */
     .floating-bar {
       position: fixed;
       bottom: 0;
@@ -266,7 +326,7 @@
     .modal-card {
       background: #fff;
       width: 100%;
-      max-width: 600px;
+      max-width: 650px;
       border-radius: 10px;
       padding: 18px;
       max-height: 90vh;
@@ -327,16 +387,16 @@
 </head>
 <body>
 
-  <!-- Top App Bar -->
+  <!-- Header -->
   <header class="app-header">
     <h1>🩺 NefroPase Cloud</h1>
     <div class="status-pill">
       <span class="status-dot" id="cloudDot"></span>
-      <span id="cloudStatus">Sincronizado</span>
+      <span id="cloudStatus">Conectando...</span>
     </div>
   </header>
 
-  <!-- Controls: Day & Date -->
+  <!-- Controls -->
   <div class="control-strip">
     <div class="day-selector-group">
       <label for="daySelect">🗓️ Día:</label>
@@ -351,8 +411,23 @@
       <input type="date" id="sessionDate" onchange="onDateChanged()">
     </div>
     <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-      <button class="btn-light" style="padding: 5px 9px; font-size: 12px;" onclick="openImportModal()">📥 Importar Censo de este Día</button>
-      <button class="btn-light" style="padding: 5px 9px; font-size: 12px;" onclick="addPatientPrompt()">➕ Agregar Paciente</button>
+      <button class="btn-light" onclick="togglePastePanel()">📋 <span id="pastePanelToggleTxt">Pegar Tabla de Archivo</span></button>
+      <button class="btn-light" onclick="addPatientPrompt()">➕ Agregar Paciente</button>
+    </div>
+  </div>
+
+  <!-- DIRECT PC PASTE PANEL -->
+  <div class="pc-paste-container" id="pcPasteContainer">
+    <div class="paste-card">
+      <div class="paste-card-header">
+        <h2>📋 Pegar Tabla de Control de Sala para <span id="pasteDayLabel" style="text-decoration: underline;">MARTES</span></h2>
+        <button class="btn-light" style="padding: 2px 7px; font-size: 11px;" onclick="clearPasteBox()">Limpiar</button>
+      </div>
+      <div id="pasteBox" class="paste-box" contenteditable="true"></div>
+      <div class="paste-actions">
+        <span style="font-size: 11px; color: #475569;">💡 Copia las filas desde Google Docs, Word o PDF y pégalas aquí. Detecta automáticamente turnos y columnas.</span>
+        <button class="btn-save" style="padding: 7px 14px;" onclick="processDirectPaste()">⚡ Procesar e Incorporar Pacientes</button>
+      </div>
     </div>
   </div>
 
@@ -370,7 +445,7 @@
     <p style="text-align: center; color: var(--muted); margin-top: 40px;">Cargando censo de pacientes desde la nube...</p>
   </div>
 
-  <!-- Floating Bottom Bar (Quick Generation for PC & Mobile) -->
+  <!-- Floating Bottom Bar -->
   <div class="floating-bar">
     <div class="bar-info" id="barSummary">0 pacientes</div>
     <div class="bar-buttons">
@@ -383,10 +458,10 @@
   <div id="previewDocModal" class="modal-overlay">
     <div class="modal-card" style="max-width: 720px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
-        <h3 style="font-size: 16px; color: #1e3a8a;" id="previewDocModalTitle">👁️ Previsualización de Nota para Expediente</h3>
+        <h3 style="font-size: 16px; color: #1e3a8a;" id="previewDocModalTitle">👁️ Previsualización: Expediente Clínico</h3>
         <button onclick="closeDocPreviewModal()" style="background: none; border: none; font-size: 22px; cursor: pointer;">&times;</button>
       </div>
-      <p style="font-size: 11.5px; color: var(--muted); margin-bottom: 10px;">Esta es la tabla exacta de 13 columnas continuas que se pegará en Google Docs:</p>
+      <p style="font-size: 11.5px; color: var(--muted); margin-bottom: 10px;">Esta es la tabla continua exacta de 13 columnas que se pegará en Google Docs:</p>
       <div id="previewDocContent" style="overflow-x: auto; background: #fff; padding: 4px; border: 1px solid #e2e8f0; border-radius: 6px;"></div>
       <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px;">
         <button class="btn-light" onclick="closeDocPreviewModal()">Cerrar</button>
@@ -395,25 +470,7 @@
     </div>
   </div>
 
-  <!-- Modal Importar Censo del Día -->
-  <div id="importCensusModal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 650px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
-        <h3 style="font-size: 16px; color: #1e3a8a;">📥 Importar Censo de Pacientes para <span id="importDayLabel"></span></h3>
-        <button onclick="closeImportModal()" style="background: none; border: none; font-size: 22px; cursor: pointer;">&times;</button>
-      </div>
-      <p style="font-size: 12px; color: var(--muted); margin-bottom: 8px;">
-        Pega aquí las filas o la tabla copiada de Google Docs correspondiente a este día:
-      </p>
-      <div id="importPasteArea" contenteditable="true" style="min-height: 140px; max-height: 240px; overflow-y: auto; border: 2px dashed #94a3b8; border-radius: 6px; padding: 10px; background: #fdfdfd; font-size: 12px; outline: none; margin-bottom: 10px;"></div>
-      <div style="display: flex; justify-content: flex-end; gap: 8px;">
-        <button class="btn-light" onclick="closeImportModal()">Cancelar</button>
-        <button class="btn-save" onclick="processImportedCensus()">⚡ Procesar e Incorporar a este Día</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal Nota de Piso (Intacto) -->
+  <!-- Modal Nota de Piso (Completamente Intacto) -->
   <div id="pisoModal" class="modal-overlay">
     <div class="modal-card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
@@ -477,9 +534,8 @@
     return v.toString().includes('L') || v.toString().includes('LT') ? v : v + ' L';
   }
 
-  // Initial preloaded census directly from user's schedule
+  // Preloaded census
   const PRELOADED_CENSUS = [
-    // Primer Turno Matutino
     { id: "campos_bonilla", nombre: "CAMPOS BONILLA MARGARITA", maquina: "2", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "50", pp: "51.85", qs: "350", qd: "600", uf: "2.3 L", na: "138", bic: "3.5", temp: "36", filtro: "400", ta_in: "128/74", fc_in: "85", ta_out: "128/77", fc_out: "71", lastAnnotation: "Tuvo secrecion de sitio de salida, se tomo cultivo y se inicio clindamicina", vigilanciaAcceso: true },
     { id: "acevedo_castaneda", nombre: "ACEVEDO CASTAÑEDA MARIA CONCEPCIÓN", maquina: "5", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "62.5", pp: "65.7", qs: "350", qd: "500", uf: "2.8 L", na: "137", bic: "3.3", temp: "37", filtro: "18", ta_in: "130/72", fc_in: "60", ta_out: "121/80", fc_out: "80", lastAnnotation: "Calambres al final de la sesion. Vigilar la proxima pb ajuste de peso seco", vigilanciaAcceso: false },
     { id: "cortes_villavicencio", nombre: "CORTES VILLAVICENCIO MARIA TERESITA", maquina: "3", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "60", pp: "62", qs: "300", qd: "600", uf: "2.5 L", na: "136", bic: "3.4", temp: "36", filtro: "400", ta_in: "144/76", fc_in: "73", ta_out: "171/80", fc_out: "69", lastAnnotation: "Toma de cultivo siguente sesión y receta de hidroxicina-ITU (Dra Hernandez)", vigilanciaAcceso: false },
@@ -489,8 +545,6 @@
     { id: "marquez_vega", nombre: "MÁRQUEZ VEGA AURORA", maquina: "8", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "51", pp: "52.4", qs: "350", qd: "600", uf: "1.5 L", na: "138", bic: "3.1", temp: "36", filtro: "18", ta_in: "152/95", fc_in: "66", ta_out: "171/105", fc_out: "68", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
     { id: "torija_zamora", nombre: "TORIJA ZAMORA MARIA DE LOS ANGELES", maquina: "9", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "53.5", pp: "54.1", qs: "320", qd: "500", uf: "0.5 L", na: "138", bic: "3.3", temp: "35.5", filtro: "18", ta_in: "129/83", fc_in: "80", ta_out: "139/100", fc_out: "77", lastAnnotation: "De conecto invecticio", vigilanciaAcceso: false },
     { id: "ramos_coronel", nombre: "RAMOS CORONEL LEONOR", maquina: "10", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "83.5", pp: "90", qs: "320", qd: "500", uf: "2.5 L", na: "140", bic: "3.1", temp: "35.5", filtro: "18", ta_in: "122/82", fc_in: "80", ta_out: "152/101", fc_out: "80", lastAnnotation: "Cultivo de sitio de salida 04/08. Vancomicina 1g y Ertapenem 500mg", vigilanciaAcceso: true },
-
-    // Segundo Turno Matutino
     { id: "celerino_sanchez", nombre: "CELERINO SANCHEZ LINA JOSE BLAS", maquina: "1", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "68", pp: "70", qs: "200", qd: "500", uf: "0.3 L", na: "138", bic: "3.1", temp: "36", filtro: "18", ta_in: "137/74", fc_in: "80", ta_out: "140/80", fc_out: "80", lastAnnotation: "Ingresa a piso", vigilanciaAcceso: false },
     { id: "cicle_daniel", nombre: "CICLE DANIEL CIRILO", maquina: "3", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "74", pp: "77.45", qs: "300", qd: "800", uf: "2.0 L", na: "138", bic: "3.0", temp: "36", filtro: "18", ta_in: "152/100", fc_in: "62", ta_out: "149/99", fc_out: "60", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
     { id: "torres_cholula", nombre: "TORRES CHOLULA LUCIA", maquina: "4", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "71", pp: "71.95", qs: "300", qd: "500", uf: "2.0 L", na: "143", bic: "3.0", temp: "37", filtro: "19", ta_in: "162/91", fc_in: "82", ta_out: "151/73", fc_out: "74", lastAnnotation: "Presenta IRA toma Paracetamol", vigilanciaAcceso: false },
@@ -498,8 +552,6 @@
     { id: "cadena_castillo", nombre: "CADENA CASTILLO LUCAS", maquina: "6", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "46", pp: "48.3", qs: "250", qd: "600", uf: "2.6 L", na: "140", bic: "3.5", temp: "35.5", filtro: "18", ta_in: "155/120", fc_in: "80", ta_out: "147/117", fc_out: "81", lastAnnotation: "Catéter doblado ver funcionamiento", vigilanciaAcceso: true },
     { id: "romero_sosa", nombre: "ROMERO SOSA GERMAN", maquina: "7", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "57", pp: "61", qs: "310", qd: "500", uf: "3.0 L", na: "136", bic: "3.0", temp: "37", filtro: "18", ta_in: "155/83", fc_in: "60", ta_out: "150/95", fc_out: "55", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
     { id: "valerio_flores", nombre: "VALERIO FLORES MARCELINA", maquina: "10", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "65", pp: "67.2", qs: "250", qd: "500", uf: "1.3 L", na: "138", bic: "3.1", temp: "36", filtro: "18", ta_in: "146/85", fc_in: "60", ta_out: "140/80", fc_out: "60", lastAnnotation: "Cita Cardio el 29 de septiembre, pendiente fecha de Holter", vigilanciaAcceso: false },
-
-    // Turno Vespertino 1
     { id: "zarate_audelo", nombre: "ZÁRATE AUDELO CELSO ALBERTO", maquina: "1", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "53", pp: "54.5", qs: "300", qd: "700", uf: "1.5 L", na: "138", bic: "3.1", temp: "36", filtro: "400", ta_in: "120/83", fc_in: "67", ta_out: "174/107", fc_out: "51", lastAnnotation: "Se toma hemocultivo central y periferico por escalofrios", vigilanciaAcceso: true },
     { id: "lopez_rojas", nombre: "LOPEZ ROJAS ROSENDO", maquina: "2", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "66.5", pp: "70.4", qs: "320", qd: "700", uf: "3.5 L", na: "138", bic: "3.0", temp: "36", filtro: "400", ta_in: "160/91", fc_in: "65", ta_out: "150/100", fc_out: "65", lastAnnotation: "Hospitalizado por neumonia en la cama 631", vigilanciaAcceso: false },
     { id: "serrano_jimenez", nombre: "SERRANO JIMÉNEZ UBALDO", maquina: "3", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "78", pp: "81", qs: "320", qd: "700", uf: "2.8 L", na: "140", bic: "3.3", temp: "35", filtro: "400", ta_in: "181/104", fc_in: "60", ta_out: "187/96", fc_out: "51", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
@@ -529,11 +581,33 @@
     if (dayName !== "DOMINGO") {
       document.getElementById('daySelect').value = dayName;
     }
+    updatePasteDayLabel();
   }
   initDate();
 
+  function updatePasteDayLabel() {
+    const d = document.getElementById('daySelect').value;
+    document.getElementById('pasteDayLabel').innerText = d;
+  }
+
+  function togglePastePanel() {
+    const p = document.getElementById('pcPasteContainer');
+    const txt = document.getElementById('pastePanelToggleTxt');
+    if (p.style.display === 'none') {
+      p.style.display = 'block';
+      txt.innerText = 'Ocultar Panel de Pegado';
+    } else {
+      p.style.display = 'none';
+      txt.innerText = 'Pegar Tabla de Archivo';
+    }
+  }
+
+  function clearPasteBox() {
+    document.getElementById('pasteBox').innerHTML = '';
+  }
+
   window.addEventListener('firebase-ready', async () => {
-    document.getElementById('cloudStatus').innerText = "Conectado a Firestore";
+    document.getElementById('cloudStatus').innerText = "Firestore Conectado";
     document.getElementById('cloudDot').style.background = "#4ade80";
     await loadDayPatients();
   });
@@ -548,6 +622,7 @@
   async function loadDayPatients() {
     const selectedDay = document.getElementById('daySelect').value;
     const dateKey = document.getElementById('sessionDate').value;
+    updatePasteDayLabel();
     
     document.getElementById('patientsContainer').innerHTML = '<p style="text-align: center; color: var(--muted); margin-top: 30px;">Cargando pacientes del ' + selectedDay + '...</p>';
 
@@ -629,7 +704,10 @@
     document.getElementById('barSummary').innerText = `${list.length} de ${currentPatients.length} pacientes`;
 
     if (list.length === 0) {
-      container.innerHTML = `<p style="text-align: center; color: var(--muted); margin-top: 40px;">No hay pacientes agendados para este turno en ${document.getElementById('daySelect').value}. Usa el botón '📥 Importar Censo de este Día' para agregarlos.</p>`;
+      container.innerHTML = `<div style="text-align: center; color: var(--muted); margin-top: 30px; padding: 20px; background: #fff; border-radius: 8px; border: 1px solid var(--border);">
+        <p style="font-weight: 600; color: #1e3a8a; font-size: 14px; margin-bottom: 6px;">No hay pacientes agendados para este turno en ${document.getElementById('daySelect').value}.</p>
+        <p style="font-size: 12.5px;">Copia tu tabla de Google Docs o Word y pégala en el recuadro superior azul para cargarlos al instante.</p>
+      </div>`;
       return;
     }
 
@@ -698,14 +776,14 @@
           <textarea id="obs_${p.id}" placeholder="Escribe aquí observaciones clínicas, cultivos, medicamentos..." onchange="autoSavePatient('${p.id}')">${p.lastAnnotation || p.anotaciones || ''}</textarea>
         </div>
 
-        <div class="card-actions" style="flex-wrap: wrap;">
-          <button class="btn-save" style="padding: 5px 9px; font-size: 12px;" onclick="savePatientManual('${p.id}')">💾 Guardar</button>
-          <button class="btn-light" style="padding: 5px 9px; font-size: 12px;" onclick="openDocPreview('${p.id}')">👁️ Ver Nota</button>
-          <button class="btn-action" style="padding: 5px 9px; font-size: 12px;" onclick="openNotaPisoSingle('${p.id}')">📝 Nota Piso</button>
-          <button class="btn-light" style="padding: 5px 9px; font-size: 12px;" onclick="copySingleDocNote('${p.id}')">📋 Copiar Doc</button>
-          <button class="${p.vigilanciaAcceso ? 'btn-warn' : 'btn-light'}" style="padding: 5px 9px; font-size: 12px;" onclick="toggleVigilanciaAcceso('${p.id}')">${p.vigilanciaAcceso ? '⚠️ En Vigilancia' : '🛡️ Vigilar Acceso'}</button>
-          <button class="${p.noAcudio ? 'btn-save' : 'btn-warn'}" style="padding: 5px 9px; font-size: 12px;" onclick="toggleNoAcudio('${p.id}')">${p.noAcudio ? '↩️ Reactivar' : '🚫 No Acudió'}</button>
-          <button class="btn-danger" style="padding: 5px 9px; font-size: 12px;" onclick="deletePatientConfirm('${p.id}')">🗑️ Eliminar</button>
+        <div class="card-actions">
+          <button class="btn-save" onclick="savePatientManual('${p.id}')">💾 Guardar</button>
+          <button class="btn-light" onclick="openDocPreview('${p.id}')">👁️ Ver Nota</button>
+          <button class="btn-action" onclick="openNotaPisoSingle('${p.id}')">📝 Nota Piso</button>
+          <button class="btn-light" onclick="copySingleDocNote('${p.id}')">📋 Copiar Doc</button>
+          <button class="${p.vigilanciaAcceso ? 'btn-warn' : 'btn-light'}" onclick="toggleVigilanciaAcceso('${p.id}')">${p.vigilanciaAcceso ? '⚠️ En Vigilancia' : '🛡️ Vigilar Acceso'}</button>
+          <button class="${p.noAcudio ? 'btn-save' : 'btn-warn'}" onclick="toggleNoAcudio('${p.id}')">${p.noAcudio ? '↩️ Reactivar' : '🚫 No Acudió'}</button>
+          <button class="btn-danger" onclick="deletePatientConfirm('${p.id}')">🗑️ Eliminar</button>
         </div>
       `;
 
@@ -780,6 +858,235 @@
   function autoSavePatient(id) { savePatientData(id, true); }
   function savePatientManual(id) { savePatientData(id, false); }
 
+  // ROBUST PARSER (Adapted directly from v11 dynamic column mapping)
+  async function processDirectPaste() {
+    const box = document.getElementById('pasteBox');
+    const currentDay = document.getElementById('daySelect').value;
+    let extracted = [];
+
+    let isVespertino = false;
+    const tables = box.querySelectorAll('table');
+
+    if (tables.length > 0) {
+      const allElements = box.querySelectorAll('h1, h2, h3, p, div, table, tr');
+      allElements.forEach(el => {
+        let txt = clean(el.innerText).toUpperCase();
+        if (txt.includes('VESPERTINO')) isVespertino = true;
+        else if (txt.includes('MATUTINO')) isVespertino = false;
+      });
+
+      tables.forEach(t => {
+        const pts = parseHtmlTableWithTurno(t, isVespertino, currentDay);
+        extracted = extracted.concat(pts);
+      });
+    } else {
+      extracted = parsePlainTextWithTurno(box.innerText || box.textContent, currentDay);
+    }
+
+    if (extracted.length === 0) {
+      alert("No se detectaron pacientes en el texto pegado. Copia directamente las filas de la tabla con Ctrl+C y pégalas aquí con Ctrl+V.");
+      return;
+    }
+
+    // Merge into currentPatients and save to Firestore
+    for (const p of extracted) {
+      const existingIdx = currentPatients.findIndex(item => item.id === p.id);
+      if (existingIdx !== -1) {
+        if (!p.lastAnnotation || p.lastAnnotation === 'Ninguna') {
+          p.lastAnnotation = currentPatients[existingIdx].lastAnnotation || 'Ninguna';
+        }
+        currentPatients[existingIdx] = Object.assign(currentPatients[existingIdx], p);
+      } else {
+        currentPatients.push(p);
+      }
+
+      if (window.db) {
+        try {
+          const pRef = window.fsDoc(window.db, "pacientes", p.id);
+          const existingSnap = await window.fsGetDoc(pRef);
+          if (existingSnap.exists()) {
+            const data = existingSnap.data();
+            const diasArr = data.dias || [];
+            if (!diasArr.includes(currentDay)) diasArr.push(currentDay);
+            await window.fsUpdateDoc(pRef, {
+              dias: diasArr,
+              maquina: p.maquina || data.maquina || '1',
+              ps: p.ps || data.ps || '60',
+              filtro: p.filtro || data.filtro || '400',
+              lastAnnotation: (p.lastAnnotation && p.lastAnnotation !== 'Ninguna') ? p.lastAnnotation : (data.lastAnnotation || 'Ninguna')
+            });
+          } else {
+            await window.fsSetDoc(pRef, p);
+          }
+        } catch (e) {
+          console.error("Error al guardar en Firestore:", e);
+        }
+      }
+    }
+
+    clearPasteBox();
+    renderCards();
+    showToast(`¡Se procesaron e incorporaron ${extracted.length} pacientes a ${currentDay}!`);
+  }
+
+  function parseHtmlTableWithTurno(table, globalIsVesp, currentDay) {
+    const rows = Array.from(table.querySelectorAll('tr'));
+    if (rows.length === 0) return [];
+
+    let headers = [];
+    let hIdx = -1;
+    let localIsVesp = globalIsVesp;
+    let results = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const rowTxt = clean(rows[i].innerText).toUpperCase();
+      if (rowTxt.includes('VESPERTINO')) localIsVesp = true;
+      else if (rowTxt.includes('MATUTINO')) localIsVesp = false;
+
+      const cells = Array.from(rows[i].querySelectorAll('th, td')).map(c => clean(c.innerText).toUpperCase());
+      if (cells.some(c => c.includes('CAMA') || c.includes('NOMBRE') || c.includes('PS') || c.includes('PP'))) {
+        headers = cells;
+        hIdx = i;
+        break;
+      }
+    }
+
+    let colMap = {
+      cama: -1, nombre: -1, ps: -1, pp: -1, qs: -1, uf: -1, qd: -1, na: -1, bic: -1, t: -1, filtro: -1,
+      tafc_in: -1, tafc_out: -1, anotaciones: -1
+    };
+
+    if (hIdx !== -1) {
+      let tafcList = [];
+      headers.forEach((h, idx) => {
+        if (h.includes('CAMA')) colMap.cama = idx;
+        else if (h.includes('NOMBRE')) colMap.nombre = idx;
+        else if (h === 'PS' || h.includes('PESO S')) colMap.ps = idx;
+        else if (h === 'PP' || h.includes('PESO P') || h.includes('PESO A')) colMap.pp = idx;
+        else if (h === 'QS' || h.includes('FS') || h.includes('OS')) colMap.qs = idx;
+        else if (h === 'UF' || h.includes('ULTRA')) colMap.uf = idx;
+        else if (h === 'QD' || h.includes('FD') || h.includes('OD')) colMap.qd = idx;
+        else if (h === 'NA' || h.includes('SODIO')) colMap.na = idx;
+        else if (h === 'BIC' || h.includes('HCO3')) colMap.bic = idx;
+        else if (h === 'T' || h.includes('TEMP')) colMap.t = idx;
+        else if (h.includes('FILTRO')) colMap.filtro = idx;
+        else if (h.includes('TA') || h.includes('FC')) tafcList.push(idx);
+        else if (h.includes('ANOTACION') || h.includes('OBSERVACION')) colMap.anotaciones = idx;
+      });
+
+      if (tafcList.length >= 1) colMap.tafc_in = tafcList[0];
+      if (tafcList.length >= 2) colMap.tafc_out = tafcList[1];
+      if (colMap.anotaciones === -1 && headers.length > 0) colMap.anotaciones = headers.length - 1;
+    }
+
+    const start = hIdx !== -1 ? hIdx + 1 : 0;
+    for (let r = start; r < rows.length; r++) {
+      const rowTxt = clean(rows[r].innerText).toUpperCase();
+      if (rowTxt.includes('VESPERTINO')) { localIsVesp = true; continue; }
+      if (rowTxt.includes('MATUTINO')) { localIsVesp = false; continue; }
+
+      const cells = Array.from(rows[r].querySelectorAll('td, th')).map(c => clean(c.innerText));
+      if (cells.length < 3) continue;
+
+      let p = extractPatientFromRow(cells, colMap, localIsVesp, currentDay);
+      if (p && p.nombre && p.nombre.length > 2 && !p.nombre.toUpperCase().includes('NOMBRE')) {
+        results.push(p);
+      }
+    }
+    return results;
+  }
+
+  function parsePlainTextWithTurno(text, currentDay) {
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    let isVesp = false;
+    let results = [];
+    lines.forEach(line => {
+      let upper = line.toUpperCase();
+      if (upper.includes('VESPERTINO')) { isVesp = true; return; }
+      if (upper.includes('MATUTINO')) { isVesp = false; return; }
+      let cells = line.split('\t').map(c => clean(c));
+      if (cells.length < 4) cells = line.split('|').map(c => clean(c)).filter(c => c.length > 0);
+      if (cells.length >= 4) {
+        let p = extractPatientFromRow(cells, null, isVesp, currentDay);
+        if (p && p.nombre && !p.nombre.toUpperCase().includes('NOMBRE')) {
+          results.push(p);
+        }
+      }
+    });
+    return results;
+  }
+
+  function extractPatientFromRow(cells, colMap, isVespertino, currentDay) {
+    let rawNote = '';
+    if (colMap && colMap.anotaciones !== -1 && cells[colMap.anotaciones]) {
+      rawNote = cells[colMap.anotaciones];
+    } else if (cells.length >= 14) {
+      rawNote = cells[cells.length - 1];
+    }
+    let obsText = (rawNote && rawNote !== '-' && rawNote.trim() !== '') ? rawNote.trim() : 'Ninguna';
+
+    let turnoCode = isVespertino ? "VESPERTINO_1" : "MATUTINO_1";
+
+    if (colMap && colMap.nombre !== -1) {
+      let rawName = cells[colMap.nombre] || '';
+      if (!rawName || rawName.length < 3) return null;
+      let tafcIn = parseTaFc(cells[colMap.tafc_in] || '');
+      let tafcOut = parseTaFc(cells[colMap.tafc_out] || '');
+      return {
+        id: rawName.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+        nombre: rawName.toUpperCase(),
+        maquina: cells[colMap.cama] || '1',
+        turno: turnoCode,
+        dias: [currentDay],
+        ps: cells[colMap.ps] ? cells[colMap.ps].replace(/kg/i, '').trim() : '60',
+        pp: cells[colMap.pp] || '',
+        qs: cells[colMap.qs] || '310',
+        uf: formatUF(cells[colMap.uf] || ''),
+        qd: cells[colMap.qd] || '600',
+        na: cells[colMap.na] || '138',
+        bic: cells[colMap.bic] || '3.0',
+        temp: cells[colMap.t] || '36.0',
+        filtro: cells[colMap.filtro] || '400',
+        ta_in: tafcIn.ta,
+        fc_in: tafcIn.fc,
+        ta_out: tafcOut.ta,
+        fc_out: tafcOut.fc,
+        lastAnnotation: obsText,
+        vigilanciaAcceso: false,
+        noAcudio: false
+      };
+    }
+
+    let rawName = cells[1] || '';
+    if (!rawName || rawName.length < 3) return null;
+    let tafc1 = parseTaFc(cells[12] || cells[11] || '');
+    let tafc2 = parseTaFc(cells[13] || cells[12] || '');
+    return {
+      id: rawName.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+      nombre: rawName.toUpperCase(),
+      maquina: cells[0] || '1',
+      turno: turnoCode,
+      dias: [currentDay],
+      ps: cells[3] ? cells[3].replace(/kg/i, '').trim() : '60',
+      pp: cells[4] || '',
+      qs: cells[5] || '310',
+      uf: formatUF(cells[6] || ''),
+      qd: cells[7] || '600',
+      na: cells[8] || '138',
+      bic: cells[9] || '3.0',
+      temp: cells[10] || '36.0',
+      filtro: cells[11] || '400',
+      ta_in: tafc1.ta,
+      fc_in: tafc1.fc,
+      ta_out: tafc2.ta,
+      fc_out: tafc2.fc,
+      lastAnnotation: obsText,
+      vigilanciaAcceso: false,
+      noAcudio: false
+    };
+  }
+
+  // NOTE GENERATION & EXPORT
   function generateGoogleDocTable(p) {
     const fecha = getSelectedDateFormatted();
     const isVesp = p.turno && p.turno.includes('VESPERTINO');
@@ -946,7 +1253,7 @@
     }
   }
 
-  // --- NOTA DE PISO LOGIC ---
+  // NOTA DE PISO LOGIC (100% INTACT)
   function openNotaPisoModal() {
     if (currentPatients.length === 0) return;
     activePatientForPiso = currentPatients[0];
@@ -1020,7 +1327,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
     showToast(`¡Notas de piso de los ${list.length} pacientes copiadas!`);
   }
 
-  // --- VIGILANCIA ACCESO, PREVIEW DOC, NO ACUDIO, DELETE ---
+  // VIGILANCIA, PREVIEW, NO ACUDIO, DELETE
   async function toggleVigilanciaAcceso(id) {
     const p = currentPatients.find(item => item.id === id);
     if (!p) return;
@@ -1035,7 +1342,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
       }
     }
     renderCards();
-    showToast(p.vigilanciaAcceso ? `⚠️ ${p.nombre} marcado en vigilancia de acceso` : `✓ ${p.nombre} retirado de vigilancia`);
+    showToast(p.vigilanciaAcceso ? `⚠️ ${p.nombre} en vigilancia de acceso` : `✓ ${p.nombre} retirado de vigilancia`);
   }
 
   function openDocPreview(id) {
@@ -1109,152 +1416,6 @@ MÉDICOS RESPONSABLES: ${medico}`;
     }
     renderCards();
     showToast(`Paciente eliminado de ${currentDay}`);
-  }
-
-  // --- IMPORT CENSUS MODAL & PARSING ---
-  function openImportModal() {
-    const currentDay = document.getElementById('daySelect').value;
-    document.getElementById('importDayLabel').innerText = currentDay;
-    document.getElementById('importPasteArea').innerHTML = '';
-    document.getElementById('importCensusModal').style.display = 'flex';
-  }
-
-  function closeImportModal() {
-    document.getElementById('importCensusModal').style.display = 'none';
-  }
-
-  async function processImportedCensus() {
-    try {
-      const pasteBox = document.getElementById('importPasteArea');
-      const currentDay = document.getElementById('daySelect').value;
-      const text = pasteBox.innerText || pasteBox.textContent || '';
-      const tables = pasteBox.querySelectorAll('table');
-      let imported = [];
-
-      if (tables.length > 0) {
-        tables.forEach(table => {
-          let isVespTable = false;
-          const rows = Array.from(table.querySelectorAll('tr'));
-          rows.forEach(r => {
-            const rowText = clean(r.innerText).toUpperCase();
-            if (rowText.includes('VESPERTINO')) isVespTable = true;
-            const cells = Array.from(r.querySelectorAll('td, th')).map(c => clean(c.innerText));
-            if (cells.length >= 3 && !cells[1].toUpperCase().includes('NOMBRE') && !cells[0].toUpperCase().includes('CAMA')) {
-              const p = parseImportRow(cells, currentDay, isVespTable);
-              if (p) imported.push(p);
-            }
-          });
-        });
-      } else {
-        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-        let isVespLine = false;
-        lines.forEach(line => {
-          const upper = line.toUpperCase();
-          if (upper.includes('VESPERTINO')) isVespLine = true;
-          let cells = line.split('\t').map(c => clean(c));
-          if (cells.length < 3) cells = line.split('|').map(c => clean(c)).filter(c => c.length > 0);
-          if (cells.length >= 3 && !cells[1].toUpperCase().includes('NOMBRE') && !cells[0].toUpperCase().includes('CAMA')) {
-            const p = parseImportRow(cells, currentDay, isVespLine);
-            if (p) imported.push(p);
-          }
-        });
-      }
-
-      if (imported.length === 0) {
-        alert("No se detectaron filas válidas. Copia directamente la tabla de Google Docs (Ctrl+C) y pégala aquí (Ctrl+V).");
-        return;
-      }
-
-      for (const p of imported) {
-        const existingIdx = currentPatients.findIndex(item => item.id === p.id);
-        if (existingIdx !== -1) {
-          if (!p.lastAnnotation || p.lastAnnotation === 'Ninguna') {
-            p.lastAnnotation = currentPatients[existingIdx].lastAnnotation || 'Ninguna';
-          }
-          currentPatients[existingIdx] = Object.assign(currentPatients[existingIdx], p);
-        } else {
-          currentPatients.push(p);
-        }
-
-        if (window.db) {
-          try {
-            const pRef = window.fsDoc(window.db, "pacientes", p.id);
-            const existingSnap = await window.fsGetDoc(pRef);
-            if (existingSnap.exists()) {
-              const data = existingSnap.data();
-              const diasArr = data.dias || [];
-              if (!diasArr.includes(currentDay)) diasArr.push(currentDay);
-              await window.fsUpdateDoc(pRef, {
-                dias: diasArr,
-                maquina: p.maquina || data.maquina || '1',
-                ps: p.ps || data.ps || '60',
-                filtro: p.filtro || data.filtro || '400',
-                lastAnnotation: (p.lastAnnotation && p.lastAnnotation !== 'Ninguna') ? p.lastAnnotation : (data.lastAnnotation || 'Ninguna')
-              });
-            } else {
-              await window.fsSetDoc(pRef, p);
-            }
-          } catch (e) {
-            console.error("Error guardando en Firestore paciente importado:", e);
-          }
-        }
-      }
-
-      closeImportModal();
-      renderCards();
-      showToast(`¡Se incorporaron ${imported.length} pacientes al censo del ${currentDay}!`);
-    } catch (err) {
-      console.error("Error en processImportedCensus:", err);
-      alert("Ocurrió un error al procesar la tabla: " + err.message);
-    }
-  }
-
-  function parseImportRow(cells, currentDay, isVespertino = false) {
-    if (!cells || cells.length < 2) return null;
-    const rawName = cells[1] || '';
-    if (!rawName || rawName.length < 3 || rawName.toUpperCase().includes('NOMBRE')) return null;
-
-    const cleanId = rawName.toLowerCase().replace(/[^a-z0-9]/g, '_');
-    const maq = cells[0] || '1';
-    const ps = cells[3] ? cells[3].replace(/kg/i, '').trim() : '60';
-    const pp = cells[4] || '';
-    const qs = cells[5] || '310';
-    const uf = cells[6] ? formatUF(cells[6]) : '';
-    const qd = cells[7] || '600';
-    const na = cells[8] || '138';
-    const bic = cells[9] || '3.0';
-    const temp = cells[10] || '36.0';
-    const filtro = cells[11] || '400';
-    
-    const tafc1 = parseTaFc(cells[12] || '');
-    const tafc2 = parseTaFc(cells[13] || '');
-    const obs = cells[14] || cells[cells.length - 1] || 'Ninguna';
-
-    let turnoCode = isVespertino ? "VESPERTINO_1" : "MATUTINO_1";
-
-    return {
-      id: cleanId,
-      nombre: rawName.toUpperCase(),
-      maquina: maq,
-      turno: turnoCode,
-      dias: [currentDay],
-      ps: ps,
-      pp: pp,
-      qs: qs,
-      qd: qd,
-      uf: uf,
-      na: na,
-      bic: bic,
-      temp: temp,
-      filtro: filtro,
-      ta_in: tafc1.ta,
-      fc_in: tafc1.fc,
-      ta_out: tafc2.ta,
-      fc_out: tafc2.fc,
-      lastAnnotation: obs && obs !== '-' ? obs : 'Ninguna',
-      vigilanciaAcceso: false,
-      noAcudio: false
-    };
   }
 
   async function addPatientPrompt() {
