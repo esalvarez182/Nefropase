@@ -944,10 +944,13 @@
   
   
   // ADVANCED SHIFT & TURN DETECTION
-  function checkShiftHeader(text) {
+  function checkShiftHeaderOnly(text) {
     if (!text) return null;
     const t = clean(text).toUpperCase();
     
+    // Ignore if this text looks like a patient row or contains blood pressures / numbers
+    if (/\d{2,3}\/\d{2,3}/.test(t)) return null;
+
     // Check Vespertino main header
     if (t.includes('VESPERTINO') && !t.includes('MATUTINO')) {
       if (t.includes('SEGUNDO') || t.includes('2DO') || t.includes('2°')) {
@@ -983,53 +986,57 @@
     let isVespertino = false;
     let subTurno = 1;
 
-    // First: collect all elements in sequential order, ignoring containers that wrap other blocks
-    // In Google Docs, elements are p, h1, h2, h3, or tr
+    // Collect all elements sequentially
     const allRowsAndParas = Array.from(box.querySelectorAll('p, h1, h2, h3, h4, tr'));
     
-    // If empty, fall back to plain text
     if (allRowsAndParas.length === 0) {
       extracted = parsePlainTextWithTurno(box.innerText || box.textContent, currentDay);
     } else {
       let currentHeaders = [];
       let colMap = {
-        cama: -1, nombre: -1, ps: -1, pp: -1, qs: -1, uf: -1, qd: -1, na: -1, bic: -1, t: -1, filtro: -1,
+        cama: -1, nombre: -1, ur: -1, ps: -1, pp: -1, qs: -1, uf: -1, qd: -1, na: -1, bic: -1, t: -1, filtro: -1,
         tafc_in: -1, tafc_out: -1, anotaciones: -1
       };
 
       for (let i = 0; i < allRowsAndParas.length; i++) {
         const el = allRowsAndParas[i];
         
-        // If element is inside a table, only process <tr>, skip <p> inside <td>
+        // Skip <p> inside <td>
         if (el.tagName === 'P' && el.closest('tr')) continue;
 
         const txt = clean(el.innerText).toUpperCase();
         if (!txt) continue;
 
-        // Check if this element triggers a shift/subturno change
-        const detected = checkShiftHeader(txt);
-        if (detected) {
-          if (detected.isVesp !== undefined) isVespertino = detected.isVesp;
-          if (detected.sub !== undefined) subTurno = detected.sub;
-          continue; // It's a header line, not a patient row
+        // Check if row has column headers (CAMA, NOMBRE, etc.)
+        const isHeaderRow = (txt.includes('NOMBRE') && (txt.includes('CAMA') || txt.includes('PS') || txt.includes('PP')));
+
+        // If the header row itself says "PRIMER TURNO" or "SEGUNDO TURNO" or "VESPERTINO", extract shift FIRST!
+        const shiftDetected = checkShiftHeaderOnly(txt);
+        if (shiftDetected) {
+          if (shiftDetected.isVesp !== undefined) isVespertino = shiftDetected.isVesp;
+          if (shiftDetected.sub !== undefined) subTurno = shiftDetected.sub;
+          
+          // If it was JUST a section divider title without column headers, move to next line
+          if (!isHeaderRow) continue;
         }
 
-        // Only process patient data if it's a <tr>
+        // Only process patient or header data if it's a <tr>
         if (el.tagName === 'TR') {
           const cells = Array.from(el.querySelectorAll('th, td')).map(c => clean(c.innerText));
           const cellsUpper = cells.map(c => c.toUpperCase());
 
-          // Check if this row is a column header (CAMA, NOMBRE, etc.)
+          // Check if this row is a column header definition
           if (cellsUpper.some(c => c.includes('CAMA') || c.includes('NOMBRE') || c.includes('PS') || c.includes('PP'))) {
             currentHeaders = cellsUpper;
             colMap = {
-              cama: -1, nombre: -1, ps: -1, pp: -1, qs: -1, uf: -1, qd: -1, na: -1, bic: -1, t: -1, filtro: -1,
+              cama: -1, nombre: -1, ur: -1, ps: -1, pp: -1, qs: -1, uf: -1, qd: -1, na: -1, bic: -1, t: -1, filtro: -1,
               tafc_in: -1, tafc_out: -1, anotaciones: -1
             };
             let tafcList = [];
             currentHeaders.forEach((h, idx) => {
               if (h.includes('CAMA')) colMap.cama = idx;
               else if (h.includes('NOMBRE')) colMap.nombre = idx;
+              else if (h === 'UR' || h.includes('URESIS')) colMap.ur = idx;
               else if (h === 'PS' || h.includes('PESO S')) colMap.ps = idx;
               else if (h === 'PP' || h.includes('PESO P') || h.includes('PESO A')) colMap.pp = idx;
               else if (h === 'QS' || h.includes('FS') || h.includes('OS')) colMap.qs = idx;
@@ -1037,7 +1044,7 @@
               else if (h === 'QD' || h.includes('FD') || h.includes('OD')) colMap.qd = idx;
               else if (h === 'NA' || h.includes('SODIO')) colMap.na = idx;
               else if (h === 'BIC' || h.includes('HCO3')) colMap.bic = idx;
-              else if (h === 'T' || h.includes('TEMP')) colMap.t = idx;
+              else if (h === 'T' || h.includes('TEMP') || h.includes('T°')) colMap.t = idx;
               else if (h.includes('FILTRO')) colMap.filtro = idx;
               else if (h.includes('TA') || h.includes('FC')) tafcList.push(idx);
               else if (h.includes('ANOTACION') || h.includes('OBSERVACION')) colMap.anotaciones = idx;
@@ -1048,7 +1055,8 @@
             continue;
           }
 
-          if (cells.length < 3) continue;
+          // Relaxed validation: Allow patient even if row only has name and cama
+          if (cells.length < 2) continue;
 
           const currentTurnoCode = isVespertino 
             ? (subTurno === 2 ? 'VESPERTINO_2' : 'VESPERTINO_1')
