@@ -859,27 +859,64 @@
   function savePatientManual(id) { savePatientData(id, false); }
 
   // ROBUST PARSER (Adapted directly from v11 dynamic column mapping)
+  
+  // ADVANCED SHIFT DETECTION STATE MACHINE
+  function detectTurnoFromText(txt, currentIsVesp, currentSubTurno) {
+    let isVesp = currentIsVesp;
+    let sub = currentSubTurno;
+    const cleanTxt = clean(txt).toUpperCase();
+
+    if (cleanTxt.includes('VESPERTINO')) {
+      isVesp = true;
+      sub = 1; // default to 1st shift of vespertino
+    } else if (cleanTxt.includes('MATUTINO')) {
+      isVesp = false;
+      sub = 1;
+    }
+
+    if (cleanTxt.includes('SEGUNDO TURNO') || cleanTxt.includes('2DO TURNO') || cleanTxt.includes('2° TURNO') || cleanTxt.includes('2DO. TURNO')) {
+      sub = 2;
+    } else if (cleanTxt.includes('PRIMER TURNO') || cleanTxt.includes('1ER TURNO') || cleanTxt.includes('1° TURNO') || cleanTxt.includes('1ER. TURNO')) {
+      sub = 1;
+    }
+
+    const turnoCode = isVesp 
+      ? (sub === 2 ? 'VESPERTINO_2' : 'VESPERTINO_1')
+      : (sub === 2 ? 'MATUTINO_2' : 'MATUTINO_1');
+
+    return { isVesp, sub, turnoCode };
+  }
+
   async function processDirectPaste() {
     const box = document.getElementById('pasteBox');
     const currentDay = document.getElementById('daySelect').value;
     let extracted = [];
 
     let isVespertino = false;
+    let subTurno = 1;
+
+    // Check if there are tables
     const tables = box.querySelectorAll('table');
-
     if (tables.length > 0) {
-      const allElements = box.querySelectorAll('h1, h2, h3, p, div, table, tr');
-      allElements.forEach(el => {
-        let txt = clean(el.innerText).toUpperCase();
-        if (txt.includes('VESPERTINO')) isVespertino = true;
-        else if (txt.includes('MATUTINO')) isVespertino = false;
-      });
-
-      tables.forEach(t => {
-        const pts = parseHtmlTableWithTurno(t, isVespertino, currentDay);
-        extracted = extracted.concat(pts);
+      // Traverse all top-level child elements or rows to maintain sequential order
+      const childElements = Array.from(box.querySelectorAll('h1, h2, h3, h4, p, div, table'));
+      
+      childElements.forEach(el => {
+        // If it's a heading or paragraph outside table, check for shift changes
+        if (el.tagName !== 'TABLE' && !el.closest('table')) {
+          const shiftState = detectTurnoFromText(el.innerText, isVespertino, subTurno);
+          isVespertino = shiftState.isVesp;
+          subTurno = shiftState.sub;
+        } else if (el.tagName === 'TABLE') {
+          // Parse this table with the current shift state
+          const pts = parseHtmlTableWithTurno(el, isVespertino, subTurno, currentDay);
+          extracted = extracted.concat(pts.patients);
+          isVespertino = pts.isVesp;
+          subTurno = pts.sub;
+        }
       });
     } else {
+      // Plain text parsing
       extracted = parsePlainTextWithTurno(box.innerText || box.textContent, currentDay);
     }
 
@@ -895,6 +932,7 @@
         if (!p.lastAnnotation || p.lastAnnotation === 'Ninguna') {
           p.lastAnnotation = currentPatients[existingIdx].lastAnnotation || 'Ninguna';
         }
+        // Update turno, maquina, and vitals
         currentPatients[existingIdx] = Object.assign(currentPatients[existingIdx], p);
       } else {
         currentPatients.push(p);
@@ -911,6 +949,7 @@
             await window.fsUpdateDoc(pRef, {
               dias: diasArr,
               maquina: p.maquina || data.maquina || '1',
+              turno: p.turno,
               ps: p.ps || data.ps || '60',
               filtro: p.filtro || data.filtro || '400',
               lastAnnotation: (p.lastAnnotation && p.lastAnnotation !== 'Ninguna') ? p.lastAnnotation : (data.lastAnnotation || 'Ninguna')
@@ -926,97 +965,106 @@
 
     clearPasteBox();
     renderCards();
-    showToast(`¡Se procesaron e incorporaron ${extracted.length} pacientes a ${currentDay}!`);
+    showToast(`¡Se procesaron e incorporaron ${extracted.length} pacientes clasificados en sus 4 turnos!`);
   }
 
-  function parseHtmlTableWithTurno(table, globalIsVesp, currentDay) {
+  function parseHtmlTableWithTurno(table, currentIsVesp, currentSubTurno, currentDay) {
     const rows = Array.from(table.querySelectorAll('tr'));
-    if (rows.length === 0) return [];
+    if (rows.length === 0) return { patients: [], isVesp: currentIsVesp, sub: currentSubTurno };
 
+    let isVesp = currentIsVesp;
+    let sub = currentSubTurno;
     let headers = [];
-    let hIdx = -1;
-    let localIsVesp = globalIsVesp;
-    let results = [];
-
-    for (let i = 0; i < rows.length; i++) {
-      const rowTxt = clean(rows[i].innerText).toUpperCase();
-      if (rowTxt.includes('VESPERTINO')) localIsVesp = true;
-      else if (rowTxt.includes('MATUTINO')) localIsVesp = false;
-
-      const cells = Array.from(rows[i].querySelectorAll('th, td')).map(c => clean(c.innerText).toUpperCase());
-      if (cells.some(c => c.includes('CAMA') || c.includes('NOMBRE') || c.includes('PS') || c.includes('PP'))) {
-        headers = cells;
-        hIdx = i;
-        break;
-      }
-    }
-
     let colMap = {
       cama: -1, nombre: -1, ps: -1, pp: -1, qs: -1, uf: -1, qd: -1, na: -1, bic: -1, t: -1, filtro: -1,
       tafc_in: -1, tafc_out: -1, anotaciones: -1
     };
+    let patients = [];
 
-    if (hIdx !== -1) {
-      let tafcList = [];
-      headers.forEach((h, idx) => {
-        if (h.includes('CAMA')) colMap.cama = idx;
-        else if (h.includes('NOMBRE')) colMap.nombre = idx;
-        else if (h === 'PS' || h.includes('PESO S')) colMap.ps = idx;
-        else if (h === 'PP' || h.includes('PESO P') || h.includes('PESO A')) colMap.pp = idx;
-        else if (h === 'QS' || h.includes('FS') || h.includes('OS')) colMap.qs = idx;
-        else if (h === 'UF' || h.includes('ULTRA')) colMap.uf = idx;
-        else if (h === 'QD' || h.includes('FD') || h.includes('OD')) colMap.qd = idx;
-        else if (h === 'NA' || h.includes('SODIO')) colMap.na = idx;
-        else if (h === 'BIC' || h.includes('HCO3')) colMap.bic = idx;
-        else if (h === 'T' || h.includes('TEMP')) colMap.t = idx;
-        else if (h.includes('FILTRO')) colMap.filtro = idx;
-        else if (h.includes('TA') || h.includes('FC')) tafcList.push(idx);
-        else if (h.includes('ANOTACION') || h.includes('OBSERVACION')) colMap.anotaciones = idx;
-      });
-
-      if (tafcList.length >= 1) colMap.tafc_in = tafcList[0];
-      if (tafcList.length >= 2) colMap.tafc_out = tafcList[1];
-      if (colMap.anotaciones === -1 && headers.length > 0) colMap.anotaciones = headers.length - 1;
-    }
-
-    const start = hIdx !== -1 ? hIdx + 1 : 0;
-    for (let r = start; r < rows.length; r++) {
+    for (let r = 0; r < rows.length; r++) {
       const rowTxt = clean(rows[r].innerText).toUpperCase();
-      if (rowTxt.includes('VESPERTINO')) { localIsVesp = true; continue; }
-      if (rowTxt.includes('MATUTINO')) { localIsVesp = false; continue; }
+      
+      // Check if this row is a shift header
+      const shiftState = detectTurnoFromText(rowTxt, isVesp, sub);
+      isVesp = shiftState.isVesp;
+      sub = shiftState.sub;
 
-      const cells = Array.from(rows[r].querySelectorAll('td, th')).map(c => clean(c.innerText));
+      const cells = Array.from(rows[r].querySelectorAll('th, td')).map(c => clean(c.innerText));
+      const cellsUpper = cells.map(c => c.toUpperCase());
+
+      // Check if this row is a column header definition
+      if (cellsUpper.some(c => c.includes('CAMA') || c.includes('NOMBRE') || c.includes('PS') || c.includes('PP'))) {
+        headers = cellsUpper;
+        colMap = {
+          cama: -1, nombre: -1, ps: -1, pp: -1, qs: -1, uf: -1, qd: -1, na: -1, bic: -1, t: -1, filtro: -1,
+          tafc_in: -1, tafc_out: -1, anotaciones: -1
+        };
+        let tafcList = [];
+        headers.forEach((h, idx) => {
+          if (h.includes('CAMA')) colMap.cama = idx;
+          else if (h.includes('NOMBRE')) colMap.nombre = idx;
+          else if (h === 'PS' || h.includes('PESO S')) colMap.ps = idx;
+          else if (h === 'PP' || h.includes('PESO P') || h.includes('PESO A')) colMap.pp = idx;
+          else if (h === 'QS' || h.includes('FS') || h.includes('OS')) colMap.qs = idx;
+          else if (h === 'UF' || h.includes('ULTRA')) colMap.uf = idx;
+          else if (h === 'QD' || h.includes('FD') || h.includes('OD')) colMap.qd = idx;
+          else if (h === 'NA' || h.includes('SODIO')) colMap.na = idx;
+          else if (h === 'BIC' || h.includes('HCO3')) colMap.bic = idx;
+          else if (h === 'T' || h.includes('TEMP')) colMap.t = idx;
+          else if (h.includes('FILTRO')) colMap.filtro = idx;
+          else if (h.includes('TA') || h.includes('FC')) tafcList.push(idx);
+          else if (h.includes('ANOTACION') || h.includes('OBSERVACION')) colMap.anotaciones = idx;
+        });
+        if (tafcList.length >= 1) colMap.tafc_in = tafcList[0];
+        if (tafcList.length >= 2) colMap.tafc_out = tafcList[1];
+        if (colMap.anotaciones === -1 && headers.length > 0) colMap.anotaciones = headers.length - 1;
+        continue;
+      }
+
       if (cells.length < 3) continue;
 
-      let p = extractPatientFromRow(cells, colMap, localIsVesp, currentDay);
+      const currentTurnoCode = isVesp 
+        ? (sub === 2 ? 'VESPERTINO_2' : 'VESPERTINO_1')
+        : (sub === 2 ? 'MATUTINO_2' : 'MATUTINO_1');
+
+      let p = extractPatientFromRow(cells, colMap, currentTurnoCode, currentDay);
       if (p && p.nombre && p.nombre.length > 2 && !p.nombre.toUpperCase().includes('NOMBRE')) {
-        results.push(p);
+        patients.push(p);
       }
     }
-    return results;
+
+    return { patients, isVesp, sub };
   }
 
   function parsePlainTextWithTurno(text, currentDay) {
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     let isVesp = false;
+    let sub = 1;
     let results = [];
+
     lines.forEach(line => {
-      let upper = line.toUpperCase();
-      if (upper.includes('VESPERTINO')) { isVesp = true; return; }
-      if (upper.includes('MATUTINO')) { isVesp = false; return; }
+      const shiftState = detectTurnoFromText(line, isVesp, sub);
+      isVesp = shiftState.isVesp;
+      sub = shiftState.sub;
+
       let cells = line.split('\t').map(c => clean(c));
       if (cells.length < 4) cells = line.split('|').map(c => clean(c)).filter(c => c.length > 0);
       if (cells.length >= 4) {
-        let p = extractPatientFromRow(cells, null, isVesp, currentDay);
+        const currentTurnoCode = isVesp 
+          ? (sub === 2 ? 'VESPERTINO_2' : 'VESPERTINO_1')
+          : (sub === 2 ? 'MATUTINO_2' : 'MATUTINO_1');
+
+        let p = extractPatientFromRow(cells, null, currentTurnoCode, currentDay);
         if (p && p.nombre && !p.nombre.toUpperCase().includes('NOMBRE')) {
           results.push(p);
         }
       }
     });
+
     return results;
   }
 
-  function extractPatientFromRow(cells, colMap, isVespertino, currentDay) {
+  function extractPatientFromRow(cells, colMap, currentTurnoCode, currentDay) {
     let rawNote = '';
     if (colMap && colMap.anotaciones !== -1 && cells[colMap.anotaciones]) {
       rawNote = cells[colMap.anotaciones];
@@ -1024,8 +1072,6 @@
       rawNote = cells[cells.length - 1];
     }
     let obsText = (rawNote && rawNote !== '-' && rawNote.trim() !== '') ? rawNote.trim() : 'Ninguna';
-
-    let turnoCode = isVespertino ? "VESPERTINO_1" : "MATUTINO_1";
 
     if (colMap && colMap.nombre !== -1) {
       let rawName = cells[colMap.nombre] || '';
@@ -1036,7 +1082,7 @@
         id: rawName.toLowerCase().replace(/[^a-z0-9]/g, '_'),
         nombre: rawName.toUpperCase(),
         maquina: cells[colMap.cama] || '1',
-        turno: turnoCode,
+        turno: currentTurnoCode,
         dias: [currentDay],
         ps: cells[colMap.ps] ? cells[colMap.ps].replace(/kg/i, '').trim() : '60',
         pp: cells[colMap.pp] || '',
@@ -1065,7 +1111,7 @@
       id: rawName.toLowerCase().replace(/[^a-z0-9]/g, '_'),
       nombre: rawName.toUpperCase(),
       maquina: cells[0] || '1',
-      turno: turnoCode,
+      turno: currentTurnoCode,
       dias: [currentDay],
       ps: cells[3] ? cells[3].replace(/kg/i, '').trim() : '60',
       pp: cells[4] || '',
