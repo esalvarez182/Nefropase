@@ -726,7 +726,15 @@
               ${p.nombre}
               ${p.noAcudio ? '<span class="badge-no-acudio">NO ACUDIÓ</span>' : ''}${p.vigilanciaAcceso ? '<span class="badge-vigilancia">⚠️ VIGILANCIA ACCESO</span>' : ''}
             </div>
-            <div class="card-sub">${shiftTag} &bull; PS: <strong>${p.ps || '-'} kg</strong> &bull; Filtro: <strong>${p.filtro || '400'}</strong></div>
+            <div class="card-sub" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 3px;">
+              <select style="font-size: 11px; padding: 2px 6px; border-radius: 4px; border: 1px solid #cbd5e1; font-weight: 700; background: #eff6ff; color: #1e40af; outline: none;" onchange="changePatientTurno('${p.id}', this.value)">
+                <option value="MATUTINO_1" ${p.turno === 'MATUTINO_1' ? 'selected' : ''}>1er Turno (Mat)</option>
+                <option value="MATUTINO_2" ${p.turno === 'MATUTINO_2' ? 'selected' : ''}>2do Turno (Mat)</option>
+                <option value="VESPERTINO_1" ${p.turno === 'VESPERTINO_1' ? 'selected' : ''}>Vesp. 1</option>
+                <option value="VESPERTINO_2" ${p.turno === 'VESPERTINO_2' ? 'selected' : ''}>Vesp. 2</option>
+              </select>
+              <span>&bull; PS: <strong>${p.ps || '-'} kg</strong> &bull; Filtro: <strong>${p.filtro || '400'}</strong></span>
+            </div>
           </div>
           <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
             <label style="font-size: 10px; font-weight: 700; color: #1e40af; text-transform: uppercase;">Cama / Máq:</label>
@@ -860,31 +868,37 @@
 
   // ROBUST PARSER (Adapted directly from v11 dynamic column mapping)
   
-  // ADVANCED SHIFT DETECTION STATE MACHINE
-  function detectTurnoFromText(txt, currentIsVesp, currentSubTurno) {
-    let isVesp = currentIsVesp;
-    let sub = currentSubTurno;
-    const cleanTxt = clean(txt).toUpperCase();
-
-    if (cleanTxt.includes('VESPERTINO')) {
-      isVesp = true;
-      sub = 1; // default to 1st shift of vespertino
-    } else if (cleanTxt.includes('MATUTINO')) {
-      isVesp = false;
-      sub = 1;
+  
+  // ADVANCED SHIFT & TURN DETECTION
+  function checkShiftHeader(text) {
+    if (!text) return null;
+    const t = clean(text).toUpperCase();
+    
+    // Check Vespertino main header
+    if (t.includes('VESPERTINO') && !t.includes('MATUTINO')) {
+      if (t.includes('SEGUNDO') || t.includes('2DO') || t.includes('2°')) {
+        return { isVesp: true, sub: 2, code: 'VESPERTINO_2' };
+      }
+      return { isVesp: true, sub: 1, code: 'VESPERTINO_1' };
     }
 
-    if (cleanTxt.includes('SEGUNDO TURNO') || cleanTxt.includes('2DO TURNO') || cleanTxt.includes('2° TURNO') || cleanTxt.includes('2DO. TURNO')) {
-      sub = 2;
-    } else if (cleanTxt.includes('PRIMER TURNO') || cleanTxt.includes('1ER TURNO') || cleanTxt.includes('1° TURNO') || cleanTxt.includes('1ER. TURNO')) {
-      sub = 1;
+    // Check Matutino main header
+    if (t.includes('MATUTINO')) {
+      if (t.includes('SEGUNDO') || t.includes('2DO') || t.includes('2°')) {
+        return { isVesp: false, sub: 2, code: 'MATUTINO_2' };
+      }
+      return { isVesp: false, sub: 1, code: 'MATUTINO_1' };
     }
 
-    const turnoCode = isVesp 
-      ? (sub === 2 ? 'VESPERTINO_2' : 'VESPERTINO_1')
-      : (sub === 2 ? 'MATUTINO_2' : 'MATUTINO_1');
+    // Sub-headers without specifying matutino/vespertino
+    if (t.includes('SEGUNDO TURNO') || t.includes('2DO TURNO') || t.includes('2° TURNO') || t.includes('2DO. TURNO')) {
+      return { sub: 2 };
+    }
+    if (t.includes('PRIMER TURNO') || t.includes('1ER TURNO') || t.includes('1° TURNO') || t.includes('1ER. TURNO')) {
+      return { sub: 1 };
+    }
 
-    return { isVesp, sub, turnoCode };
+    return null;
   }
 
   async function processDirectPaste() {
@@ -895,33 +909,87 @@
     let isVespertino = false;
     let subTurno = 1;
 
-    // Check if there are tables
-    const tables = box.querySelectorAll('table');
-    if (tables.length > 0) {
-      // Traverse all top-level child elements or rows to maintain sequential order
-      const childElements = Array.from(box.querySelectorAll('h1, h2, h3, h4, p, div, table'));
-      
-      childElements.forEach(el => {
-        // If it's a heading or paragraph outside table, check for shift changes
-        if (el.tagName !== 'TABLE' && !el.closest('table')) {
-          const shiftState = detectTurnoFromText(el.innerText, isVespertino, subTurno);
-          isVespertino = shiftState.isVesp;
-          subTurno = shiftState.sub;
-        } else if (el.tagName === 'TABLE') {
-          // Parse this table with the current shift state
-          const pts = parseHtmlTableWithTurno(el, isVespertino, subTurno, currentDay);
-          extracted = extracted.concat(pts.patients);
-          isVespertino = pts.isVesp;
-          subTurno = pts.sub;
-        }
-      });
-    } else {
-      // Plain text parsing
+    // First: collect all elements in sequential order, ignoring containers that wrap other blocks
+    // In Google Docs, elements are p, h1, h2, h3, or tr
+    const allRowsAndParas = Array.from(box.querySelectorAll('p, h1, h2, h3, h4, tr'));
+    
+    // If empty, fall back to plain text
+    if (allRowsAndParas.length === 0) {
       extracted = parsePlainTextWithTurno(box.innerText || box.textContent, currentDay);
+    } else {
+      let currentHeaders = [];
+      let colMap = {
+        cama: -1, nombre: -1, ps: -1, pp: -1, qs: -1, uf: -1, qd: -1, na: -1, bic: -1, t: -1, filtro: -1,
+        tafc_in: -1, tafc_out: -1, anotaciones: -1
+      };
+
+      for (let i = 0; i < allRowsAndParas.length; i++) {
+        const el = allRowsAndParas[i];
+        
+        // If element is inside a table, only process <tr>, skip <p> inside <td>
+        if (el.tagName === 'P' && el.closest('tr')) continue;
+
+        const txt = clean(el.innerText).toUpperCase();
+        if (!txt) continue;
+
+        // Check if this element triggers a shift/subturno change
+        const detected = checkShiftHeader(txt);
+        if (detected) {
+          if (detected.isVesp !== undefined) isVespertino = detected.isVesp;
+          if (detected.sub !== undefined) subTurno = detected.sub;
+          continue; // It's a header line, not a patient row
+        }
+
+        // Only process patient data if it's a <tr>
+        if (el.tagName === 'TR') {
+          const cells = Array.from(el.querySelectorAll('th, td')).map(c => clean(c.innerText));
+          const cellsUpper = cells.map(c => c.toUpperCase());
+
+          // Check if this row is a column header (CAMA, NOMBRE, etc.)
+          if (cellsUpper.some(c => c.includes('CAMA') || c.includes('NOMBRE') || c.includes('PS') || c.includes('PP'))) {
+            currentHeaders = cellsUpper;
+            colMap = {
+              cama: -1, nombre: -1, ps: -1, pp: -1, qs: -1, uf: -1, qd: -1, na: -1, bic: -1, t: -1, filtro: -1,
+              tafc_in: -1, tafc_out: -1, anotaciones: -1
+            };
+            let tafcList = [];
+            currentHeaders.forEach((h, idx) => {
+              if (h.includes('CAMA')) colMap.cama = idx;
+              else if (h.includes('NOMBRE')) colMap.nombre = idx;
+              else if (h === 'PS' || h.includes('PESO S')) colMap.ps = idx;
+              else if (h === 'PP' || h.includes('PESO P') || h.includes('PESO A')) colMap.pp = idx;
+              else if (h === 'QS' || h.includes('FS') || h.includes('OS')) colMap.qs = idx;
+              else if (h === 'UF' || h.includes('ULTRA')) colMap.uf = idx;
+              else if (h === 'QD' || h.includes('FD') || h.includes('OD')) colMap.qd = idx;
+              else if (h === 'NA' || h.includes('SODIO')) colMap.na = idx;
+              else if (h === 'BIC' || h.includes('HCO3')) colMap.bic = idx;
+              else if (h === 'T' || h.includes('TEMP')) colMap.t = idx;
+              else if (h.includes('FILTRO')) colMap.filtro = idx;
+              else if (h.includes('TA') || h.includes('FC')) tafcList.push(idx);
+              else if (h.includes('ANOTACION') || h.includes('OBSERVACION')) colMap.anotaciones = idx;
+            });
+            if (tafcList.length >= 1) colMap.tafc_in = tafcList[0];
+            if (tafcList.length >= 2) colMap.tafc_out = tafcList[1];
+            if (colMap.anotaciones === -1 && currentHeaders.length > 0) colMap.anotaciones = currentHeaders.length - 1;
+            continue;
+          }
+
+          if (cells.length < 3) continue;
+
+          const currentTurnoCode = isVespertino 
+            ? (subTurno === 2 ? 'VESPERTINO_2' : 'VESPERTINO_1')
+            : (subTurno === 2 ? 'MATUTINO_2' : 'MATUTINO_1');
+
+          let p = extractPatientFromRow(cells, colMap, currentTurnoCode, currentDay);
+          if (p && p.nombre && p.nombre.length > 2 && !p.nombre.toUpperCase().includes('NOMBRE') && !p.nombre.toUpperCase().includes('TURNO')) {
+            extracted.push(p);
+          }
+        }
+      }
     }
 
     if (extracted.length === 0) {
-      alert("No se detectaron pacientes en el texto pegado. Copia directamente las filas de la tabla con Ctrl+C y pégalas aquí con Ctrl+V.");
+      alert("No se detectaron pacientes. Copia directamente las filas de la tabla con Ctrl+C y pégalas aquí con Ctrl+V.");
       return;
     }
 
@@ -932,7 +1000,6 @@
         if (!p.lastAnnotation || p.lastAnnotation === 'Ninguna') {
           p.lastAnnotation = currentPatients[existingIdx].lastAnnotation || 'Ninguna';
         }
-        // Update turno, maquina, and vitals
         currentPatients[existingIdx] = Object.assign(currentPatients[existingIdx], p);
       } else {
         currentPatients.push(p);
@@ -965,75 +1032,25 @@
 
     clearPasteBox();
     renderCards();
-    showToast(`¡Se procesaron e incorporaron ${extracted.length} pacientes clasificados en sus 4 turnos!`);
+    showToast(`¡Se procesaron ${extracted.length} pacientes clasificados correctamente en sus 4 turnos!`);
   }
 
-  function parseHtmlTableWithTurno(table, currentIsVesp, currentSubTurno, currentDay) {
-    const rows = Array.from(table.querySelectorAll('tr'));
-    if (rows.length === 0) return { patients: [], isVesp: currentIsVesp, sub: currentSubTurno };
+  // Quick Turno Change handler
+  async function changePatientTurno(id, newTurno) {
+    const p = currentPatients.find(item => item.id === id);
+    if (!p) return;
+    p.turno = newTurno;
 
-    let isVesp = currentIsVesp;
-    let sub = currentSubTurno;
-    let headers = [];
-    let colMap = {
-      cama: -1, nombre: -1, ps: -1, pp: -1, qs: -1, uf: -1, qd: -1, na: -1, bic: -1, t: -1, filtro: -1,
-      tafc_in: -1, tafc_out: -1, anotaciones: -1
-    };
-    let patients = [];
-
-    for (let r = 0; r < rows.length; r++) {
-      const rowTxt = clean(rows[r].innerText).toUpperCase();
-      
-      // Check if this row is a shift header
-      const shiftState = detectTurnoFromText(rowTxt, isVesp, sub);
-      isVesp = shiftState.isVesp;
-      sub = shiftState.sub;
-
-      const cells = Array.from(rows[r].querySelectorAll('th, td')).map(c => clean(c.innerText));
-      const cellsUpper = cells.map(c => c.toUpperCase());
-
-      // Check if this row is a column header definition
-      if (cellsUpper.some(c => c.includes('CAMA') || c.includes('NOMBRE') || c.includes('PS') || c.includes('PP'))) {
-        headers = cellsUpper;
-        colMap = {
-          cama: -1, nombre: -1, ps: -1, pp: -1, qs: -1, uf: -1, qd: -1, na: -1, bic: -1, t: -1, filtro: -1,
-          tafc_in: -1, tafc_out: -1, anotaciones: -1
-        };
-        let tafcList = [];
-        headers.forEach((h, idx) => {
-          if (h.includes('CAMA')) colMap.cama = idx;
-          else if (h.includes('NOMBRE')) colMap.nombre = idx;
-          else if (h === 'PS' || h.includes('PESO S')) colMap.ps = idx;
-          else if (h === 'PP' || h.includes('PESO P') || h.includes('PESO A')) colMap.pp = idx;
-          else if (h === 'QS' || h.includes('FS') || h.includes('OS')) colMap.qs = idx;
-          else if (h === 'UF' || h.includes('ULTRA')) colMap.uf = idx;
-          else if (h === 'QD' || h.includes('FD') || h.includes('OD')) colMap.qd = idx;
-          else if (h === 'NA' || h.includes('SODIO')) colMap.na = idx;
-          else if (h === 'BIC' || h.includes('HCO3')) colMap.bic = idx;
-          else if (h === 'T' || h.includes('TEMP')) colMap.t = idx;
-          else if (h.includes('FILTRO')) colMap.filtro = idx;
-          else if (h.includes('TA') || h.includes('FC')) tafcList.push(idx);
-          else if (h.includes('ANOTACION') || h.includes('OBSERVACION')) colMap.anotaciones = idx;
-        });
-        if (tafcList.length >= 1) colMap.tafc_in = tafcList[0];
-        if (tafcList.length >= 2) colMap.tafc_out = tafcList[1];
-        if (colMap.anotaciones === -1 && headers.length > 0) colMap.anotaciones = headers.length - 1;
-        continue;
-      }
-
-      if (cells.length < 3) continue;
-
-      const currentTurnoCode = isVesp 
-        ? (sub === 2 ? 'VESPERTINO_2' : 'VESPERTINO_1')
-        : (sub === 2 ? 'MATUTINO_2' : 'MATUTINO_1');
-
-      let p = extractPatientFromRow(cells, colMap, currentTurnoCode, currentDay);
-      if (p && p.nombre && p.nombre.length > 2 && !p.nombre.toUpperCase().includes('NOMBRE')) {
-        patients.push(p);
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", id);
+        await window.fsUpdateDoc(pRef, { turno: newTurno });
+      } catch (err) {
+        console.error("Error al actualizar turno:", err);
       }
     }
-
-    return { patients, isVesp, sub };
+    renderCards();
+    showToast(`Turno de ${p.nombre} cambiado`);
   }
 
   function parsePlainTextWithTurno(text, currentDay) {
