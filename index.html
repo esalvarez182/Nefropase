@@ -383,7 +383,80 @@
     window.fsOnSnapshot = onSnapshot;
 
     window.dispatchEvent(new Event('firebase-ready'));
-  </script>
+  
+  // FUNCIONALIDAD: MOVER CENSO DE DÍA
+  function openMoverDiaModal() {
+    const currentDay = document.getElementById('daySelect').value;
+    if (!currentPatients || currentPatients.length === 0) {
+      alert(`No hay pacientes registrados en el día ${currentDay} para mover.`);
+      return;
+    }
+    document.getElementById('moverDiaOrigenLabel').innerText = `${currentDay} (${currentPatients.length} pacientes)`;
+    
+    // Auto-select a different day in the dropdown
+    const select = document.getElementById('moverDiaDestinoSelect');
+    for (let opt of select.options) {
+      if (opt.value !== currentDay) {
+        select.value = opt.value;
+        break;
+      }
+    }
+
+    document.getElementById('moverDiaModal').style.display = 'flex';
+  }
+
+  function closeMoverDiaModal() {
+    document.getElementById('moverDiaModal').style.display = 'none';
+  }
+
+  async function confirmarMoverDia() {
+    const diaOrigen = document.getElementById('daySelect').value;
+    const diaDestino = document.getElementById('moverDiaDestinoSelect').value;
+
+    if (diaOrigen === diaDestino) {
+      alert("El día destino debe ser diferente al día actual.");
+      return;
+    }
+
+    const total = currentPatients.length;
+    if (total === 0) return;
+
+    showToast(`Moviendo ${total} pacientes a ${diaDestino}...`);
+
+    // Process all patients currently displayed on this day
+    const movingList = [...currentPatients];
+
+    for (const p of movingList) {
+      // 1. Update local dias array
+      let diasArr = Array.isArray(p.dias) ? [...p.dias] : [diaOrigen];
+      diasArr = diasArr.filter(d => d !== diaOrigen);
+      if (!diasArr.includes(diaDestino)) {
+        diasArr.push(diaDestino);
+      }
+      p.dias = diasArr;
+
+      // 2. Persist to Firestore
+      if (window.db) {
+        try {
+          const pRef = window.fsDoc(window.db, "pacientes", p.id);
+          await window.fsUpdateDoc(pRef, { dias: diasArr });
+        } catch (err) {
+          console.error(`Error al reasignar día de ${p.nombre}:`, err);
+        }
+      }
+    }
+
+    closeMoverDiaModal();
+
+    // Switch daySelect to the new day and load its patients
+    document.getElementById('daySelect').value = diaDestino;
+    updatePasteDayLabel();
+    await loadDayPatients();
+
+    showToast(`✓ Se movieron ${total} pacientes de ${diaOrigen} a ${diaDestino}`);
+  }
+
+</script>
 </head>
 <body>
 
@@ -412,6 +485,7 @@
     </div>
     <div style="display: flex; gap: 6px; flex-wrap: wrap;">
       <button class="btn-light" onclick="togglePastePanel()">📋 <span id="pastePanelToggleTxt">Pegar Tabla de Archivo</span></button>
+      <button class="btn-light" onclick="openMoverDiaModal()">🔄 Mover Censo de Día</button>
       <button class="btn-light" onclick="addPatientPrompt()">➕ Agregar Paciente</button>
     </div>
   </div>
@@ -1532,6 +1606,109 @@ MÉDICOS RESPONSABLES: ${medico}`;
     t.classList.add('show');
     setTimeout(() => { t.classList.remove('show'); }, 2600);
   }
-  </script>
+  
+  // FUNCIONALIDAD: MOVER CENSO DE DÍA
+  function openMoverDiaModal() {
+    const currentDay = document.getElementById('daySelect').value;
+    if (!currentPatients || currentPatients.length === 0) {
+      alert(`No hay pacientes registrados en el día ${currentDay} para mover.`);
+      return;
+    }
+    document.getElementById('moverDiaOrigenLabel').innerText = `${currentDay} (${currentPatients.length} pacientes)`;
+    
+    // Auto-select a different day in the dropdown
+    const select = document.getElementById('moverDiaDestinoSelect');
+    for (let opt of select.options) {
+      if (opt.value !== currentDay) {
+        select.value = opt.value;
+        break;
+      }
+    }
+
+    document.getElementById('moverDiaModal').style.display = 'flex';
+  }
+
+  function closeMoverDiaModal() {
+    document.getElementById('moverDiaModal').style.display = 'none';
+  }
+
+  async function confirmarMoverDia() {
+    const diaOrigen = document.getElementById('daySelect').value;
+    const diaDestino = document.getElementById('moverDiaDestinoSelect').value;
+
+    if (diaOrigen === diaDestino) {
+      alert("El día destino debe ser diferente al día actual.");
+      return;
+    }
+
+    const total = currentPatients.length;
+    if (total === 0) return;
+
+    showToast(`Moviendo ${total} pacientes a ${diaDestino}...`);
+
+    // Process all patients currently displayed on this day
+    const movingList = [...currentPatients];
+
+    for (const p of movingList) {
+      // 1. Update local dias array
+      let diasArr = Array.isArray(p.dias) ? [...p.dias] : [diaOrigen];
+      diasArr = diasArr.filter(d => d !== diaOrigen);
+      if (!diasArr.includes(diaDestino)) {
+        diasArr.push(diaDestino);
+      }
+      p.dias = diasArr;
+
+      // 2. Persist to Firestore
+      if (window.db) {
+        try {
+          const pRef = window.fsDoc(window.db, "pacientes", p.id);
+          await window.fsUpdateDoc(pRef, { dias: diasArr });
+        } catch (err) {
+          console.error(`Error al reasignar día de ${p.nombre}:`, err);
+        }
+      }
+    }
+
+    closeMoverDiaModal();
+
+    // Switch daySelect to the new day and load its patients
+    document.getElementById('daySelect').value = diaDestino;
+    updatePasteDayLabel();
+    await loadDayPatients();
+
+    showToast(`✓ Se movieron ${total} pacientes de ${diaOrigen} a ${diaDestino}`);
+  }
+
+</script>
+
+  <!-- Modal Mover Censo de Día -->
+  <div id="moverDiaModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 460px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+        <h3 style="font-size: 16px; color: #1e3a8a;">🔄 Mover Censo de Día</h3>
+        <button onclick="closeMoverDiaModal()" style="background: none; border: none; font-size: 22px; cursor: pointer;">&times;</button>
+      </div>
+      <p style="font-size: 12.5px; color: #334155; margin-bottom: 12px; line-height: 1.4;">
+        ¿Te equivocaste de día al cargar el censo? Esta función reasigna todos los pacientes de 
+        <strong id="moverDiaOrigenLabel" style="color: #b91c1c;"></strong> hacia otro día de la semana.
+      </p>
+      <div style="margin-bottom: 16px;">
+        <label style="font-size: 11.5px; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Selecciona el día destino correcto:</label>
+        <select id="moverDiaDestinoSelect" style="width: 100%; padding: 8px 10px; border: 1.5px solid #93c5fd; border-radius: 6px; font-size: 13.5px; font-weight: 700; color: #1e40af; background: #eff6ff; outline: none;">
+          <option value="LUNES">Lunes</option>
+          <option value="MARTES">Martes</option>
+          <option value="MIERCOLES">Miércoles</option>
+          <option value="JUEVES">Jueves</option>
+          <option value="VIERNES">Viernes</option>
+          <option value="SABADO">Sábado</option>
+        </select>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button class="btn-light" onclick="closeMoverDiaModal()">Cancelar</button>
+        <button class="btn-save" onclick="confirmarMoverDia()">🔄 Mover Pacientes</button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
