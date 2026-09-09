@@ -215,13 +215,26 @@
     /* Inputs Grid */
     .inputs-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
       gap: 8px;
       margin-bottom: 10px;
     }
-    @media (max-width: 500px) {
+    @media (max-width: 600px) {
+      .inputs-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 420px) {
       .inputs-grid { grid-template-columns: repeat(2, 1fr); }
     }
+    .field-item select {
+      padding: 6px 6px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      outline: none;
+      background: #fff;
+    }
+    .field-item select:focus { border-color: var(--primary); background: #f0f9ff; }
     .field-item { display: flex; flex-direction: column; gap: 3px; }
     .field-item label { font-size: 11px; font-weight: 600; color: #475569; }
     .field-item input {
@@ -818,12 +831,48 @@
 
         <div class="inputs-grid">
           <div class="field-item">
-            <label>PP (Peso Actual):</label>
+            <label>PS (Seco):</label>
+            <input type="text" id="ps_${p.id}" value="${p.ps || ''}" placeholder="Ej. 60" onchange="autoSavePatient('${p.id}')">
+          </div>
+          <div class="field-item">
+            <label>PP (Actual):</label>
             <input type="text" id="pp_${p.id}" value="${p.pp || ''}" placeholder="Ej. 64.8" onchange="autoSavePatient('${p.id}')">
           </div>
           <div class="field-item">
             <label>UF (Litros):</label>
             <input type="text" id="uf_${p.id}" value="${p.uf || ''}" placeholder="Ej. 2.2 L" onchange="autoSavePatient('${p.id}')">
+          </div>
+          <div class="field-item">
+            <label>Filtro:</label>
+            <input type="text" id="filtro_${p.id}" value="${p.filtro || '400'}" placeholder="400" onchange="autoSavePatient('${p.id}')">
+          </div>
+          <div class="field-item">
+            <label>QS (Sangre):</label>
+            <input type="text" id="qs_${p.id}" value="${p.qs || '310'}" placeholder="310" onchange="autoSavePatient('${p.id}')">
+          </div>
+          <div class="field-item">
+            <label>QD (Líquido):</label>
+            <input type="text" id="qd_${p.id}" value="${p.qd || '600'}" placeholder="600" onchange="autoSavePatient('${p.id}')">
+          </div>
+          <div class="field-item">
+            <label>Na (Sodio):</label>
+            <input type="text" id="na_${p.id}" value="${p.na || '138'}" placeholder="138" onchange="autoSavePatient('${p.id}')">
+          </div>
+          <div class="field-item">
+            <label>K (Potasio):</label>
+            <input type="text" id="k_${p.id}" value="${p.k || '2'}" placeholder="2" onchange="autoSavePatient('${p.id}')">
+          </div>
+          <div class="field-item">
+            <label>HCO3 (Bic):</label>
+            <input type="text" id="bic_${p.id}" value="${p.bic || '3.0'}" placeholder="3.0" onchange="autoSavePatient('${p.id}')">
+          </div>
+          <div class="field-item">
+            <label>Anticoagulación:</label>
+            <select id="anticoag_${p.id}" onchange="autoSavePatient('${p.id}')">
+              <option value="SH" ${(!p.anticoag || p.anticoag === 'SH' || p.anticoag === '') ? 'selected' : ''}>Sin heparina (SH)</option>
+              <option value="Enoxaparina" ${p.anticoag === 'Enoxaparina' ? 'selected' : ''}>Enoxaparina</option>
+              <option value="Heparina" ${p.anticoag === 'Heparina' ? 'selected' : ''}>Heparina</option>
+            </select>
           </div>
           <div class="field-item">
             <label>TA Ingreso:</label>
@@ -840,10 +889,6 @@
           <div class="field-item">
             <label>FC Egreso:</label>
             <input type="text" id="fcout_${p.id}" value="${p.fc_out || ''}" placeholder="68" onchange="autoSavePatient('${p.id}')">
-          </div>
-          <div class="field-item">
-            <label>QS / QD:</label>
-            <input type="text" id="qsqd_${p.id}" value="${p.qs || '310'} / ${p.qd || '600'}" placeholder="310/600" onchange="autoSavePatient('${p.id}')">
           </div>
           <div class="field-item">
             <label>Temp (°C):</label>
@@ -879,6 +924,23 @@
 
     const maqInput = document.getElementById(`maq_${id}`);
     if (maqInput) p.maquina = maqInput.value.trim();
+    const psInput = document.getElementById(`ps_${id}`);
+    if (psInput) p.ps = psInput.value.trim();
+    const filtroInput = document.getElementById(`filtro_${id}`);
+    if (filtroInput) p.filtro = filtroInput.value.trim();
+    const qsInput = document.getElementById(`qs_${id}`);
+    if (qsInput) p.qs = qsInput.value.trim();
+    const qdInput = document.getElementById(`qd_${id}`);
+    if (qdInput) p.qd = qdInput.value.trim();
+    const naInput = document.getElementById(`na_${id}`);
+    if (naInput) p.na = naInput.value.trim();
+    const kInput = document.getElementById(`k_${id}`);
+    if (kInput) p.k = kInput.value.trim();
+    const bicInput = document.getElementById(`bic_${id}`);
+    if (bicInput) p.bic = bicInput.value.trim();
+    const anticoagInput = document.getElementById(`anticoag_${id}`);
+    if (anticoagInput) p.anticoag = anticoagInput.value;
+
     p.pp = document.getElementById(`pp_${id}`).value.trim();
     p.uf = document.getElementById(`uf_${id}`).value.trim();
     p.ta_in = document.getElementById(`tain_${id}`).value.trim();
@@ -886,12 +948,6 @@
     p.ta_out = document.getElementById(`taout_${id}`).value.trim();
     p.fc_out = document.getElementById(`fcout_${id}`).value.trim();
     p.temp = document.getElementById(`temp_${id}`).value.trim();
-    
-    const qsqd = document.getElementById(`qsqd_${id}`).value.split('/');
-    if (qsqd.length >= 2) {
-      p.qs = qsqd[0].trim();
-      p.qd = qsqd[1].trim();
-    }
 
     const newAnnotation = document.getElementById(`obs_${id}`).value.trim();
     p.lastAnnotation = newAnnotation;
@@ -906,21 +962,33 @@
         await window.fsUpdateDoc(pRef, {
           lastAnnotation: newAnnotation,
           ps: p.ps,
-          filtro: p.filtro || '400'
+          filtro: p.filtro || '400',
+          qs: p.qs || '310',
+          qd: p.qd || '600',
+          na: p.na || '138',
+          k: p.k || '2',
+          bic: p.bic || '3.0',
+          anticoag: p.anticoag || 'SH'
         });
 
         const sRef = window.fsDoc(window.db, "sesiones", dateKey);
         const sessionPayload = {};
         sessionPayload[id] = {
           maquina: p.maquina,
+          ps: p.ps,
           pp: p.pp,
           uf: p.uf,
+          filtro: p.filtro,
+          qs: p.qs,
+          qd: p.qd,
+          na: p.na,
+          k: p.k,
+          bic: p.bic,
+          anticoag: p.anticoag,
           ta_in: p.ta_in,
           fc_in: p.fc_in,
           ta_out: p.ta_out,
           fc_out: p.fc_out,
-          qs: p.qs,
-          qd: p.qd,
           temp: p.temp,
           anotaciones: newAnnotation
         };
@@ -1290,10 +1358,10 @@
       <td style="${tdCenter}">${p.qs || '310'}</td>
       <td style="${tdCenter}">${p.qd || '600'}</td>
       <td style="${tdCenter}">${p.filtro || '400'}</td>
-      <td style="${tdCenter}">2</td>
+      <td style="${tdCenter}">${p.k || '2'}</td>
       <td style="${tdCenter}">${p.bic || '3.0'}</td>
       <td style="${tdCenter}">${p.na || '138'}</td>
-      <td style="${tdCenter}">SH</td>
+      <td style="${tdCenter}">${p.anticoag || 'SH'}</td>
     </tr>
     <tr style="height: 13px; text-align: left;">
       <td colspan="2" style="${tdLeft}">Neurológico</td>
@@ -1425,11 +1493,13 @@
     const fcIn = p.fc_in ? `${p.fc_in} lpm` : '-';
     const taOut = p.ta_out ? `${p.ta_out} mmHg` : '-';
     const fcOut = p.fc_out ? `${p.fc_out} lpm` : '-';
+    const potasioVal = (p.k && p.k.trim() !== '') ? `${p.k} mEq/L` : potasio;
+    const anticoagVal = (p.anticoag && p.anticoag !== 'SH') ? p.anticoag : 'Sin heparina';
 
     return `***NOTA DE HEMODIÁLISIS***
 PACIENTE: ${p.nombre.toUpperCase()}
 
-PACIENTE QUIÉN PASA A SESIÓN DE HEMODIÁLISIS PROGRAMADA EN MODALIDAD CONVENCIONAL, CON LOS SIGUIENTES PARÁMETROS FILTRO: ${p.filtro || '400'} T°: ${p.temp || '36.0'} TIEMPO: ${tiempo} UF: ${p.uf || '-'} QS: ${p.qs || '310'} QD: ${p.qd || '600'} NA: ${p.na || '138'} HCO3: ${p.bic || '3.0'} POTASIO: ${potasio}
+PACIENTE QUIÉN PASA A SESIÓN DE HEMODIÁLISIS PROGRAMADA EN MODALIDAD CONVENCIONAL, CON LOS SIGUIENTES PARÁMETROS FILTRO: ${p.filtro || '400'} T°: ${p.temp || '36.0'} TIEMPO: ${tiempo} UF: ${p.uf || '-'} QS: ${p.qs || '310'} QD: ${p.qd || '600'} NA: ${p.na || '138'} HCO3: ${p.bic || '3.0'} POTASIO: ${potasioVal} ANTICOAGULACIÓN: ${anticoagVal}
 INGRESA CON LOS SIGNOS VITALES:
 TA: ${taIn} FC: ${fcIn} FR: 18 rpm
 EVENTUALIDADES:
