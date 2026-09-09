@@ -5,274 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>NefroPase - Hemodiálisis en la Nube</title>
   
-  <!-- Firebase SDKs -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { 
-      getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, onSnapshot, query, where 
-    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyCRVrRtLKaeBz3xGX7jAc0YUdpsMHHRDrU",
-      authDomain: "hemodialisis-app-16c51.firebaseapp.com",
-      projectId: "hemodialisis-app-16c51",
-      storageBucket: "hemodialisis-app-16c51.firebasestorage.app",
-      messagingSenderId: "326169297387",
-      appId: "1:326169297387:web:dc317ed73b6ca4e76159ae",
-      measurementId: "G-89BHPQ2QYY"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    // Make db accessible globally
-    window.db = db;
-    window.fsCollection = collection;
-    window.fsDoc = doc;
-    window.fsSetDoc = setDoc;
-    window.fsGetDoc = getDoc;
-    window.fsGetDocs = getDocs;
-    window.fsUpdateDoc = updateDoc;
-    window.fsOnSnapshot = onSnapshot;
-
-    window.dispatchEvent(new Event('firebase-ready'));
-  
-  let activePreviewDocPatient = null;
-
-
-  // 5. Función Vigilancia de Infección de Angioacceso (Brote)
-  async function toggleVigilanciaAcceso(id) {
-    const p = currentPatients.find(item => item.id === id);
-    if (!p) return;
-    p.vigilanciaAcceso = !p.vigilanciaAcceso;
-
-    // Save to master patient record so it follows the patient across all days and shifts!
-    if (window.db) {
-      try {
-        const pRef = window.fsDoc(window.db, "pacientes", id);
-        await window.fsUpdateDoc(pRef, { vigilanciaAcceso: p.vigilanciaAcceso });
-      } catch (err) {
-        console.error("Error al guardar estado de vigilancia:", err);
-      }
-    }
-    renderCards();
-    showToast(p.vigilanciaAcceso ? `⚠️ ${p.nombre} marcado en vigilancia de acceso` : `✓ ${p.nombre} retirado de vigilancia`);
-  }
-
-  // 1. Previsualización de Nota para Expediente
-  function openDocPreview(id) {
-    const p = currentPatients.find(item => item.id === id);
-    if (!p) return;
-    activePreviewDocPatient = p;
-    document.getElementById('previewDocModalTitle').innerText = `👁️ Previsualización: ${p.nombre}`;
-    document.getElementById('previewDocContent').innerHTML = generateGoogleDocTable(p);
-    document.getElementById('previewDocModal').style.display = 'flex';
-  }
-
-  function closeDocPreviewModal() {
-    document.getElementById('previewDocModal').style.display = 'none';
-  }
-
-  async function copyCurrentPreviewDoc() {
-    if (!activePreviewDocPatient) return;
-    const html = generateGoogleDocTable(activePreviewDocPatient);
-    await copyRichHtml(html);
-    closeDocPreviewModal();
-    showToast(`¡Nota de ${activePreviewDocPatient.nombre} copiada!`);
-  }
-
-  // 2. Función No Acudió
-  async function toggleNoAcudio(id) {
-    const p = currentPatients.find(item => item.id === id);
-    if (!p) return;
-    p.noAcudio = !p.noAcudio;
-
-    if (p.noAcudio) {
-      p.lastAnnotation = p.lastAnnotation && p.lastAnnotation !== 'Ninguna' ? `${p.lastAnnotation} (NO ACUDIÓ)` : 'Paciente no acude a sesión de hemodiálisis programada';
-      p.anotaciones = p.lastAnnotation;
-    }
-
-    const dateKey = document.getElementById('sessionDate').value;
-    if (window.db) {
-      try {
-        const sRef = window.fsDoc(window.db, "sesiones", dateKey);
-        const payload = {};
-        payload[id] = { noAcudio: p.noAcudio, anotaciones: p.lastAnnotation };
-        await window.fsSetDoc(sRef, payload, { merge: true });
-      } catch (err) {
-        console.error("Error al guardar estado de asistencia:", err);
-      }
-    }
-    renderCards();
-    showToast(p.noAcudio ? `Marcado como: NO ACUDIÓ` : `Paciente reactivado`);
-  }
-
-  // 3. Función Eliminar Paciente
-  async function deletePatientConfirm(id) {
-    const p = currentPatients.find(item => item.id === id);
-    if (!p) return;
-    const currentDay = document.getElementById('daySelect').value;
-
-    const conf = confirm(`¿Deseas eliminar a "${p.nombre}" del censo de los días ${currentDay}?`);
-    if (!conf) return;
-
-    // Remove from local list
-    currentPatients = currentPatients.filter(item => item.id !== id);
-
-    if (window.db) {
-      try {
-        const pRef = window.fsDoc(window.db, "pacientes", id);
-        if (p.dias && p.dias.length > 1) {
-          // Just remove current day from dias array
-          const updatedDias = p.dias.filter(d => d !== currentDay);
-          await window.fsUpdateDoc(pRef, { dias: updatedDias });
-        } else {
-          // If only scheduled this day, delete from firestore
-          // (or deleteDoc if imported)
-          await window.fsUpdateDoc(pRef, { dias: [] });
-        }
-      } catch (err) {
-        console.error("Error al eliminar paciente:", err);
-      }
-    }
-    renderCards();
-    showToast(`Paciente eliminado de ${currentDay}`);
-  }
-
-  // 4. Modal Importar Censo del Día
-  function openImportModal() {
-    const currentDay = document.getElementById('daySelect').value;
-    document.getElementById('importDayLabel').innerText = currentDay;
-    document.getElementById('importPasteArea').innerHTML = '';
-    document.getElementById('importCensusModal').style.display = 'flex';
-  }
-
-  function closeImportModal() {
-    document.getElementById('importCensusModal').style.display = 'none';
-  }
-
-  async function processImportedCensus() {
-    const pasteBox = document.getElementById('importPasteArea');
-    const currentDay = document.getElementById('daySelect').value;
-    const dateKey = document.getElementById('sessionDate').value;
-    const text = pasteBox.innerText;
-    const tables = pasteBox.querySelectorAll('table');
-    let imported = [];
-
-    if (tables.length > 0) {
-      tables.forEach(table => {
-        const rows = Array.from(table.querySelectorAll('tr'));
-        rows.forEach(r => {
-          const cells = Array.from(r.querySelectorAll('td, th')).map(c => c.innerText.trim());
-          if (cells.length >= 4 && !cells[1].toUpperCase().includes('NOMBRE')) {
-            imported.push(parseImportRow(cells, currentDay));
-          }
-        });
-      });
-    } else {
-      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-      lines.forEach(line => {
-        let cells = line.split('\t').map(c => c.trim());
-        if (cells.length < 4) cells = line.split('|').map(c => c.trim()).filter(c => c.length > 0);
-        if (cells.length >= 4 && !cells[1].toUpperCase().includes('NOMBRE')) {
-          imported.push(parseImportRow(cells, currentDay));
-        }
-      });
-    }
-
-    if (imported.length === 0) {
-      alert("No se detectaron filas válidas. Copia la tabla de Google Docs completa y pégala dentro del recuadro.");
-      return;
-    }
-
-    // Save to Firestore & merge
-    for (const p of imported) {
-      // Check if already in current list
-      const existingIdx = currentPatients.findIndex(item => item.id === p.id);
-      if (existingIdx !== -1) {
-        // Keep existing annotation if new one is empty
-        if (!p.lastAnnotation || p.lastAnnotation === 'Ninguna') {
-          p.lastAnnotation = currentPatients[existingIdx].lastAnnotation || 'Ninguna';
-        }
-        currentPatients[existingIdx] = Object.assign(currentPatients[existingIdx], p);
-      } else {
-        currentPatients.push(p);
-      }
-
-      if (window.db) {
-        try {
-          const pRef = window.fsDoc(window.db, "pacientes", p.id);
-          const existingSnap = await window.fsGetDoc(pRef);
-          if (existingSnap.exists()) {
-            const data = existingSnap.data();
-            const diasArr = data.dias || [];
-            if (!diasArr.includes(currentDay)) diasArr.push(currentDay);
-            await window.fsUpdateDoc(pRef, {
-              dias: diasArr,
-              maquina: p.maquina || data.maquina || '1',
-              ps: p.ps || data.ps || '60',
-              filtro: p.filtro || data.filtro || '400',
-              lastAnnotation: (p.lastAnnotation && p.lastAnnotation !== 'Ninguna') ? p.lastAnnotation : (data.lastAnnotation || 'Ninguna')
-            });
-          } else {
-            await window.fsSetDoc(pRef, p);
-          }
-        } catch (err) {
-          console.error("Error al guardar paciente importado:", err);
-        }
-      }
-    }
-
-    closeImportModal();
-    renderCards();
-    showToast(`Se incorporaron ${imported.length} pacientes al día ${currentDay}`);
-  }
-
-  function parseImportRow(cells, currentDay) {
-    const rawName = cells[1] || 'SIN NOMBRE';
-    const cleanId = rawName.toLowerCase().replace(/[^a-z0-9]/g, '_');
-    const maq = cells[0] || '1';
-    const ps = cells[3] || '60';
-    const pp = cells[4] || '';
-    const qs = cells[5] || '310';
-    const uf = cells[6] ? (cells[6].includes('L') ? cells[6] : `${cells[6]} L`) : '';
-    const qd = cells[7] || '600';
-    const na = cells[8] || '138';
-    const bic = cells[9] || '3.0';
-    const temp = cells[10] || '36.0';
-    const filtro = cells[11] || '400';
-    
-    // Parse TA-FC
-    const tafc1 = parseTaFc(cells[12] || '');
-    const tafc2 = parseTaFc(cells[13] || '');
-    const obs = cells[14] || cells[cells.length - 1] || 'Ninguna';
-
-    return {
-      id: cleanId,
-      nombre: rawName.toUpperCase(),
-      maquina: maq,
-      turno: "MATUTINO_1",
-      dias: [currentDay],
-      ps: ps,
-      pp: pp,
-      qs: qs,
-      qd: qd,
-      uf: uf,
-      na: na,
-      bic: bic,
-      temp: temp,
-      filtro: filtro,
-      ta_in: tafc1.ta,
-      fc_in: tafc1.fc,
-      ta_out: tafc2.ta,
-      fc_out: tafc2.fc,
-      lastAnnotation: obs && obs !== '-' ? obs : 'Ninguna',
-      noAcudio: false
-    };
-  }
-
-</script>
-
   <style>
     :root {
       --primary: #1e40af;
@@ -427,15 +159,6 @@
     }
     .card-title { font-size: 14.5px; font-weight: 700; color: #0f172a; }
     .card-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
-    .badge-machine {
-      background: #dbeafe;
-      color: #1e40af;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: 6px;
-      white-space: nowrap;
-    }
 
     /* Grid for quick input fields */
     .inputs-grid {
@@ -529,7 +252,7 @@
     .bar-info { font-size: 12px; color: var(--muted); }
     .bar-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
 
-    /* Modal for Piso */
+    /* Modals */
     .modal-overlay {
       display: none;
       position: fixed;
@@ -569,6 +292,38 @@
     }
     .toast.show { opacity: 1; }
   </style>
+
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { 
+      getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, onSnapshot 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCRVrRtLKaeBz3xGX7jAc0YUdpsMHHRDrU",
+      authDomain: "hemodialisis-app-16c51.firebaseapp.com",
+      projectId: "hemodialisis-app-16c51",
+      storageBucket: "hemodialisis-app-16c51.firebasestorage.app",
+      messagingSenderId: "326169297387",
+      appId: "1:326169297387:web:dc317ed73b6ca4e76159ae",
+      measurementId: "G-89BHPQ2QYY"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    window.db = db;
+    window.fsCollection = collection;
+    window.fsDoc = doc;
+    window.fsSetDoc = setDoc;
+    window.fsGetDoc = getDoc;
+    window.fsGetDocs = getDocs;
+    window.fsUpdateDoc = updateDoc;
+    window.fsOnSnapshot = onSnapshot;
+
+    window.dispatchEvent(new Event('firebase-ready'));
+  </script>
 </head>
 <body>
 
@@ -595,7 +350,7 @@
       </select>
       <input type="date" id="sessionDate" onchange="onDateChanged()">
     </div>
-    <div>
+    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
       <button class="btn-light" style="padding: 5px 9px; font-size: 12px;" onclick="openImportModal()">📥 Importar Censo de este Día</button>
       <button class="btn-light" style="padding: 5px 9px; font-size: 12px;" onclick="addPatientPrompt()">➕ Agregar Paciente</button>
     </div>
@@ -624,7 +379,41 @@
     </div>
   </div>
 
-  <!-- Modal Nota de Piso -->
+  <!-- Modal Previsualización Nota Expediente -->
+  <div id="previewDocModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 720px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+        <h3 style="font-size: 16px; color: #1e3a8a;" id="previewDocModalTitle">👁️ Previsualización de Nota para Expediente</h3>
+        <button onclick="closeDocPreviewModal()" style="background: none; border: none; font-size: 22px; cursor: pointer;">&times;</button>
+      </div>
+      <p style="font-size: 11.5px; color: var(--muted); margin-bottom: 10px;">Esta es la tabla exacta de 13 columnas continuas que se pegará en Google Docs:</p>
+      <div id="previewDocContent" style="overflow-x: auto; background: #fff; padding: 4px; border: 1px solid #e2e8f0; border-radius: 6px;"></div>
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px;">
+        <button class="btn-light" onclick="closeDocPreviewModal()">Cerrar</button>
+        <button class="btn-action" onclick="copyCurrentPreviewDoc()">📋 Copiar Esta Nota</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Importar Censo del Día -->
+  <div id="importCensusModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 650px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+        <h3 style="font-size: 16px; color: #1e3a8a;">📥 Importar Censo de Pacientes para <span id="importDayLabel"></span></h3>
+        <button onclick="closeImportModal()" style="background: none; border: none; font-size: 22px; cursor: pointer;">&times;</button>
+      </div>
+      <p style="font-size: 12px; color: var(--muted); margin-bottom: 8px;">
+        Pega aquí las filas o la tabla copiada de Google Docs correspondiente a este día:
+      </p>
+      <div id="importPasteArea" contenteditable="true" style="min-height: 140px; max-height: 240px; overflow-y: auto; border: 2px dashed #94a3b8; border-radius: 6px; padding: 10px; background: #fdfdfd; font-size: 12px; outline: none; margin-bottom: 10px;"></div>
+      <div style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button class="btn-light" onclick="closeImportModal()">Cancelar</button>
+        <button class="btn-save" onclick="processImportedCensus()">⚡ Procesar e Incorporar a este Día</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Nota de Piso (Intacto) -->
   <div id="pisoModal" class="modal-overlay">
     <div class="modal-card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
@@ -653,47 +442,81 @@
 
   <div id="toast" class="toast">Guardado</div>
 
-<script>
-  // Initial preloaded census directly from the user's source schedule (Martes)
+  <script>
+  // Helper functions
+  function clean(s) {
+    if (!s) return '';
+    return s.replace(/\s+/g, ' ').trim();
+  }
+
+  function parseTaFc(val) {
+    if (!val) return { ta: '', fc: '' };
+    let s = clean(val.replace(/\r?\n|\r/g, ' '));
+    let parts = s.split('-');
+    if (parts.length >= 2) {
+      let ta = parts[0].trim().replace(/\/$/, '').trim();
+      let fc = parts.slice(1).join('-').trim().replace(/^\//, '').trim();
+      return { ta, fc };
+    }
+    let m = s.match(/^(\d{2,3}\/\d{2,3})\s+(\d{2,3})$/);
+    if (m) {
+      return { ta: m[1], fc: m[2] };
+    }
+    return { ta: s, fc: '' };
+  }
+
+  function formatUF(v) {
+    if (!v) return '';
+    let cleanVal = v.toString().replace(/,/g, '.').replace(/[^0-9.]/g, '');
+    let n = parseFloat(cleanVal);
+    if (isNaN(n)) return v;
+    if (n >= 100) {
+      let lit = (n / 1000).toFixed(1);
+      return (lit.endsWith('.0') ? lit.slice(0, -2) : lit) + ' L';
+    }
+    return v.toString().includes('L') || v.toString().includes('LT') ? v : v + ' L';
+  }
+
+  // Initial preloaded census directly from user's schedule
   const PRELOADED_CENSUS = [
     // Primer Turno Matutino
-    { id: "campos_bonilla", nombre: "CAMPOS BONILLA MARGARITA", maquina: "2", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "50", pp: "51.85", qs: "350", qd: "600", uf: "2.3 L", na: "138", bic: "3.5", temp: "36", filtro: "400", ta_in: "128/74", fc_in: "85", ta_out: "128/77", fc_out: "71", lastAnnotation: "Tuvo secrecion de sitio de salida, se tomo cultivo y se inicio clindamicina" },
-    { id: "acevedo_castaneda", nombre: "ACEVEDO CASTAÑEDA MARIA CONCEPCIÓN", maquina: "5", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "62.5", pp: "65.7", qs: "350", qd: "500", uf: "2.8 L", na: "137", bic: "3.3", temp: "37", filtro: "18", ta_in: "130/72", fc_in: "60", ta_out: "121/80", fc_out: "80", lastAnnotation: "Calambres al final de la sesion. Vigilar la proxima pb ajuste de peso seco" },
-    { id: "cortes_villavicencio", nombre: "CORTES VILLAVICENCIO MARIA TERESITA", maquina: "3", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "60", pp: "62", qs: "300", qd: "600", uf: "2.5 L", na: "136", bic: "3.4", temp: "36", filtro: "400", ta_in: "144/76", fc_in: "73", ta_out: "171/80", fc_out: "69", lastAnnotation: "Toma de cultivo siguente sesión y receta de hidroxicina-ITU (Dra Hernandez)" },
-    { id: "garcia_barraza", nombre: "GARCIA BARRAZA ROSALINDA", maquina: "4", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "62.5", pp: "64.8", qs: "310", qd: "600", uf: "2.2 L", na: "138", bic: "3.5", temp: "35", filtro: "19", ta_in: "126/76", fc_in: "72", ta_out: "138/92", fc_out: "68", lastAnnotation: "Ninguna" },
-    { id: "perez_aragon", nombre: "PÉREZ ARAGÓN JESÚS", maquina: "1", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "78.5", pp: "83", qs: "310", qd: "600", uf: "3.2 L", na: "138", bic: "3.3", temp: "36.5", filtro: "400", ta_in: "140/87", fc_in: "91", ta_out: "129/88", fc_out: "80", lastAnnotation: "Ninguna" },
-    { id: "martinez_garcia", nombre: "MARTINEZ GARCÍA VÍCTOR HUGO", maquina: "7", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "70", pp: "72.5", qs: "350", qd: "700", uf: "2.5 L", na: "137", bic: "3.3", temp: "36", filtro: "18", ta_in: "145/99", fc_in: "73", ta_out: "135/95", fc_out: "80", lastAnnotation: "ITU Receta Cipro 7 dias" },
-    { id: "marquez_vega", nombre: "MÁRQUEZ VEGA AURORA", maquina: "8", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "51", pp: "52.4", qs: "350", qd: "600", uf: "1.5 L", na: "138", bic: "3.1", temp: "36", filtro: "18", ta_in: "152/95", fc_in: "66", ta_out: "171/105", fc_out: "68", lastAnnotation: "Ninguna" },
-    { id: "torija_zamora", nombre: "TORIJA ZAMORA MARIA DE LOS ANGELES", maquina: "9", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "53.5", pp: "54.1", qs: "320", qd: "500", uf: "0.5 L", na: "138", bic: "3.3", temp: "35.5", filtro: "18", ta_in: "129/83", fc_in: "80", ta_out: "139/100", fc_out: "77", lastAnnotation: "De conecto invecticio" },
-    { id: "ramos_coronel", nombre: "RAMOS CORONEL LEONOR", maquina: "10", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "83.5", pp: "90", qs: "320", qd: "500", uf: "2.5 L", na: "140", bic: "3.1", temp: "35.5", filtro: "18", ta_in: "122/82", fc_in: "80", ta_out: "152/101", fc_out: "80", lastAnnotation: "Cultivo de sitio de salida 04/08. Vancomicina 1g y Ertapenem 500mg" },
+    { id: "campos_bonilla", nombre: "CAMPOS BONILLA MARGARITA", maquina: "2", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "50", pp: "51.85", qs: "350", qd: "600", uf: "2.3 L", na: "138", bic: "3.5", temp: "36", filtro: "400", ta_in: "128/74", fc_in: "85", ta_out: "128/77", fc_out: "71", lastAnnotation: "Tuvo secrecion de sitio de salida, se tomo cultivo y se inicio clindamicina", vigilanciaAcceso: true },
+    { id: "acevedo_castaneda", nombre: "ACEVEDO CASTAÑEDA MARIA CONCEPCIÓN", maquina: "5", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "62.5", pp: "65.7", qs: "350", qd: "500", uf: "2.8 L", na: "137", bic: "3.3", temp: "37", filtro: "18", ta_in: "130/72", fc_in: "60", ta_out: "121/80", fc_out: "80", lastAnnotation: "Calambres al final de la sesion. Vigilar la proxima pb ajuste de peso seco", vigilanciaAcceso: false },
+    { id: "cortes_villavicencio", nombre: "CORTES VILLAVICENCIO MARIA TERESITA", maquina: "3", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "60", pp: "62", qs: "300", qd: "600", uf: "2.5 L", na: "136", bic: "3.4", temp: "36", filtro: "400", ta_in: "144/76", fc_in: "73", ta_out: "171/80", fc_out: "69", lastAnnotation: "Toma de cultivo siguente sesión y receta de hidroxicina-ITU (Dra Hernandez)", vigilanciaAcceso: false },
+    { id: "garcia_barraza", nombre: "GARCIA BARRAZA ROSALINDA", maquina: "4", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "62.5", pp: "64.8", qs: "310", qd: "600", uf: "2.2 L", na: "138", bic: "3.5", temp: "35", filtro: "19", ta_in: "126/76", fc_in: "72", ta_out: "138/92", fc_out: "68", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
+    { id: "perez_aragon", nombre: "PÉREZ ARAGÓN JESÚS", maquina: "1", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "78.5", pp: "83", qs: "310", qd: "600", uf: "3.2 L", na: "138", bic: "3.3", temp: "36.5", filtro: "400", ta_in: "140/87", fc_in: "91", ta_out: "129/88", fc_out: "80", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
+    { id: "martinez_garcia", nombre: "MARTINEZ GARCÍA VÍCTOR HUGO", maquina: "7", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "70", pp: "72.5", qs: "350", qd: "700", uf: "2.5 L", na: "137", bic: "3.3", temp: "36", filtro: "18", ta_in: "145/99", fc_in: "73", ta_out: "135/95", fc_out: "80", lastAnnotation: "ITU Receta Cipro 7 dias", vigilanciaAcceso: false },
+    { id: "marquez_vega", nombre: "MÁRQUEZ VEGA AURORA", maquina: "8", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "51", pp: "52.4", qs: "350", qd: "600", uf: "1.5 L", na: "138", bic: "3.1", temp: "36", filtro: "18", ta_in: "152/95", fc_in: "66", ta_out: "171/105", fc_out: "68", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
+    { id: "torija_zamora", nombre: "TORIJA ZAMORA MARIA DE LOS ANGELES", maquina: "9", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "53.5", pp: "54.1", qs: "320", qd: "500", uf: "0.5 L", na: "138", bic: "3.3", temp: "35.5", filtro: "18", ta_in: "129/83", fc_in: "80", ta_out: "139/100", fc_out: "77", lastAnnotation: "De conecto invecticio", vigilanciaAcceso: false },
+    { id: "ramos_coronel", nombre: "RAMOS CORONEL LEONOR", maquina: "10", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "83.5", pp: "90", qs: "320", qd: "500", uf: "2.5 L", na: "140", bic: "3.1", temp: "35.5", filtro: "18", ta_in: "122/82", fc_in: "80", ta_out: "152/101", fc_out: "80", lastAnnotation: "Cultivo de sitio de salida 04/08. Vancomicina 1g y Ertapenem 500mg", vigilanciaAcceso: true },
 
     // Segundo Turno Matutino
-    { id: "celerino_sanchez", nombre: "CELERINO SANCHEZ LINA JOSE BLAS", maquina: "1", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "68", pp: "70", qs: "200", qd: "500", uf: "0.3 L", na: "138", bic: "3.1", temp: "36", filtro: "18", ta_in: "137/74", fc_in: "80", ta_out: "140/80", fc_out: "80", lastAnnotation: "Ingresa a piso" },
-    { id: "cicle_daniel", nombre: "CICLE DANIEL CIRILO", maquina: "3", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "74", pp: "77.45", qs: "300", qd: "800", uf: "2.0 L", na: "138", bic: "3.0", temp: "36", filtro: "18", ta_in: "152/100", fc_in: "62", ta_out: "149/99", fc_out: "60", lastAnnotation: "Ninguna" },
-    { id: "torres_cholula", nombre: "TORRES CHOLULA LUCIA", maquina: "4", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "71", pp: "71.95", qs: "300", qd: "500", uf: "2.0 L", na: "143", bic: "3.0", temp: "37", filtro: "19", ta_in: "162/91", fc_in: "82", ta_out: "151/73", fc_out: "74", lastAnnotation: "Presenta IRA toma Paracetamol" },
-    { id: "perez_ballinas", nombre: "PÉREZ BALLINAS ALBERTO ANSELMO", maquina: "5", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "78", pp: "79.8", qs: "350", qd: "800", uf: "1.1 L", na: "138", bic: "3.3", temp: "36", filtro: "18", ta_in: "99/65", fc_in: "75", ta_out: "159/84", fc_out: "60", lastAnnotation: "Ninguna" },
-    { id: "cadena_castillo", nombre: "CADENA CASTILLO LUCAS", maquina: "6", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "46", pp: "48.3", qs: "250", qd: "600", uf: "2.6 L", na: "140", bic: "3.5", temp: "35.5", filtro: "18", ta_in: "155/120", fc_in: "80", ta_out: "147/117", fc_out: "81", lastAnnotation: "Catéter doblado ver funcionamiento" },
-    { id: "romero_sosa", nombre: "ROMERO SOSA GERMAN", maquina: "7", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "57", pp: "61", qs: "310", qd: "500", uf: "3.0 L", na: "136", bic: "3.0", temp: "37", filtro: "18", ta_in: "155/83", fc_in: "60", ta_out: "150/95", fc_out: "55", lastAnnotation: "Ninguna" },
-    { id: "valerio_flores", nombre: "VALERIO FLORES MARCELINA", maquina: "10", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "65", pp: "67.2", qs: "250", qd: "500", uf: "1.3 L", na: "138", bic: "3.1", temp: "36", filtro: "18", ta_in: "146/85", fc_in: "60", ta_out: "140/80", fc_out: "60", lastAnnotation: "Cita Cardio el 29 de septiembre, pendiente fecha de Holter" },
+    { id: "celerino_sanchez", nombre: "CELERINO SANCHEZ LINA JOSE BLAS", maquina: "1", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "68", pp: "70", qs: "200", qd: "500", uf: "0.3 L", na: "138", bic: "3.1", temp: "36", filtro: "18", ta_in: "137/74", fc_in: "80", ta_out: "140/80", fc_out: "80", lastAnnotation: "Ingresa a piso", vigilanciaAcceso: false },
+    { id: "cicle_daniel", nombre: "CICLE DANIEL CIRILO", maquina: "3", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "74", pp: "77.45", qs: "300", qd: "800", uf: "2.0 L", na: "138", bic: "3.0", temp: "36", filtro: "18", ta_in: "152/100", fc_in: "62", ta_out: "149/99", fc_out: "60", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
+    { id: "torres_cholula", nombre: "TORRES CHOLULA LUCIA", maquina: "4", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "71", pp: "71.95", qs: "300", qd: "500", uf: "2.0 L", na: "143", bic: "3.0", temp: "37", filtro: "19", ta_in: "162/91", fc_in: "82", ta_out: "151/73", fc_out: "74", lastAnnotation: "Presenta IRA toma Paracetamol", vigilanciaAcceso: false },
+    { id: "perez_ballinas", nombre: "PÉREZ BALLINAS ALBERTO ANSELMO", maquina: "5", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "78", pp: "79.8", qs: "350", qd: "800", uf: "1.1 L", na: "138", bic: "3.3", temp: "36", filtro: "18", ta_in: "99/65", fc_in: "75", ta_out: "159/84", fc_out: "60", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
+    { id: "cadena_castillo", nombre: "CADENA CASTILLO LUCAS", maquina: "6", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "46", pp: "48.3", qs: "250", qd: "600", uf: "2.6 L", na: "140", bic: "3.5", temp: "35.5", filtro: "18", ta_in: "155/120", fc_in: "80", ta_out: "147/117", fc_out: "81", lastAnnotation: "Catéter doblado ver funcionamiento", vigilanciaAcceso: true },
+    { id: "romero_sosa", nombre: "ROMERO SOSA GERMAN", maquina: "7", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "57", pp: "61", qs: "310", qd: "500", uf: "3.0 L", na: "136", bic: "3.0", temp: "37", filtro: "18", ta_in: "155/83", fc_in: "60", ta_out: "150/95", fc_out: "55", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
+    { id: "valerio_flores", nombre: "VALERIO FLORES MARCELINA", maquina: "10", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "65", pp: "67.2", qs: "250", qd: "500", uf: "1.3 L", na: "138", bic: "3.1", temp: "36", filtro: "18", ta_in: "146/85", fc_in: "60", ta_out: "140/80", fc_out: "60", lastAnnotation: "Cita Cardio el 29 de septiembre, pendiente fecha de Holter", vigilanciaAcceso: false },
 
     // Turno Vespertino 1
-    { id: "zarate_audelo", nombre: "ZÁRATE AUDELO CELSO ALBERTO", maquina: "1", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "53", pp: "54.5", qs: "300", qd: "700", uf: "1.5 L", na: "138", bic: "3.1", temp: "36", filtro: "400", ta_in: "120/83", fc_in: "67", ta_out: "174/107", fc_out: "51", lastAnnotation: "Se toma hemocultivo central y periferico por escalofrios" },
-    { id: "lopez_rojas", nombre: "LOPEZ ROJAS ROSENDO", maquina: "2", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "66.5", pp: "70.4", qs: "320", qd: "700", uf: "3.5 L", na: "138", bic: "3.0", temp: "36", filtro: "400", ta_in: "160/91", fc_in: "65", ta_out: "150/100", fc_out: "65", lastAnnotation: "Hospitalizado por neumonia en la cama 631" },
-    { id: "serrano_jimenez", nombre: "SERRANO JIMÉNEZ UBALDO", maquina: "3", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "78", pp: "81", qs: "320", qd: "700", uf: "2.8 L", na: "140", bic: "3.3", temp: "35", filtro: "400", ta_in: "181/104", fc_in: "60", ta_out: "187/96", fc_out: "51", lastAnnotation: "Ninguna" },
-    { id: "esquivel_villalba", nombre: "ESQUIVEL VILLALBA RUFINO", maquina: "4", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "74.8", pp: "77.6", qs: "330", qd: "600", uf: "2.8 L", na: "138", bic: "3.0", temp: "36", filtro: "400", ta_in: "136/85", fc_in: "60", ta_out: "89/59", fc_out: "65", lastAnnotation: "Hipotension asintomatica" },
-    { id: "cuadrado_lucero", nombre: "CUADRADO LUCERO JOAQUIN", maquina: "5", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "84", pp: "87.5", qs: "290", qd: "600", uf: "3.5 L", na: "136", bic: "3.0", temp: "36", filtro: "400", ta_in: "119/91", fc_in: "99", ta_out: "134/101", fc_out: "91", lastAnnotation: "Ninguna" },
-    { id: "morales_reyes", nombre: "MORALES REYES VICTORIA", maquina: "6", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "65", pp: "66", qs: "250", qd: "500", uf: "1.0 L", na: "137", bic: "3.0", temp: "36", filtro: "400", ta_in: "184/79", fc_in: "71", ta_out: "201/104", fc_out: "49", lastAnnotation: "Bradicardia e hipertension asintomatica" },
-    { id: "lopez_barrales", nombre: "LOPEZ BARRALES MARIA ISABEL TERES", maquina: "7", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "60", pp: "62", qs: "280", qd: "800", uf: "1.9 L", na: "139", bic: "3.1", temp: "35", filtro: "400", ta_in: "128/75", fc_in: "71", ta_out: "81/49", fc_out: "66", lastAnnotation: "Refiere dolor en fosa renal bilateral" },
-    { id: "bautista_moran", nombre: "BAUTISTA MORAN BERENIZZE GUADALU", maquina: "8", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "66.6", pp: "66.6", qs: "300", qd: "600", uf: "1.0 L", na: "137", bic: "3.0", temp: "36", filtro: "400", ta_in: "173/103", fc_in: "60", ta_out: "152/95", fc_out: "55", lastAnnotation: "Refiere cefalea. Se administra paracetamol" },
-    { id: "rivera_mendoza", nombre: "RIVERA MENDOZA JOSE JAIME", maquina: "9", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "65", pp: "63", qs: "290", qd: "500", uf: "1.0 L", na: "138", bic: "3.1", temp: "36", filtro: "400", ta_in: "129/79", fc_in: "67", ta_out: "138/82", fc_out: "72", lastAnnotation: "Ninguna" },
-    { id: "hernandez_cruz", nombre: "HERNÁNDEZ CRUZ ELENA", maquina: "10", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "44", pp: "50.3", qs: "260", qd: "500", uf: "3.0 L", na: "136", bic: "3.1", temp: "35", filtro: "400", ta_in: "162/82", fc_in: "99", ta_out: "149/96", fc_out: "87", lastAnnotation: "Parece que subio de peso" }
+    { id: "zarate_audelo", nombre: "ZÁRATE AUDELO CELSO ALBERTO", maquina: "1", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "53", pp: "54.5", qs: "300", qd: "700", uf: "1.5 L", na: "138", bic: "3.1", temp: "36", filtro: "400", ta_in: "120/83", fc_in: "67", ta_out: "174/107", fc_out: "51", lastAnnotation: "Se toma hemocultivo central y periferico por escalofrios", vigilanciaAcceso: true },
+    { id: "lopez_rojas", nombre: "LOPEZ ROJAS ROSENDO", maquina: "2", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "66.5", pp: "70.4", qs: "320", qd: "700", uf: "3.5 L", na: "138", bic: "3.0", temp: "36", filtro: "400", ta_in: "160/91", fc_in: "65", ta_out: "150/100", fc_out: "65", lastAnnotation: "Hospitalizado por neumonia en la cama 631", vigilanciaAcceso: false },
+    { id: "serrano_jimenez", nombre: "SERRANO JIMÉNEZ UBALDO", maquina: "3", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "78", pp: "81", qs: "320", qd: "700", uf: "2.8 L", na: "140", bic: "3.3", temp: "35", filtro: "400", ta_in: "181/104", fc_in: "60", ta_out: "187/96", fc_out: "51", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
+    { id: "esquivel_villalba", nombre: "ESQUIVEL VILLALBA RUFINO", maquina: "4", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "74.8", pp: "77.6", qs: "330", qd: "600", uf: "2.8 L", na: "138", bic: "3.0", temp: "36", filtro: "400", ta_in: "136/85", fc_in: "60", ta_out: "89/59", fc_out: "65", lastAnnotation: "Hipotension asintomatica", vigilanciaAcceso: false },
+    { id: "cuadrado_lucero", nombre: "CUADRADO LUCERO JOAQUIN", maquina: "5", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "84", pp: "87.5", qs: "290", qd: "600", uf: "3.5 L", na: "136", bic: "3.0", temp: "36", filtro: "400", ta_in: "119/91", fc_in: "99", ta_out: "134/101", fc_out: "91", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
+    { id: "morales_reyes", nombre: "MORALES REYES VICTORIA", maquina: "6", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "65", pp: "66", qs: "250", qd: "500", uf: "1.0 L", na: "137", bic: "3.0", temp: "36", filtro: "400", ta_in: "184/79", fc_in: "71", ta_out: "201/104", fc_out: "49", lastAnnotation: "Bradicardia e hipertension asintomatica", vigilanciaAcceso: false },
+    { id: "lopez_barrales", nombre: "LOPEZ BARRALES MARIA ISABEL TERES", maquina: "7", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "60", pp: "62", qs: "280", qd: "800", uf: "1.9 L", na: "139", bic: "3.1", temp: "35", filtro: "400", ta_in: "128/75", fc_in: "71", ta_out: "81/49", fc_out: "66", lastAnnotation: "Refiere dolor en fosa renal bilateral", vigilanciaAcceso: false },
+    { id: "bautista_moran", nombre: "BAUTISTA MORAN BERENIZZE GUADALU", maquina: "8", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "66.6", pp: "66.6", qs: "300", qd: "600", uf: "1.0 L", na: "137", bic: "3.0", temp: "36", filtro: "400", ta_in: "173/103", fc_in: "60", ta_out: "152/95", fc_out: "55", lastAnnotation: "Refiere cefalea. Se administra paracetamol", vigilanciaAcceso: false },
+    { id: "rivera_mendoza", nombre: "RIVERA MENDOZA JOSE JAIME", maquina: "9", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "65", pp: "63", qs: "290", qd: "500", uf: "1.0 L", na: "138", bic: "3.1", temp: "36", filtro: "400", ta_in: "129/79", fc_in: "67", ta_out: "138/82", fc_out: "72", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
+    { id: "hernandez_cruz", nombre: "HERNÁNDEZ CRUZ ELENA", maquina: "10", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "44", pp: "50.3", qs: "260", qd: "500", uf: "3.0 L", na: "136", bic: "3.1", temp: "35", filtro: "400", ta_in: "162/82", fc_in: "99", ta_out: "149/96", fc_out: "87", lastAnnotation: "Parece que subio de peso", vigilanciaAcceso: false }
   ];
 
   let currentPatients = [];
   let currentShiftFilter = 'TODOS';
   let activePatientForPiso = null;
+  let activePreviewDocPatient = null;
 
-  // Initialize Date
   function initDate() {
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -701,7 +524,6 @@
     const dd = String(today.getDate()).padStart(2, '0');
     document.getElementById('sessionDate').value = `${yyyy}-${mm}-${dd}`;
     
-    // Auto detect current day of week
     const days = ["DOMINGO", "LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
     const dayName = days[today.getDay()];
     if (dayName !== "DOMINGO") {
@@ -716,7 +538,6 @@
     await loadDayPatients();
   });
 
-  // Get current selected date string (DD/MM/YYYY)
   function getSelectedDateFormatted() {
     const raw = document.getElementById('sessionDate').value;
     if (!raw) return '';
@@ -724,26 +545,22 @@
     return `${d}/${m}/${y}`;
   }
 
-  // Load patients for the chosen day from Firestore (or preload if empty)
   async function loadDayPatients() {
     const selectedDay = document.getElementById('daySelect').value;
-    const dateKey = document.getElementById('sessionDate').value; // e.g. 2026-09-08
+    const dateKey = document.getElementById('sessionDate').value;
     
     document.getElementById('patientsContainer').innerHTML = '<p style="text-align: center; color: var(--muted); margin-top: 30px;">Cargando pacientes del ' + selectedDay + '...</p>';
 
     try {
       if (!window.db) {
-        // Fallback local
         useFallbackCensus(selectedDay);
         return;
       }
 
-      // Read from Firestore master collection "pacientes"
       const patientsRef = window.fsCollection(window.db, "pacientes");
       const snapshot = await window.fsGetDocs(patientsRef);
 
       if (snapshot.empty) {
-        // Seed initial census
         document.getElementById('cloudStatus').innerText = "Inicializando Censo...";
         for (const p of PRELOADED_CENSUS) {
           const docRef = window.fsDoc(window.db, "pacientes", p.id);
@@ -756,15 +573,12 @@
           allPatients.push({ id: docSnap.id, ...docSnap.data() });
         });
         
-        // Filter by day
         currentPatients = allPatients.filter(p => p.dias && p.dias.includes(selectedDay));
         
-        // Now check if there is session-specific vitals saved for this date
         const sessionRef = window.fsDoc(window.db, "sesiones", dateKey);
         const sessionSnap = await window.fsGetDoc(sessionRef);
         if (sessionSnap.exists()) {
           const sessionData = sessionSnap.data();
-          // Merge session data (e.g. today's TA, FC, PP, UF)
           currentPatients.forEach(p => {
             if (sessionData[p.id]) {
               Object.assign(p, sessionData[p.id]);
@@ -803,7 +617,6 @@
     renderCards();
   }
 
-  // Render Mobile Cards
   function renderCards() {
     const container = document.getElementById('patientsContainer');
     container.innerHTML = '';
@@ -816,11 +629,11 @@
     document.getElementById('barSummary').innerText = `${list.length} de ${currentPatients.length} pacientes`;
 
     if (list.length === 0) {
-      container.innerHTML = `<p style="text-align: center; color: var(--muted); margin-top: 40px;">No hay pacientes agendados para este turno en ${document.getElementById('daySelect').value}.</p>`;
+      container.innerHTML = `<p style="text-align: center; color: var(--muted); margin-top: 40px;">No hay pacientes agendados para este turno en ${document.getElementById('daySelect').value}. Usa el botón '📥 Importar Censo de este Día' para agregarlos.</p>`;
       return;
     }
 
-    list.forEach((p, idx) => {
+    list.forEach((p) => {
       const isVesp = p.turno && p.turno.includes('VESPERTINO');
       const shiftTag = isVesp ? 'Turno Vespertino' : 'Turno Matutino';
 
@@ -878,7 +691,6 @@
           </div>
         </div>
 
-        <!-- Anotaciones Acumulativas que Viajan de Sesión en Sesión -->
         <div class="obs-box">
           <div class="obs-box-header">
             <span>📌 Anotación Acumulativa (Se guarda para las próximas sesiones):</span>
@@ -901,7 +713,6 @@
     });
   }
 
-  // Save changes to Firestore (Both Session specific and Master Patient Record for persistent annotations!)
   async function savePatientData(id, isSilent = false) {
     const p = currentPatients.find(item => item.id === id);
     if (!p) return;
@@ -916,14 +727,12 @@
     p.fc_out = document.getElementById(`fcout_${id}`).value.trim();
     p.temp = document.getElementById(`temp_${id}`).value.trim();
     
-    // Parse QS / QD
     const qsqd = document.getElementById(`qsqd_${id}`).value.split('/');
     if (qsqd.length >= 2) {
       p.qs = qsqd[0].trim();
       p.qd = qsqd[1].trim();
     }
 
-    // Annotation update
     const newAnnotation = document.getElementById(`obs_${id}`).value.trim();
     p.lastAnnotation = newAnnotation;
     p.anotaciones = newAnnotation;
@@ -931,10 +740,8 @@
 
     const dateKey = document.getElementById('sessionDate').value;
 
-    // Save to Cloud Firestore
     if (window.db) {
       try {
-        // 1. Update master patient record (so lastAnnotation persists to future days!)
         const pRef = window.fsDoc(window.db, "pacientes", id);
         await window.fsUpdateDoc(pRef, {
           lastAnnotation: newAnnotation,
@@ -942,7 +749,6 @@
           filtro: p.filtro || '400'
         });
 
-        // 2. Save session-specific data for today
         const sRef = window.fsDoc(window.db, "sesiones", dateKey);
         const sessionPayload = {};
         sessionPayload[id] = {
@@ -971,15 +777,9 @@
     }
   }
 
-  function autoSavePatient(id) {
-    savePatientData(id, true);
-  }
+  function autoSavePatient(id) { savePatientData(id, true); }
+  function savePatientManual(id) { savePatientData(id, false); }
 
-  function savePatientManual(id) {
-    savePatientData(id, false);
-  }
-
-  // BUILD GOOGLE DOCS HTML NOTE (Ultracompact Single 13-Column Table)
   function generateGoogleDocTable(p) {
     const fecha = getSelectedDateFormatted();
     const isVesp = p.turno && p.turno.includes('VESPERTINO');
@@ -993,31 +793,26 @@
     return `
 <table border="1" cellspacing="0" cellpadding="0" style="border-collapse: collapse; width: 100%; font-family: Arial, Helvetica, sans-serif; font-size: 7.5pt; line-height: 1.0; margin: 0; padding: 0;">
   <tbody>
-    <!-- FILA 1: PACIENTE -->
     <tr style="height: 14px; background-color: #f2f2f2;">
       <td colspan="13" style="${tdLeft} font-weight: bold; font-size: 8pt; background-color: #f2f2f2;">
         PACIENTE: ${p.nombre.toUpperCase()}
       </td>
     </tr>
-    <!-- FILA 2: FECHA, MÁQUINA, PANEL VIRAL -->
     <tr style="height: 13px;">
       <td colspan="3" style="${tdLeft}"><strong>FECHA:</strong> ${fecha}</td>
       <td colspan="3" style="${tdLeft}"><strong>MÁQUINA:</strong> ${p.maquina || 'S/N'}</td>
       <td colspan="7" style="${tdLeft}"><strong>PANEL VIRAL:</strong> NEGATIVO A VIH, VHC, VHB VIGENTE.</td>
     </tr>
-    <!-- FILA 3: PROVENIENTE DE, PESO SECO, PESO ACTUAL -->
     <tr style="height: 13px;">
       <td colspan="3" style="${tdLeft}"><strong>PROVENIENTE DE:</strong> Domicilio</td>
       <td colspan="3" style="${tdLeft}"><strong>PESO SECO:</strong> ${p.ps || ''} KG</td>
       <td colspan="7" style="${tdLeft}"><strong>PESO ACTUAL:</strong> ${p.pp || ''}</td>
     </tr>
-    <!-- FILA 4: ENCABEZADOS DE INGRESO -->
     <tr style="height: 13px; font-weight: bold;">
       <td colspan="5" style="${tdLeft}">SIGNOS VITALES AL INGRESO:</td>
       <td colspan="7" style="${tdLeft}">PRESCRIPCIÓN DE TERAPIA:</td>
       <td colspan="1" style="${tdLeft}">ULTRAFILTRACIÓN: ${p.uf || ''}</td>
     </tr>
-    <!-- FILA 5: ENCABEZADOS DE PARÁMETROS -->
     <tr style="height: 13px; text-align: center; font-size: 7pt; font-weight: normal;">
       <td style="${tdCenter} width: 10%;">TA</td>
       <td style="${tdCenter} width: 6%;">FC</td>
@@ -1033,7 +828,6 @@
       <td style="${tdCenter} width: 6%;">Na</td>
       <td style="${tdCenter} width: 24%;">Anticoagulación</td>
     </tr>
-    <!-- FILA 6: VALORES DE INGRESO -->
     <tr style="height: 14px; text-align: center;">
       <td style="${tdCenter}">${p.ta_in || ''}</td>
       <td style="${tdCenter}">${p.fc_in || ''}</td>
@@ -1049,7 +843,6 @@
       <td style="${tdCenter}">${p.na || '138'}</td>
       <td style="${tdCenter}">SH</td>
     </tr>
-    <!-- FILA 7: ENCABEZADOS DE SISTEMAS -->
     <tr style="height: 13px; text-align: left;">
       <td colspan="2" style="${tdLeft}">Neurológico</td>
       <td colspan="2" style="${tdLeft}">Cardiovascular</td>
@@ -1057,7 +850,6 @@
       <td colspan="4" style="${tdLeft}">Angioacceso Funcional: Si</td>
       <td colspan="3" style="${tdLeft}">Angioacceso Disfuncional: -</td>
     </tr>
-    <!-- FILA 8: VALORES DE SISTEMAS -->
     <tr style="height: 13px; text-align: left;">
       <td colspan="2" style="${tdLeft}">Estable</td>
       <td colspan="2" style="${tdLeft}">Estable</td>
@@ -1065,17 +857,14 @@
       <td colspan="4" style="${tdLeft}">Datos de Infección: <strong>${p.vigilanciaAcceso ? 'SI' : 'No'}</strong></td>
       <td colspan="3" style="${tdLeft}">Especifique: -</td>
     </tr>
-    <!-- FILA 9: SOBRECARGA Y ANTIBIÓTICO -->
     <tr style="height: 13px; text-align: left;">
       <td colspan="6" style="${tdLeft}">Sobrecarga hídrica: No</td>
       <td colspan="7" style="${tdLeft}">Antibiótico actual: <strong>${p.vigilanciaAcceso ? 'Si' : 'No'}</strong></td>
     </tr>
-    <!-- FILA 10: TÍTULOS EGRESO Y OBSERVACIONES -->
     <tr style="height: 13px; font-weight: bold; text-align: left;">
       <td colspan="5" style="${tdLeft}">SIGNOS VITALES AL EGRESO:</td>
       <td colspan="8" style="${tdLeft}">OBSERVACIONES:</td>
     </tr>
-    <!-- FILA 11: ENCABEZADOS EGRESO + OBSERVACIONES -->
     <tr style="height: 13px; text-align: center; font-size: 7pt;">
       <td style="${tdCenter}">TA</td>
       <td style="${tdCenter}">FC</td>
@@ -1086,7 +875,6 @@
         ${obs}
       </td>
     </tr>
-    <!-- FILA 12: VALORES EGRESO -->
     <tr style="height: 14px; text-align: center;">
       <td style="${tdCenter}">${p.ta_out || ''}</td>
       <td style="${tdCenter}">${p.fc_out || ''}</td>
@@ -1094,13 +882,11 @@
       <td style="${tdCenter}">36.5</td>
       <td style="${tdCenter}">94%</td>
     </tr>
-    <!-- FILA 13: EGRESA A -->
     <tr style="height: 13px;">
       <td colspan="13" style="${tdLeft}">
         <strong>EGRESA A:</strong> Domicilio
       </td>
     </tr>
-    <!-- FILA 14: MÉDICOS RESPONSABLES -->
     <tr style="height: 13px;">
       <td colspan="13" style="${tdLeft}">
         <strong>MÉDICOS RESPONSABLES:</strong> ${medico}
@@ -1111,7 +897,6 @@
     `.trim();
   }
 
-  // Copy Single Doc Note
   async function copySingleDocNote(id) {
     await savePatientData(id, true);
     const p = currentPatients.find(item => item.id === id);
@@ -1122,7 +907,6 @@
     showToast(`¡Nota de ${p.nombre} copiada! Lista para Google Docs`);
   }
 
-  // Copy All Doc Notes (Filtered or All)
   async function copyAllDocNotes() {
     let list = currentPatients;
     if (currentShiftFilter !== 'TODOS') {
@@ -1130,7 +914,6 @@
     }
     if (list.length === 0) return;
 
-    // Save all inputs first
     for (const p of list) {
       await savePatientData(p.id, true);
     }
@@ -1237,7 +1020,243 @@ MÉDICOS RESPONSABLES: ${medico}`;
     showToast(`¡Notas de piso de los ${list.length} pacientes copiadas!`);
   }
 
-  // Quick Prompt to add new patient on the go
+  // --- VIGILANCIA ACCESO, PREVIEW DOC, NO ACUDIO, DELETE ---
+  async function toggleVigilanciaAcceso(id) {
+    const p = currentPatients.find(item => item.id === id);
+    if (!p) return;
+    p.vigilanciaAcceso = !p.vigilanciaAcceso;
+
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", id);
+        await window.fsUpdateDoc(pRef, { vigilanciaAcceso: p.vigilanciaAcceso });
+      } catch (err) {
+        console.error("Error al guardar estado de vigilancia:", err);
+      }
+    }
+    renderCards();
+    showToast(p.vigilanciaAcceso ? `⚠️ ${p.nombre} marcado en vigilancia de acceso` : `✓ ${p.nombre} retirado de vigilancia`);
+  }
+
+  function openDocPreview(id) {
+    const p = currentPatients.find(item => item.id === id);
+    if (!p) return;
+    activePreviewDocPatient = p;
+    document.getElementById('previewDocModalTitle').innerText = `👁️ Previsualización: ${p.nombre}`;
+    document.getElementById('previewDocContent').innerHTML = generateGoogleDocTable(p);
+    document.getElementById('previewDocModal').style.display = 'flex';
+  }
+
+  function closeDocPreviewModal() {
+    document.getElementById('previewDocModal').style.display = 'none';
+  }
+
+  async function copyCurrentPreviewDoc() {
+    if (!activePreviewDocPatient) return;
+    const html = generateGoogleDocTable(activePreviewDocPatient);
+    await copyRichHtml(html);
+    closeDocPreviewModal();
+    showToast(`¡Nota de ${activePreviewDocPatient.nombre} copiada!`);
+  }
+
+  async function toggleNoAcudio(id) {
+    const p = currentPatients.find(item => item.id === id);
+    if (!p) return;
+    p.noAcudio = !p.noAcudio;
+
+    if (p.noAcudio) {
+      p.lastAnnotation = p.lastAnnotation && p.lastAnnotation !== 'Ninguna' ? `${p.lastAnnotation} (NO ACUDIÓ)` : 'Paciente no acude a sesión de hemodiálisis programada';
+      p.anotaciones = p.lastAnnotation;
+    }
+
+    const dateKey = document.getElementById('sessionDate').value;
+    if (window.db) {
+      try {
+        const sRef = window.fsDoc(window.db, "sesiones", dateKey);
+        const payload = {};
+        payload[id] = { noAcudio: p.noAcudio, anotaciones: p.lastAnnotation };
+        await window.fsSetDoc(sRef, payload, { merge: true });
+      } catch (err) {
+        console.error("Error al guardar estado de asistencia:", err);
+      }
+    }
+    renderCards();
+    showToast(p.noAcudio ? `Marcado como: NO ACUDIÓ` : `Paciente reactivado`);
+  }
+
+  async function deletePatientConfirm(id) {
+    const p = currentPatients.find(item => item.id === id);
+    if (!p) return;
+    const currentDay = document.getElementById('daySelect').value;
+
+    const conf = confirm(`¿Deseas eliminar a "${p.nombre}" del censo de los días ${currentDay}?`);
+    if (!conf) return;
+
+    currentPatients = currentPatients.filter(item => item.id !== id);
+
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", id);
+        if (p.dias && p.dias.length > 1) {
+          const updatedDias = p.dias.filter(d => d !== currentDay);
+          await window.fsUpdateDoc(pRef, { dias: updatedDias });
+        } else {
+          await window.fsUpdateDoc(pRef, { dias: [] });
+        }
+      } catch (err) {
+        console.error("Error al eliminar paciente:", err);
+      }
+    }
+    renderCards();
+    showToast(`Paciente eliminado de ${currentDay}`);
+  }
+
+  // --- IMPORT CENSUS MODAL & PARSING ---
+  function openImportModal() {
+    const currentDay = document.getElementById('daySelect').value;
+    document.getElementById('importDayLabel').innerText = currentDay;
+    document.getElementById('importPasteArea').innerHTML = '';
+    document.getElementById('importCensusModal').style.display = 'flex';
+  }
+
+  function closeImportModal() {
+    document.getElementById('importCensusModal').style.display = 'none';
+  }
+
+  async function processImportedCensus() {
+    try {
+      const pasteBox = document.getElementById('importPasteArea');
+      const currentDay = document.getElementById('daySelect').value;
+      const text = pasteBox.innerText || pasteBox.textContent || '';
+      const tables = pasteBox.querySelectorAll('table');
+      let imported = [];
+
+      if (tables.length > 0) {
+        tables.forEach(table => {
+          let isVespTable = false;
+          const rows = Array.from(table.querySelectorAll('tr'));
+          rows.forEach(r => {
+            const rowText = clean(r.innerText).toUpperCase();
+            if (rowText.includes('VESPERTINO')) isVespTable = true;
+            const cells = Array.from(r.querySelectorAll('td, th')).map(c => clean(c.innerText));
+            if (cells.length >= 3 && !cells[1].toUpperCase().includes('NOMBRE') && !cells[0].toUpperCase().includes('CAMA')) {
+              const p = parseImportRow(cells, currentDay, isVespTable);
+              if (p) imported.push(p);
+            }
+          });
+        });
+      } else {
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        let isVespLine = false;
+        lines.forEach(line => {
+          const upper = line.toUpperCase();
+          if (upper.includes('VESPERTINO')) isVespLine = true;
+          let cells = line.split('\t').map(c => clean(c));
+          if (cells.length < 3) cells = line.split('|').map(c => clean(c)).filter(c => c.length > 0);
+          if (cells.length >= 3 && !cells[1].toUpperCase().includes('NOMBRE') && !cells[0].toUpperCase().includes('CAMA')) {
+            const p = parseImportRow(cells, currentDay, isVespLine);
+            if (p) imported.push(p);
+          }
+        });
+      }
+
+      if (imported.length === 0) {
+        alert("No se detectaron filas válidas. Copia directamente la tabla de Google Docs (Ctrl+C) y pégala aquí (Ctrl+V).");
+        return;
+      }
+
+      for (const p of imported) {
+        const existingIdx = currentPatients.findIndex(item => item.id === p.id);
+        if (existingIdx !== -1) {
+          if (!p.lastAnnotation || p.lastAnnotation === 'Ninguna') {
+            p.lastAnnotation = currentPatients[existingIdx].lastAnnotation || 'Ninguna';
+          }
+          currentPatients[existingIdx] = Object.assign(currentPatients[existingIdx], p);
+        } else {
+          currentPatients.push(p);
+        }
+
+        if (window.db) {
+          try {
+            const pRef = window.fsDoc(window.db, "pacientes", p.id);
+            const existingSnap = await window.fsGetDoc(pRef);
+            if (existingSnap.exists()) {
+              const data = existingSnap.data();
+              const diasArr = data.dias || [];
+              if (!diasArr.includes(currentDay)) diasArr.push(currentDay);
+              await window.fsUpdateDoc(pRef, {
+                dias: diasArr,
+                maquina: p.maquina || data.maquina || '1',
+                ps: p.ps || data.ps || '60',
+                filtro: p.filtro || data.filtro || '400',
+                lastAnnotation: (p.lastAnnotation && p.lastAnnotation !== 'Ninguna') ? p.lastAnnotation : (data.lastAnnotation || 'Ninguna')
+              });
+            } else {
+              await window.fsSetDoc(pRef, p);
+            }
+          } catch (e) {
+            console.error("Error guardando en Firestore paciente importado:", e);
+          }
+        }
+      }
+
+      closeImportModal();
+      renderCards();
+      showToast(`¡Se incorporaron ${imported.length} pacientes al censo del ${currentDay}!`);
+    } catch (err) {
+      console.error("Error en processImportedCensus:", err);
+      alert("Ocurrió un error al procesar la tabla: " + err.message);
+    }
+  }
+
+  function parseImportRow(cells, currentDay, isVespertino = false) {
+    if (!cells || cells.length < 2) return null;
+    const rawName = cells[1] || '';
+    if (!rawName || rawName.length < 3 || rawName.toUpperCase().includes('NOMBRE')) return null;
+
+    const cleanId = rawName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const maq = cells[0] || '1';
+    const ps = cells[3] ? cells[3].replace(/kg/i, '').trim() : '60';
+    const pp = cells[4] || '';
+    const qs = cells[5] || '310';
+    const uf = cells[6] ? formatUF(cells[6]) : '';
+    const qd = cells[7] || '600';
+    const na = cells[8] || '138';
+    const bic = cells[9] || '3.0';
+    const temp = cells[10] || '36.0';
+    const filtro = cells[11] || '400';
+    
+    const tafc1 = parseTaFc(cells[12] || '');
+    const tafc2 = parseTaFc(cells[13] || '');
+    const obs = cells[14] || cells[cells.length - 1] || 'Ninguna';
+
+    let turnoCode = isVespertino ? "VESPERTINO_1" : "MATUTINO_1";
+
+    return {
+      id: cleanId,
+      nombre: rawName.toUpperCase(),
+      maquina: maq,
+      turno: turnoCode,
+      dias: [currentDay],
+      ps: ps,
+      pp: pp,
+      qs: qs,
+      qd: qd,
+      uf: uf,
+      na: na,
+      bic: bic,
+      temp: temp,
+      filtro: filtro,
+      ta_in: tafc1.ta,
+      fc_in: tafc1.fc,
+      ta_out: tafc2.ta,
+      fc_out: tafc2.fc,
+      lastAnnotation: obs && obs !== '-' ? obs : 'Ninguna',
+      vigilanciaAcceso: false,
+      noAcudio: false
+    };
+  }
+
   async function addPatientPrompt() {
     const nombre = prompt("Nombre completo del paciente:");
     if (!nombre) return;
@@ -1269,7 +1288,9 @@ MÉDICOS RESPONSABLES: ${medico}`;
       fc_in: "",
       ta_out: "",
       fc_out: "",
-      lastAnnotation: "Ninguna"
+      lastAnnotation: "Ninguna",
+      vigilanciaAcceso: false,
+      noAcudio: false
     };
 
     currentPatients.push(newP);
@@ -1287,277 +1308,6 @@ MÉDICOS RESPONSABLES: ${medico}`;
     t.classList.add('show');
     setTimeout(() => { t.classList.remove('show'); }, 2600);
   }
-
-  let activePreviewDocPatient = null;
-
-
-  // 5. Función Vigilancia de Infección de Angioacceso (Brote)
-  async function toggleVigilanciaAcceso(id) {
-    const p = currentPatients.find(item => item.id === id);
-    if (!p) return;
-    p.vigilanciaAcceso = !p.vigilanciaAcceso;
-
-    // Save to master patient record so it follows the patient across all days and shifts!
-    if (window.db) {
-      try {
-        const pRef = window.fsDoc(window.db, "pacientes", id);
-        await window.fsUpdateDoc(pRef, { vigilanciaAcceso: p.vigilanciaAcceso });
-      } catch (err) {
-        console.error("Error al guardar estado de vigilancia:", err);
-      }
-    }
-    renderCards();
-    showToast(p.vigilanciaAcceso ? `⚠️ ${p.nombre} marcado en vigilancia de acceso` : `✓ ${p.nombre} retirado de vigilancia`);
-  }
-
-  // 1. Previsualización de Nota para Expediente
-  function openDocPreview(id) {
-    const p = currentPatients.find(item => item.id === id);
-    if (!p) return;
-    activePreviewDocPatient = p;
-    document.getElementById('previewDocModalTitle').innerText = `👁️ Previsualización: ${p.nombre}`;
-    document.getElementById('previewDocContent').innerHTML = generateGoogleDocTable(p);
-    document.getElementById('previewDocModal').style.display = 'flex';
-  }
-
-  function closeDocPreviewModal() {
-    document.getElementById('previewDocModal').style.display = 'none';
-  }
-
-  async function copyCurrentPreviewDoc() {
-    if (!activePreviewDocPatient) return;
-    const html = generateGoogleDocTable(activePreviewDocPatient);
-    await copyRichHtml(html);
-    closeDocPreviewModal();
-    showToast(`¡Nota de ${activePreviewDocPatient.nombre} copiada!`);
-  }
-
-  // 2. Función No Acudió
-  async function toggleNoAcudio(id) {
-    const p = currentPatients.find(item => item.id === id);
-    if (!p) return;
-    p.noAcudio = !p.noAcudio;
-
-    if (p.noAcudio) {
-      p.lastAnnotation = p.lastAnnotation && p.lastAnnotation !== 'Ninguna' ? `${p.lastAnnotation} (NO ACUDIÓ)` : 'Paciente no acude a sesión de hemodiálisis programada';
-      p.anotaciones = p.lastAnnotation;
-    }
-
-    const dateKey = document.getElementById('sessionDate').value;
-    if (window.db) {
-      try {
-        const sRef = window.fsDoc(window.db, "sesiones", dateKey);
-        const payload = {};
-        payload[id] = { noAcudio: p.noAcudio, anotaciones: p.lastAnnotation };
-        await window.fsSetDoc(sRef, payload, { merge: true });
-      } catch (err) {
-        console.error("Error al guardar estado de asistencia:", err);
-      }
-    }
-    renderCards();
-    showToast(p.noAcudio ? `Marcado como: NO ACUDIÓ` : `Paciente reactivado`);
-  }
-
-  // 3. Función Eliminar Paciente
-  async function deletePatientConfirm(id) {
-    const p = currentPatients.find(item => item.id === id);
-    if (!p) return;
-    const currentDay = document.getElementById('daySelect').value;
-
-    const conf = confirm(`¿Deseas eliminar a "${p.nombre}" del censo de los días ${currentDay}?`);
-    if (!conf) return;
-
-    // Remove from local list
-    currentPatients = currentPatients.filter(item => item.id !== id);
-
-    if (window.db) {
-      try {
-        const pRef = window.fsDoc(window.db, "pacientes", id);
-        if (p.dias && p.dias.length > 1) {
-          // Just remove current day from dias array
-          const updatedDias = p.dias.filter(d => d !== currentDay);
-          await window.fsUpdateDoc(pRef, { dias: updatedDias });
-        } else {
-          // If only scheduled this day, delete from firestore
-          // (or deleteDoc if imported)
-          await window.fsUpdateDoc(pRef, { dias: [] });
-        }
-      } catch (err) {
-        console.error("Error al eliminar paciente:", err);
-      }
-    }
-    renderCards();
-    showToast(`Paciente eliminado de ${currentDay}`);
-  }
-
-  // 4. Modal Importar Censo del Día
-  function openImportModal() {
-    const currentDay = document.getElementById('daySelect').value;
-    document.getElementById('importDayLabel').innerText = currentDay;
-    document.getElementById('importPasteArea').innerHTML = '';
-    document.getElementById('importCensusModal').style.display = 'flex';
-  }
-
-  function closeImportModal() {
-    document.getElementById('importCensusModal').style.display = 'none';
-  }
-
-  async function processImportedCensus() {
-    const pasteBox = document.getElementById('importPasteArea');
-    const currentDay = document.getElementById('daySelect').value;
-    const dateKey = document.getElementById('sessionDate').value;
-    const text = pasteBox.innerText;
-    const tables = pasteBox.querySelectorAll('table');
-    let imported = [];
-
-    if (tables.length > 0) {
-      tables.forEach(table => {
-        const rows = Array.from(table.querySelectorAll('tr'));
-        rows.forEach(r => {
-          const cells = Array.from(r.querySelectorAll('td, th')).map(c => c.innerText.trim());
-          if (cells.length >= 4 && !cells[1].toUpperCase().includes('NOMBRE')) {
-            imported.push(parseImportRow(cells, currentDay));
-          }
-        });
-      });
-    } else {
-      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-      lines.forEach(line => {
-        let cells = line.split('\t').map(c => c.trim());
-        if (cells.length < 4) cells = line.split('|').map(c => c.trim()).filter(c => c.length > 0);
-        if (cells.length >= 4 && !cells[1].toUpperCase().includes('NOMBRE')) {
-          imported.push(parseImportRow(cells, currentDay));
-        }
-      });
-    }
-
-    if (imported.length === 0) {
-      alert("No se detectaron filas válidas. Copia la tabla de Google Docs completa y pégala dentro del recuadro.");
-      return;
-    }
-
-    // Save to Firestore & merge
-    for (const p of imported) {
-      // Check if already in current list
-      const existingIdx = currentPatients.findIndex(item => item.id === p.id);
-      if (existingIdx !== -1) {
-        // Keep existing annotation if new one is empty
-        if (!p.lastAnnotation || p.lastAnnotation === 'Ninguna') {
-          p.lastAnnotation = currentPatients[existingIdx].lastAnnotation || 'Ninguna';
-        }
-        currentPatients[existingIdx] = Object.assign(currentPatients[existingIdx], p);
-      } else {
-        currentPatients.push(p);
-      }
-
-      if (window.db) {
-        try {
-          const pRef = window.fsDoc(window.db, "pacientes", p.id);
-          const existingSnap = await window.fsGetDoc(pRef);
-          if (existingSnap.exists()) {
-            const data = existingSnap.data();
-            const diasArr = data.dias || [];
-            if (!diasArr.includes(currentDay)) diasArr.push(currentDay);
-            await window.fsUpdateDoc(pRef, {
-              dias: diasArr,
-              maquina: p.maquina || data.maquina || '1',
-              ps: p.ps || data.ps || '60',
-              filtro: p.filtro || data.filtro || '400',
-              lastAnnotation: (p.lastAnnotation && p.lastAnnotation !== 'Ninguna') ? p.lastAnnotation : (data.lastAnnotation || 'Ninguna')
-            });
-          } else {
-            await window.fsSetDoc(pRef, p);
-          }
-        } catch (err) {
-          console.error("Error al guardar paciente importado:", err);
-        }
-      }
-    }
-
-    closeImportModal();
-    renderCards();
-    showToast(`Se incorporaron ${imported.length} pacientes al día ${currentDay}`);
-  }
-
-  function parseImportRow(cells, currentDay) {
-    const rawName = cells[1] || 'SIN NOMBRE';
-    const cleanId = rawName.toLowerCase().replace(/[^a-z0-9]/g, '_');
-    const maq = cells[0] || '1';
-    const ps = cells[3] || '60';
-    const pp = cells[4] || '';
-    const qs = cells[5] || '310';
-    const uf = cells[6] ? (cells[6].includes('L') ? cells[6] : `${cells[6]} L`) : '';
-    const qd = cells[7] || '600';
-    const na = cells[8] || '138';
-    const bic = cells[9] || '3.0';
-    const temp = cells[10] || '36.0';
-    const filtro = cells[11] || '400';
-    
-    // Parse TA-FC
-    const tafc1 = parseTaFc(cells[12] || '');
-    const tafc2 = parseTaFc(cells[13] || '');
-    const obs = cells[14] || cells[cells.length - 1] || 'Ninguna';
-
-    return {
-      id: cleanId,
-      nombre: rawName.toUpperCase(),
-      maquina: maq,
-      turno: "MATUTINO_1",
-      dias: [currentDay],
-      ps: ps,
-      pp: pp,
-      qs: qs,
-      qd: qd,
-      uf: uf,
-      na: na,
-      bic: bic,
-      temp: temp,
-      filtro: filtro,
-      ta_in: tafc1.ta,
-      fc_in: tafc1.fc,
-      ta_out: tafc2.ta,
-      fc_out: tafc2.fc,
-      lastAnnotation: obs && obs !== '-' ? obs : 'Ninguna',
-      noAcudio: false
-    };
-  }
-
-</script>
-
-
-  <!-- Modal Previsualización Nota Expediente -->
-  <div id="previewDocModal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 720px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
-        <h3 style="font-size: 16px; color: #1e3a8a;" id="previewDocModalTitle">👁️ Previsualización de Nota para Expediente</h3>
-        <button onclick="closeDocPreviewModal()" style="background: none; border: none; font-size: 22px; cursor: pointer;">&times;</button>
-      </div>
-      <p style="font-size: 11.5px; color: var(--muted); margin-bottom: 10px;">Esta es la tabla exacta de 13 columnas continuas que se pegará en Google Docs:</p>
-      <div id="previewDocContent" style="overflow-x: auto; background: #fff; padding: 4px; border: 1px solid #e2e8f0; border-radius: 6px;"></div>
-      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px;">
-        <button class="btn-light" onclick="closeDocPreviewModal()">Cerrar</button>
-        <button class="btn-action" onclick="copyCurrentPreviewDoc()">📋 Copiar Esta Nota</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal Importar Censo del Día -->
-  <div id="importCensusModal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 650px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
-        <h3 style="font-size: 16px; color: #1e3a8a;">📥 Importar Censo de Pacientes para <span id="importDayLabel"></span></h3>
-        <button onclick="closeImportModal()" style="background: none; border: none; font-size: 22px; cursor: pointer;">&times;</button>
-      </div>
-      <p style="font-size: 12px; color: var(--muted); margin-bottom: 8px;">
-        Pega aquí las filas o la tabla de control de sala de Google Docs correspondiente a este día (con columnas CAMA, NOMBRE, PS, PP, QS, UF, etc.):
-      </p>
-      <div id="importPasteArea" contenteditable="true" style="min-height: 140px; max-height: 240px; overflow-y: auto; border: 2px dashed #94a3b8; border-radius: 6px; padding: 10px; background: #fdfdfd; font-size: 12px; outline: none; margin-bottom: 10px;"></div>
-      <div style="display: flex; justify-content: flex-end; gap: 8px;">
-        <button class="btn-light" onclick="closeImportModal()">Cancelar</button>
-        <button class="btn-save" onclick="processImportedCensus()">⚡ Procesar e Incorporar a este Día</button>
-      </div>
-    </div>
-  </div>
-
+  </script>
 </body>
 </html>
