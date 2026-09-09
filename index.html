@@ -166,7 +166,25 @@
       box-shadow: 0 1px 3px rgba(0,0,0,0.04);
       transition: all 0.2s ease;
     }
-    .patient-card.saved { border-left: 5px solid var(--accent); }
+    .patient-card.saved {
+      background: #f0fdf4 !important;
+      border: 1.5px solid #86efac !important;
+      border-left: 6px solid #16a34a !important;
+      box-shadow: 0 2px 6px rgba(22, 163, 74, 0.08);
+    }
+    .badge-visitado {
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 6px;
+      margin-left: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
     
     .patient-card.vigilancia-acceso {
       background: #fffbeb !important;
@@ -469,6 +487,181 @@
     showToast(`✓ Se movieron ${total} pacientes de ${diaOrigen} a ${diaDestino}`);
   }
 
+
+  // WIZARD VIGILANCIA DE ACCESO VASCULAR (3 PASOS)
+  let activeVigPatientId = null;
+
+  function openVigilanciaWizard(id) {
+    activeVigPatientId = id;
+    const p = currentPatients.find(item => item.id === id);
+    if (!p) return;
+
+    document.getElementById('vigWizardTitle').innerText = `🛡️ Vigilancia: ${p.nombre}`;
+    
+    // Load existing data if already set
+    const v = p.vigilanciaDatos || {};
+
+    // Paso 1
+    const hospRadios = document.getElementsByName('vigHospRadio');
+    for (let r of hospRadios) {
+      r.checked = (r.value === (v.hospUltimoMes || 'NO'));
+    }
+    document.getElementById('vigHospObsText').value = v.hospObs || '';
+    toggleVigHospObs(v.hospUltimoMes === 'SI');
+
+    // Paso 2: Accesos
+    const acc = v.accesos || {};
+    document.getElementById('vig_yd_cant').value = acc.yd_cant || 0;
+    document.getElementById('vig_yi_cant').value = acc.yi_cant || 0;
+    document.getElementById('vig_fd_cant').value = acc.fd_cant || 0;
+    document.getElementById('vig_fi_cant').value = acc.fi_cant || 0;
+    document.getElementById('vigFechaColocacion').value = acc.fechaColocacion || '';
+    
+    const accRadios = document.getElementsByName('vigAccesoActual');
+    for (let r of accRadios) {
+      r.checked = (r.value === (acc.actual || 'Yugular Derecho'));
+    }
+
+    // Paso 3: DP
+    const dpRadios = document.getElementsByName('vigDpRadio');
+    for (let r of dpRadios) {
+      r.checked = (r.value === (v.dp || 'NO'));
+    }
+    document.getElementById('vigDpObsText').value = v.dpObs || '';
+
+    // Show/hide button to withdraw
+    document.getElementById('btnQuitarVigilancia').style.display = p.vigilanciaAcceso ? 'inline-flex' : 'none';
+
+    // Start at step 1
+    irVigPaso1();
+    document.getElementById('vigilanciaWizardModal').style.display = 'flex';
+  }
+
+  function closeVigWizard() {
+    document.getElementById('vigilanciaWizardModal').style.display = 'none';
+    activeVigPatientId = null;
+  }
+
+  function irVigPaso1() {
+    document.getElementById('vigStep1').style.display = 'block';
+    document.getElementById('vigStep2').style.display = 'none';
+    document.getElementById('vigStep3').style.display = 'none';
+  }
+
+  function irVigPaso2() {
+    document.getElementById('vigStep1').style.display = 'none';
+    document.getElementById('vigStep2').style.display = 'block';
+    document.getElementById('vigStep3').style.display = 'none';
+  }
+
+  function irVigPaso3() {
+    document.getElementById('vigStep1').style.display = 'none';
+    document.getElementById('vigStep2').style.display = 'none';
+    document.getElementById('vigStep3').style.display = 'block';
+  }
+
+  function toggleVigHospObs(show) {
+    document.getElementById('vigHospObsContainer').style.display = show ? 'block' : 'none';
+  }
+
+  function toggleVigDpObs(show) {
+    // Both states can show textarea, or focus when true
+  }
+
+  async function guardarYFinalizarVigilancia() {
+    if (!activeVigPatientId) return;
+    const p = currentPatients.find(item => item.id === activeVigPatientId);
+    if (!p) return;
+
+    // Collect Step 1
+    let hospVal = 'NO';
+    for (let r of document.getElementsByName('vigHospRadio')) {
+      if (r.checked) hospVal = r.value;
+    }
+    const hospObs = document.getElementById('vigHospObsText').value.trim();
+
+    // Collect Step 2
+    let actualAcceso = 'Yugular Derecho';
+    for (let r of document.getElementsByName('vigAccesoActual')) {
+      if (r.checked) actualAcceso = r.value;
+    }
+    const accesos = {
+      yd_cant: parseInt(document.getElementById('vig_yd_cant').value, 10) || 0,
+      yi_cant: parseInt(document.getElementById('vig_yi_cant').value, 10) || 0,
+      fd_cant: parseInt(document.getElementById('vig_fd_cant').value, 10) || 0,
+      fi_cant: parseInt(document.getElementById('vig_fi_cant').value, 10) || 0,
+      actual: actualAcceso,
+      fechaColocacion: document.getElementById('vigFechaColocacion').value || ''
+    };
+
+    // Collect Step 3
+    let dpVal = 'NO';
+    for (let r of document.getElementsByName('vigDpRadio')) {
+      if (r.checked) dpVal = r.value;
+    }
+    const dpObs = document.getElementById('vigDpObsText').value.trim();
+
+    p.vigilanciaAcceso = true;
+    p.vigilanciaDatos = {
+      hospUltimoMes: hospVal,
+      hospObs: hospObs,
+      accesos: accesos,
+      dp: dpVal,
+      dpObs: dpObs
+    };
+
+    // Also enrich annotation if there is valuable clinical vigilance info
+    let summaryNote = `[VIGILANCIA: ${actualAcceso}`;
+    if (accesos.fechaColocacion) summaryNote += ` (${accesos.fechaColocacion})`;
+    if (hospVal === 'SI') summaryNote += ` | Hosp mes previo: ${hospObs || 'Sí'}`;
+    if (dpVal === 'SI') summaryNote += ` | Antecedente DP: ${dpObs || 'Sí'}`;
+    summaryNote += `]`;
+
+    if (!p.lastAnnotation || p.lastAnnotation === 'Ninguna') {
+      p.lastAnnotation = summaryNote;
+    } else if (!p.lastAnnotation.includes('[VIGILANCIA:')) {
+      p.lastAnnotation = `${p.lastAnnotation} ${summaryNote}`;
+    }
+
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", p.id);
+        await window.fsUpdateDoc(pRef, {
+          vigilanciaAcceso: true,
+          vigilanciaDatos: p.vigilanciaDatos,
+          lastAnnotation: p.lastAnnotation
+        });
+      } catch (err) {
+        console.error("Error guardando vigilancia en Firestore:", err);
+      }
+    }
+
+    closeVigWizard();
+    renderCards();
+    showToast(`⚠️ ${p.nombre} registrado en Vigilancia de Acceso`);
+  }
+
+  async function quitarVigilanciaActual() {
+    if (!activeVigPatientId) return;
+    const p = currentPatients.find(item => item.id === activeVigPatientId);
+    if (!p) return;
+
+    p.vigilanciaAcceso = false;
+
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", p.id);
+        await window.fsUpdateDoc(pRef, { vigilanciaAcceso: false });
+      } catch (err) {
+        console.error("Error al retirar vigilancia en Firestore:", err);
+      }
+    }
+
+    closeVigWizard();
+    renderCards();
+    showToast(`✓ ${p.nombre} retirado de vigilancia`);
+  }
+
 </script>
 </head>
 <body>
@@ -744,6 +937,9 @@
           currentPatients.forEach(p => {
             if (sessionData[p.id]) {
               Object.assign(p, sessionData[p.id]);
+              if (sessionData[p.id].isSaved || sessionData[p.id].ta_in || sessionData[p.id].pp) {
+                p.isSaved = true;
+              }
             }
           });
         }
@@ -787,6 +983,12 @@
     if (currentShiftFilter !== 'TODOS') {
       list = currentPatients.filter(p => p.turno === currentShiftFilter);
     }
+    // Ordenar camas por turno en orden numérico ascendente (1, 2, 3... 10)
+    list.sort((a, b) => {
+      const numA = parseInt(String(a.maquina || '').replace(/\D/g, ''), 10) || 999;
+      const numB = parseInt(String(b.maquina || '').replace(/\D/g, ''), 10) || 999;
+      return numA - numB;
+    });
 
     document.getElementById('barSummary').innerText = `${list.length} de ${currentPatients.length} pacientes`;
 
@@ -811,7 +1013,7 @@
           <div style="flex: 1; padding-right: 10px;">
             <div class="card-title" style="${p.noAcudio ? 'text-decoration: line-through; color: #94a3b8;' : ''}">
               ${p.nombre}
-              ${p.noAcudio ? '<span class="badge-no-acudio">NO ACUDIÓ</span>' : ''}${p.vigilanciaAcceso ? '<span class="badge-vigilancia">⚠️ VIGILANCIA ACCESO</span>' : ''}
+              ${p.noAcudio ? '<span class="badge-no-acudio">NO ACUDIÓ</span>' : ''}${p.vigilanciaAcceso ? '<span class="badge-vigilancia">⚠️ VIGILANCIA ACCESO</span>' : ''}${p.isSaved ? '<span class="badge-visitado">✓ VISITADO</span>' : ''}
             </div>
             <div class="card-sub" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 3px;">
               <select style="font-size: 11px; padding: 2px 6px; border-radius: 4px; border: 1px solid #cbd5e1; font-weight: 700; background: #eff6ff; color: #1e40af; outline: none;" onchange="changePatientTurno('${p.id}', this.value)">
@@ -841,6 +1043,10 @@
           <div class="field-item">
             <label>UF (Litros):</label>
             <input type="text" id="uf_${p.id}" value="${p.uf || ''}" placeholder="Ej. 2.2 L" onchange="autoSavePatient('${p.id}')">
+          </div>
+          <div class="field-item">
+            <label>Tiempo (hrs):</label>
+            <input type="text" id="tiempo_${p.id}" value="${p.tiempo || '2:30'}" placeholder="2:30" onchange="autoSavePatient('${p.id}')">
           </div>
           <div class="field-item">
             <label>Filtro:</label>
@@ -908,7 +1114,7 @@
           <button class="btn-light" onclick="openDocPreview('${p.id}')">👁️ Ver Nota</button>
           <button class="btn-action" onclick="openNotaPisoSingle('${p.id}')">📝 Nota Piso</button>
           <button class="btn-light" onclick="copySingleDocNote('${p.id}')">📋 Copiar Doc</button>
-          <button class="${p.vigilanciaAcceso ? 'btn-warn' : 'btn-light'}" onclick="toggleVigilanciaAcceso('${p.id}')">${p.vigilanciaAcceso ? '⚠️ En Vigilancia' : '🛡️ Vigilar Acceso'}</button>
+          <button class="${p.vigilanciaAcceso ? 'btn-warn' : 'btn-light'}" onclick="openVigilanciaWizard('${p.id}')">${p.vigilanciaAcceso ? '⚠️ En Vigilancia' : '🛡️ Vigilar Acceso'}</button>
           <button class="${p.noAcudio ? 'btn-save' : 'btn-warn'}" onclick="toggleNoAcudio('${p.id}')">${p.noAcudio ? '↩️ Reactivar' : '🚫 No Acudió'}</button>
           <button class="btn-danger" onclick="deletePatientConfirm('${p.id}')">🗑️ Eliminar</button>
         </div>
@@ -940,6 +1146,8 @@
     if (bicInput) p.bic = bicInput.value.trim();
     const anticoagInput = document.getElementById(`anticoag_${id}`);
     if (anticoagInput) p.anticoag = anticoagInput.value;
+    const tiempoInput = document.getElementById(`tiempo_${id}`);
+    if (tiempoInput) p.tiempo = tiempoInput.value.trim();
 
     p.pp = document.getElementById(`pp_${id}`).value.trim();
     p.uf = document.getElementById(`uf_${id}`).value.trim();
@@ -968,7 +1176,8 @@
           na: p.na || '138',
           k: p.k || '2',
           bic: p.bic || '3.0',
-          anticoag: p.anticoag || 'SH'
+          anticoag: p.anticoag || 'SH',
+          tiempo: p.tiempo || '2:30'
         });
 
         const sRef = window.fsDoc(window.db, "sesiones", dateKey);
@@ -978,6 +1187,7 @@
           ps: p.ps,
           pp: p.pp,
           uf: p.uf,
+          tiempo: p.tiempo || '2:30',
           filtro: p.filtro,
           qs: p.qs,
           qd: p.qd,
@@ -990,7 +1200,8 @@
           ta_out: p.ta_out,
           fc_out: p.fc_out,
           temp: p.temp,
-          anotaciones: newAnnotation
+          anotaciones: newAnnotation,
+          isSaved: true
         };
         await window.fsSetDoc(sRef, sessionPayload, { merge: true });
 
@@ -1354,7 +1565,7 @@
       <td style="${tdCenter}">18</td>
       <td style="${tdCenter}">${p.temp || '36.0'}</td>
       <td style="${tdCenter}">93%</td>
-      <td style="${tdCenter}">2:30</td>
+      <td style="${tdCenter}">${p.tiempo || '2:30'}</td>
       <td style="${tdCenter}">${p.qs || '310'}</td>
       <td style="${tdCenter}">${p.qd || '600'}</td>
       <td style="${tdCenter}">${p.filtro || '400'}</td>
@@ -1432,6 +1643,12 @@
     if (currentShiftFilter !== 'TODOS') {
       list = currentPatients.filter(p => p.turno === currentShiftFilter);
     }
+    // Ordenar camas por turno en orden numérico ascendente (1, 2, 3... 10)
+    list.sort((a, b) => {
+      const numA = parseInt(String(a.maquina || '').replace(/\D/g, ''), 10) || 999;
+      const numB = parseInt(String(b.maquina || '').replace(/\D/g, ''), 10) || 999;
+      return numA - numB;
+    });
     if (list.length === 0) return;
 
     for (const p of list) {
@@ -1499,7 +1716,7 @@
     return `***NOTA DE HEMODIÁLISIS***
 PACIENTE: ${p.nombre.toUpperCase()}
 
-PACIENTE QUIÉN PASA A SESIÓN DE HEMODIÁLISIS PROGRAMADA EN MODALIDAD CONVENCIONAL, CON LOS SIGUIENTES PARÁMETROS FILTRO: ${p.filtro || '400'} T°: ${p.temp || '36.0'} TIEMPO: ${tiempo} UF: ${p.uf || '-'} QS: ${p.qs || '310'} QD: ${p.qd || '600'} NA: ${p.na || '138'} HCO3: ${p.bic || '3.0'} POTASIO: ${potasioVal} ANTICOAGULACIÓN: ${anticoagVal}
+PACIENTE QUIÉN PASA A SESIÓN DE HEMODIÁLISIS PROGRAMADA EN MODALIDAD CONVENCIONAL, CON LOS SIGUIENTES PARÁMETROS FILTRO: ${p.filtro || '400'} T°: ${p.temp || '36.0'} TIEMPO: ${p.tiempo || tiempo || '2:30 hrs'} UF: ${p.uf || '-'} QS: ${p.qs || '310'} QD: ${p.qd || '600'} NA: ${p.na || '138'} HCO3: ${p.bic || '3.0'} POTASIO: ${potasioVal} ANTICOAGULACIÓN: ${anticoagVal}
 INGRESA CON LOS SIGNOS VITALES:
 TA: ${taIn} FC: ${fcIn} FR: 18 rpm
 EVENTUALIDADES:
@@ -1531,6 +1748,12 @@ MÉDICOS RESPONSABLES: ${medico}`;
     if (currentShiftFilter !== 'TODOS') {
       list = currentPatients.filter(p => p.turno === currentShiftFilter);
     }
+    // Ordenar camas por turno en orden numérico ascendente (1, 2, 3... 10)
+    list.sort((a, b) => {
+      const numA = parseInt(String(a.maquina || '').replace(/\D/g, ''), 10) || 999;
+      const numB = parseInt(String(b.maquina || '').replace(/\D/g, ''), 10) || 999;
+      return numA - numB;
+    });
     if (list.length === 0) return;
 
     const tiempo = document.getElementById('pisoTiempo').value || '2:30 hrs';
@@ -1757,6 +1980,181 @@ MÉDICOS RESPONSABLES: ${medico}`;
     showToast(`✓ Se movieron ${total} pacientes de ${diaOrigen} a ${diaDestino}`);
   }
 
+
+  // WIZARD VIGILANCIA DE ACCESO VASCULAR (3 PASOS)
+  let activeVigPatientId = null;
+
+  function openVigilanciaWizard(id) {
+    activeVigPatientId = id;
+    const p = currentPatients.find(item => item.id === id);
+    if (!p) return;
+
+    document.getElementById('vigWizardTitle').innerText = `🛡️ Vigilancia: ${p.nombre}`;
+    
+    // Load existing data if already set
+    const v = p.vigilanciaDatos || {};
+
+    // Paso 1
+    const hospRadios = document.getElementsByName('vigHospRadio');
+    for (let r of hospRadios) {
+      r.checked = (r.value === (v.hospUltimoMes || 'NO'));
+    }
+    document.getElementById('vigHospObsText').value = v.hospObs || '';
+    toggleVigHospObs(v.hospUltimoMes === 'SI');
+
+    // Paso 2: Accesos
+    const acc = v.accesos || {};
+    document.getElementById('vig_yd_cant').value = acc.yd_cant || 0;
+    document.getElementById('vig_yi_cant').value = acc.yi_cant || 0;
+    document.getElementById('vig_fd_cant').value = acc.fd_cant || 0;
+    document.getElementById('vig_fi_cant').value = acc.fi_cant || 0;
+    document.getElementById('vigFechaColocacion').value = acc.fechaColocacion || '';
+    
+    const accRadios = document.getElementsByName('vigAccesoActual');
+    for (let r of accRadios) {
+      r.checked = (r.value === (acc.actual || 'Yugular Derecho'));
+    }
+
+    // Paso 3: DP
+    const dpRadios = document.getElementsByName('vigDpRadio');
+    for (let r of dpRadios) {
+      r.checked = (r.value === (v.dp || 'NO'));
+    }
+    document.getElementById('vigDpObsText').value = v.dpObs || '';
+
+    // Show/hide button to withdraw
+    document.getElementById('btnQuitarVigilancia').style.display = p.vigilanciaAcceso ? 'inline-flex' : 'none';
+
+    // Start at step 1
+    irVigPaso1();
+    document.getElementById('vigilanciaWizardModal').style.display = 'flex';
+  }
+
+  function closeVigWizard() {
+    document.getElementById('vigilanciaWizardModal').style.display = 'none';
+    activeVigPatientId = null;
+  }
+
+  function irVigPaso1() {
+    document.getElementById('vigStep1').style.display = 'block';
+    document.getElementById('vigStep2').style.display = 'none';
+    document.getElementById('vigStep3').style.display = 'none';
+  }
+
+  function irVigPaso2() {
+    document.getElementById('vigStep1').style.display = 'none';
+    document.getElementById('vigStep2').style.display = 'block';
+    document.getElementById('vigStep3').style.display = 'none';
+  }
+
+  function irVigPaso3() {
+    document.getElementById('vigStep1').style.display = 'none';
+    document.getElementById('vigStep2').style.display = 'none';
+    document.getElementById('vigStep3').style.display = 'block';
+  }
+
+  function toggleVigHospObs(show) {
+    document.getElementById('vigHospObsContainer').style.display = show ? 'block' : 'none';
+  }
+
+  function toggleVigDpObs(show) {
+    // Both states can show textarea, or focus when true
+  }
+
+  async function guardarYFinalizarVigilancia() {
+    if (!activeVigPatientId) return;
+    const p = currentPatients.find(item => item.id === activeVigPatientId);
+    if (!p) return;
+
+    // Collect Step 1
+    let hospVal = 'NO';
+    for (let r of document.getElementsByName('vigHospRadio')) {
+      if (r.checked) hospVal = r.value;
+    }
+    const hospObs = document.getElementById('vigHospObsText').value.trim();
+
+    // Collect Step 2
+    let actualAcceso = 'Yugular Derecho';
+    for (let r of document.getElementsByName('vigAccesoActual')) {
+      if (r.checked) actualAcceso = r.value;
+    }
+    const accesos = {
+      yd_cant: parseInt(document.getElementById('vig_yd_cant').value, 10) || 0,
+      yi_cant: parseInt(document.getElementById('vig_yi_cant').value, 10) || 0,
+      fd_cant: parseInt(document.getElementById('vig_fd_cant').value, 10) || 0,
+      fi_cant: parseInt(document.getElementById('vig_fi_cant').value, 10) || 0,
+      actual: actualAcceso,
+      fechaColocacion: document.getElementById('vigFechaColocacion').value || ''
+    };
+
+    // Collect Step 3
+    let dpVal = 'NO';
+    for (let r of document.getElementsByName('vigDpRadio')) {
+      if (r.checked) dpVal = r.value;
+    }
+    const dpObs = document.getElementById('vigDpObsText').value.trim();
+
+    p.vigilanciaAcceso = true;
+    p.vigilanciaDatos = {
+      hospUltimoMes: hospVal,
+      hospObs: hospObs,
+      accesos: accesos,
+      dp: dpVal,
+      dpObs: dpObs
+    };
+
+    // Also enrich annotation if there is valuable clinical vigilance info
+    let summaryNote = `[VIGILANCIA: ${actualAcceso}`;
+    if (accesos.fechaColocacion) summaryNote += ` (${accesos.fechaColocacion})`;
+    if (hospVal === 'SI') summaryNote += ` | Hosp mes previo: ${hospObs || 'Sí'}`;
+    if (dpVal === 'SI') summaryNote += ` | Antecedente DP: ${dpObs || 'Sí'}`;
+    summaryNote += `]`;
+
+    if (!p.lastAnnotation || p.lastAnnotation === 'Ninguna') {
+      p.lastAnnotation = summaryNote;
+    } else if (!p.lastAnnotation.includes('[VIGILANCIA:')) {
+      p.lastAnnotation = `${p.lastAnnotation} ${summaryNote}`;
+    }
+
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", p.id);
+        await window.fsUpdateDoc(pRef, {
+          vigilanciaAcceso: true,
+          vigilanciaDatos: p.vigilanciaDatos,
+          lastAnnotation: p.lastAnnotation
+        });
+      } catch (err) {
+        console.error("Error guardando vigilancia en Firestore:", err);
+      }
+    }
+
+    closeVigWizard();
+    renderCards();
+    showToast(`⚠️ ${p.nombre} registrado en Vigilancia de Acceso`);
+  }
+
+  async function quitarVigilanciaActual() {
+    if (!activeVigPatientId) return;
+    const p = currentPatients.find(item => item.id === activeVigPatientId);
+    if (!p) return;
+
+    p.vigilanciaAcceso = false;
+
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", p.id);
+        await window.fsUpdateDoc(pRef, { vigilanciaAcceso: false });
+      } catch (err) {
+        console.error("Error al retirar vigilancia en Firestore:", err);
+      }
+    }
+
+    closeVigWizard();
+    renderCards();
+    showToast(`✓ ${p.nombre} retirado de vigilancia`);
+  }
+
 </script>
 
   <!-- Modal Mover Censo de Día -->
@@ -1785,6 +2183,137 @@ MÉDICOS RESPONSABLES: ${medico}`;
         <button class="btn-light" onclick="closeMoverDiaModal()">Cancelar</button>
         <button class="btn-save" onclick="confirmarMoverDia()">🔄 Mover Pacientes</button>
       </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL WIZARD: VIGILANCIA DE ACCESO VASCULAR (3 PASOS) -->
+  <div id="vigilanciaWizardModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 520px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 2px solid #fde68a; padding-bottom: 8px;">
+        <h3 style="font-size: 16px; color: #92400e;" id="vigWizardTitle">🛡️ Vigilancia de Acceso Vascular</h3>
+        <button onclick="closeVigWizard()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #78350f;">&times;</button>
+      </div>
+
+      <!-- PASO 1: Hospitalizaciones en el último mes -->
+      <div id="vigStep1" style="display: block;">
+        <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 6px; padding: 10px; margin-bottom: 14px;">
+          <strong style="color: #b45309; font-size: 13px;">Paso 1 de 3: Hospitalizaciones Recientes</strong>
+        </div>
+        <p style="font-size: 13px; font-weight: 700; margin-bottom: 10px; color: #1e293b;">
+          ¿El paciente ha tenido hospitalizaciones en el último mes?
+        </p>
+        <div style="display: flex; gap: 16px; margin-bottom: 14px;">
+          <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+            <input type="radio" name="vigHospRadio" value="NO" checked onchange="toggleVigHospObs(false)"> No
+          </label>
+          <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+            <input type="radio" name="vigHospRadio" value="SI" onchange="toggleVigHospObs(true)"> Sí
+          </label>
+        </div>
+        <div id="vigHospObsContainer" style="display: none; margin-bottom: 14px;">
+          <label style="font-size: 11.5px; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Observaciones / Causa de hospitalización:</label>
+          <textarea id="vigHospObsText" placeholder="Especifique motivo, días de estancia, antibióticos..." style="width: 100%; height: 60px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px; font-size: 12px; outline: none;"></textarea>
+        </div>
+        <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 18px;">
+          <button class="btn-warn" id="btnQuitarVigilancia" style="padding: 6px 12px; font-size: 12px;" onclick="quitarVigilanciaActual()">Retirar de Vigilancia</button>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn-light" onclick="closeVigWizard()">Cancelar</button>
+            <button class="btn-save" onclick="irVigPaso2()">Guardar y Siguiente ➔</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PASO 2: Historial de Accesos Vasculares -->
+      <div id="vigStep2" style="display: none;">
+        <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 6px; padding: 10px; margin-bottom: 14px;">
+          <strong style="color: #b45309; font-size: 13px;">Paso 2 de 3: Historial de Accesos Vasculares</strong>
+        </div>
+        <p style="font-size: 12px; color: #64748b; margin-bottom: 10px;">Indica cuántos accesos ha tenido de cada tipo y selecciona cuál es el actual:</p>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;">
+          <div style="display: grid; grid-template-columns: 1fr 90px 80px; gap: 8px; align-items: center; background: #f8fafc; padding: 6px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+            <span style="font-size: 12.5px; font-weight: 700;">Yugular Derecho:</span>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <span style="font-size: 11px; color: #64748b;">Cant:</span>
+              <input type="number" id="vig_yd_cant" min="0" value="0" style="width: 48px; padding: 3px; font-size: 12px; text-align: center; border: 1px solid #cbd5e1; border-radius: 4px;">
+            </div>
+            <label style="font-size: 11.5px; font-weight: 700; color: #1e40af; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+              <input type="radio" name="vigAccesoActual" value="Yugular Derecho" checked> Actual
+            </label>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 90px 80px; gap: 8px; align-items: center; background: #f8fafc; padding: 6px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+            <span style="font-size: 12.5px; font-weight: 700;">Yugular Izquierdo:</span>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <span style="font-size: 11px; color: #64748b;">Cant:</span>
+              <input type="number" id="vig_yi_cant" min="0" value="0" style="width: 48px; padding: 3px; font-size: 12px; text-align: center; border: 1px solid #cbd5e1; border-radius: 4px;">
+            </div>
+            <label style="font-size: 11.5px; font-weight: 700; color: #1e40af; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+              <input type="radio" name="vigAccesoActual" value="Yugular Izquierdo"> Actual
+            </label>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 90px 80px; gap: 8px; align-items: center; background: #f8fafc; padding: 6px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+            <span style="font-size: 12.5px; font-weight: 700;">Femoral Derecho:</span>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <span style="font-size: 11px; color: #64748b;">Cant:</span>
+              <input type="number" id="vig_fd_cant" min="0" value="0" style="width: 48px; padding: 3px; font-size: 12px; text-align: center; border: 1px solid #cbd5e1; border-radius: 4px;">
+            </div>
+            <label style="font-size: 11.5px; font-weight: 700; color: #1e40af; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+              <input type="radio" name="vigAccesoActual" value="Femoral Derecho"> Actual
+            </label>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 90px 80px; gap: 8px; align-items: center; background: #f8fafc; padding: 6px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+            <span style="font-size: 12.5px; font-weight: 700;">Femoral Izquierdo:</span>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <span style="font-size: 11px; color: #64748b;">Cant:</span>
+              <input type="number" id="vig_fi_cant" min="0" value="0" style="width: 48px; padding: 3px; font-size: 12px; text-align: center; border: 1px solid #cbd5e1; border-radius: 4px;">
+            </div>
+            <label style="font-size: 11.5px; font-weight: 700; color: #1e40af; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+              <input type="radio" name="vigAccesoActual" value="Femoral Izquierdo"> Actual
+            </label>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 14px;">
+          <label style="font-size: 11.5px; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">📅 Fecha de colocación del acceso actual:</label>
+          <input type="date" id="vigFechaColocacion" style="width: 100%; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; outline: none;">
+        </div>
+
+        <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 18px;">
+          <button class="btn-light" onclick="irVigPaso1()">⬅ Atrás</button>
+          <button class="btn-save" onclick="irVigPaso3()">Guardar y Siguiente ➔</button>
+        </div>
+      </div>
+
+      <!-- PASO 3: Diálisis Peritoneal -->
+      <div id="vigStep3" style="display: none;">
+        <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 6px; padding: 10px; margin-bottom: 14px;">
+          <strong style="color: #b45309; font-size: 13px;">Paso 3 de 3: Diálisis Peritoneal</strong>
+        </div>
+        <p style="font-size: 13px; font-weight: 700; margin-bottom: 10px; color: #1e293b;">
+          ¿Tiene antecedente de Diálisis Peritoneal?
+        </p>
+        <div style="display: flex; gap: 16px; margin-bottom: 14px;">
+          <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+            <input type="radio" name="vigDpRadio" value="NO" checked onchange="toggleVigDpObs(false)"> No
+          </label>
+          <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+            <input type="radio" name="vigDpRadio" value="SI" onchange="toggleVigDpObs(true)"> Sí
+          </label>
+        </div>
+        <div id="vigDpObsContainer" style="margin-bottom: 14px;">
+          <label style="font-size: 11.5px; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Observaciones / Motivo de cambio a hemodiálisis:</label>
+          <textarea id="vigDpObsText" placeholder="Especifique peritonitis previa, disfunción de catéter, tiempo en DP..." style="width: 100%; height: 65px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px; font-size: 12px; outline: none;"></textarea>
+        </div>
+        <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 18px;">
+          <button class="btn-light" onclick="irVigPaso2()">⬅ Atrás</button>
+          <button class="btn-save" onclick="guardarYFinalizarVigilancia()">💾 Guardar y Finalizar Vigilancia</button>
+        </div>
+      </div>
+
     </div>
   </div>
 
