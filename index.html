@@ -19,7 +19,7 @@
       --warn: #d97706;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-    body { background-color: var(--bg); color: var(--text); padding-bottom: 90px; -webkit-tap-highlight-color: transparent; }
+    body { background-color: var(--bg); color: var(--text); padding-bottom: 24px; -webkit-tap-highlight-color: transparent; }
     
     /* Top App Bar */
     .app-header {
@@ -323,25 +323,6 @@
     .btn-danger:hover { background: #b91c1c; }
     .btn-warn { background: #d97706; color: #fff; }
     .btn-warn:hover { background: #b45309; }
-
-    /* Bottom Fixed Bar */
-    .floating-bar {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: #fff;
-      border-top: 1px solid var(--border);
-      padding: 10px 16px;
-      box-shadow: 0 -3px 10px rgba(0,0,0,0.06);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
-      z-index: 100;
-    }
-    .bar-info { font-size: 12px; color: var(--muted); }
-    .bar-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
 
     /* Modals */
     .modal-overlay {
@@ -662,6 +643,321 @@
     showToast(`✓ ${p.nombre} retirado de vigilancia`);
   }
 
+
+  // GENERACIÓN DE REPORTE DE VIGILANCIA DE ACCESO
+  let reportePacientesData = [];
+
+  function formatTurnoNombre(code) {
+    if (!code) return 'No especificado';
+    if (code === 'MATUTINO_1') return '1er Turno Matutino';
+    if (code === 'MATUTINO_2') return '2do Turno Matutino';
+    if (code === 'VESPERTINO_1') return '1er Turno Vespertino';
+    if (code === 'VESPERTINO_2') return '2do Turno Vespertino';
+    return code;
+  }
+
+  async function openReporteVigilanciaModal() {
+    document.getElementById('reporteVigilanciaModal').style.display = 'flex';
+    document.getElementById('reporteTotalPacientes').innerText = 'Consultando base de datos...';
+    document.getElementById('reporteContenidoHtml').innerHTML = '<p style="text-align:center; color:#64748b; padding:20px;">Cargando censo completo de vigilancia...</p>';
+
+    let allVig = [];
+
+    // Consultar todos los pacientes de la base de datos completa
+    if (window.db) {
+      try {
+        const patientsRef = window.fsCollection(window.db, "pacientes");
+        const snap = await window.fsGetDocs(patientsRef);
+        snap.forEach(docSnap => {
+          const data = { id: docSnap.id, ...docSnap.data() };
+          if (data.vigilanciaAcceso === true) {
+            allVig.push(data);
+          }
+        });
+      } catch (err) {
+        console.error("Error al obtener pacientes en vigilancia:", err);
+      }
+    }
+
+    // Fallback con pacientes locales si la nube no devolvió o está offline
+    if (allVig.length === 0) {
+      allVig = currentPatients.filter(p => p.vigilanciaAcceso === true);
+    }
+
+    reportePacientesData = allVig;
+    document.getElementById('reporteTotalPacientes').innerText = `Total de pacientes en vigilancia activa: ${allVig.length}`;
+
+    if (allVig.length === 0) {
+      document.getElementById('reporteContenidoHtml').innerHTML = `
+        <div style="text-align:center; padding:30px; color:#64748b;">
+          <p style="font-size:14px; font-weight:700; color:#0f172a; margin-bottom:6px;">No hay pacientes con bandera de vigilancia activa.</p>
+          <p style="font-size:12px;">Para agregar un paciente a este reporte, haz clic en el botón <strong>🛡️ Vigilar Acceso</strong> en su tarjeta.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Render HTML Table
+    let tableHtml = `
+      <table border="1" cellspacing="0" cellpadding="6" style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:11.5px; border-color:#cbd5e1;">
+        <thead>
+          <tr style="background:#fef3c7; color:#92400e; text-align:left; font-size:11px;">
+            <th style="padding:6px; border:1px solid #cbd5e1;">Paciente</th>
+            <th style="padding:6px; border:1px solid #cbd5e1;">Días / Turno</th>
+            <th style="padding:6px; border:1px solid #cbd5e1;">Historial de Accesos</th>
+            <th style="padding:6px; border:1px solid #cbd5e1;">Hospitalizaciones (Último Mes)</th>
+            <th style="padding:6px; border:1px solid #cbd5e1;">Diálisis Peritoneal</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    allVig.forEach(p => {
+      const v = p.vigilanciaDatos || {};
+      const acc = v.accesos || {};
+      
+      const diasStr = (p.dias && p.dias.length > 0) ? p.dias.join(', ') : 'Sin días asignados';
+      const turnoStr = formatTurnoNombre(p.turno);
+
+      // Accesos
+      let accesosText = `<strong>Actual:</strong> ${acc.actual || 'No registrado'}`;
+      if (acc.fechaColocacion) accesosText += `<br><small style="color:#64748b;">Fecha colocación: ${acc.fechaColocacion}</small>`;
+      
+      let previosArr = [];
+      if (acc.yd_cant) previosArr.push(`Yugular Der: ${acc.yd_cant}`);
+      if (acc.yi_cant) previosArr.push(`Yugular Izq: ${acc.yi_cant}`);
+      if (acc.fd_cant) previosArr.push(`Femoral Der: ${acc.fd_cant}`);
+      if (acc.fi_cant) previosArr.push(`Femoral Izq: ${acc.fi_cant}`);
+      
+      if (previosArr.length > 0) {
+        accesosText += `<br><small style="color:#475569;">Previos: ${previosArr.join(' | ')}</small>`;
+      }
+
+      // Hospitalizaciones
+      let hospText = `<strong>${v.hospUltimoMes || 'No'}</strong>`;
+      if (v.hospObs) {
+        hospText += `<br><span style="font-size:11px; color:#475569;">${v.hospObs}</span>`;
+      }
+
+      // DP
+      let dpText = `<strong>${v.dp || 'No'}</strong>`;
+      if (v.dpObs) {
+        dpText += `<br><span style="font-size:11px; color:#475569;">${v.dpObs}</span>`;
+      }
+
+      tableHtml += `
+        <tr style="vertical-align:top;">
+          <td style="padding:6px; border:1px solid #cbd5e1; font-weight:700; color:#1e3a8a;">
+            ${p.nombre}
+            <br><small style="font-weight:normal; color:#64748b;">Máq/Cama: ${p.maquina || '-'}</small>
+          </td>
+          <td style="padding:6px; border:1px solid #cbd5e1;">
+            <strong>${diasStr}</strong>
+            <br><small style="color:#475569;">${turnoStr}</small>
+          </td>
+          <td style="padding:6px; border:1px solid #cbd5e1;">${accesosText}</td>
+          <td style="padding:6px; border:1px solid #cbd5e1;">${hospText}</td>
+          <td style="padding:6px; border:1px solid #cbd5e1;">${dpText}</td>
+        </tr>
+      `;
+    });
+
+    tableHtml += `
+        </tbody>
+      </table>
+    `;
+
+    document.getElementById('reporteContenidoHtml').innerHTML = tableHtml;
+  }
+
+  function closeReporteVigilanciaModal() {
+    document.getElementById('reporteVigilanciaModal').style.display = 'none';
+  }
+
+  async function copyReporteVigilanciaHtml() {
+    const cont = document.getElementById('reporteContenidoHtml');
+    if (!cont || reportePacientesData.length === 0) {
+      alert("No hay pacientes para copiar.");
+      return;
+    }
+    await copyRichHtml(cont.innerHTML);
+    showToast("¡Tabla de reporte copiada! Lista para Google Docs o Word");
+  }
+
+  async function copyReporteVigilanciaTexto() {
+    if (reportePacientesData.length === 0) {
+      alert("No hay pacientes para copiar.");
+      return;
+    }
+
+    let txt = `REPORTE EPIDEMIOLÓGICO: VIGILANCIA DE ACCESOS VASCULARES\n`;
+    txt += `Fecha de emisión: ${getSelectedDateFormatted()}\n`;
+    txt += `Total pacientes: ${reportePacientesData.length}\n\n`;
+
+    reportePacientesData.forEach((p, idx) => {
+      const v = p.vigilanciaDatos || {};
+      const acc = v.accesos || {};
+      const diasStr = (p.dias && p.dias.length > 0) ? p.dias.join(', ') : '-';
+      const turnoStr = formatTurnoNombre(p.turno);
+
+      let previos = [];
+      if (acc.yd_cant) previos.push(`YD: ${acc.yd_cant}`);
+      if (acc.yi_cant) previos.push(`YI: ${acc.yi_cant}`);
+      if (acc.fd_cant) previos.push(`FD: ${acc.fd_cant}`);
+      if (acc.fi_cant) previos.push(`FI: ${acc.fi_cant}`);
+
+      txt += `${idx + 1}. PACIENTE: ${p.nombre} (Máq: ${p.maquina || '-'})
+`;
+      txt += `   - Días y Turno: ${diasStr} | ${turnoStr}
+`;
+      txt += `   - Acceso Actual: ${acc.actual || 'No registrado'}${acc.fechaColocacion ? ' (Colocado: ' + acc.fechaColocacion + ')' : ''}
+`;
+      if (previos.length > 0) txt += `   - Historial Accesos Previos: ${previos.join(', ')}
+`;
+      txt += `   - Hospitalizaciones Último Mes: ${v.hospUltimoMes || 'No'}${v.hospObs ? ' (' + v.hospObs + ')' : ''}
+`;
+      txt += `   - Antecedente Diálisis Peritoneal: ${v.dp || 'No'}${v.dpObs ? ' (' + v.dpObs + ')' : ''}
+
+`;
+    });
+
+    await navigator.clipboard.writeText(txt);
+    showToast("¡Texto plano del reporte copiado al portapapeles!");
+  }
+
+
+  // FUNCIONALIDAD: AGREGAR PACIENTE MANUAL AL REPORTE DE VIGILANCIA
+  function openAddVigManualModal() {
+    const currentDay = document.getElementById('daySelect').value;
+    document.getElementById('addVigNombre').value = '';
+    document.getElementById('addVigMaquina').value = '';
+    document.getElementById('addVigTurno').value = (currentShiftFilter !== 'TODOS') ? currentShiftFilter : 'MATUTINO_1';
+    document.getElementById('addVig_yd').value = '0';
+    document.getElementById('addVig_yi').value = '0';
+    document.getElementById('addVig_fd').value = '0';
+    document.getElementById('addVig_fi').value = '0';
+    document.getElementById('addVigActual').value = 'Yugular Derecho';
+    document.getElementById('addVigFechaColocacion').value = '';
+    document.getElementById('addVigHosp').value = 'NO';
+    document.getElementById('addVigHospObs').value = '';
+    document.getElementById('addVigDp').value = 'NO';
+    document.getElementById('addVigDpObs').value = '';
+
+    const dayChecks = document.getElementsByName('addVigDias');
+    for (let c of dayChecks) {
+      c.checked = (c.value === currentDay);
+    }
+
+    document.getElementById('addVigManualModal').style.display = 'flex';
+  }
+
+  function closeAddVigManualModal() {
+    document.getElementById('addVigManualModal').style.display = 'none';
+  }
+
+  async function guardarPacienteVigilanciaManual() {
+    const rawName = document.getElementById('addVigNombre').value.trim();
+    if (!rawName || rawName.length < 3) {
+      alert("Por favor ingresa un nombre válido para el paciente.");
+      return;
+    }
+
+    const maquina = document.getElementById('addVigMaquina').value.trim() || '1';
+    const turno = document.getElementById('addVigTurno').value;
+
+    let selectedDias = [];
+    const dayChecks = document.getElementsByName('addVigDias');
+    for (let c of dayChecks) {
+      if (c.checked) selectedDias.push(c.value);
+    }
+    const currentDay = document.getElementById('daySelect').value;
+    if (selectedDias.length === 0) selectedDias.push(currentDay);
+
+    const accesos = {
+      yd_cant: parseInt(document.getElementById('addVig_yd').value, 10) || 0,
+      yi_cant: parseInt(document.getElementById('addVig_yi').value, 10) || 0,
+      fd_cant: parseInt(document.getElementById('addVig_fd').value, 10) || 0,
+      fi_cant: parseInt(document.getElementById('addVig_fi').value, 10) || 0,
+      actual: document.getElementById('addVigActual').value,
+      fechaColocacion: document.getElementById('addVigFechaColocacion').value || ''
+    };
+
+    const hospVal = document.getElementById('addVigHosp').value;
+    const hospObs = document.getElementById('addVigHospObs').value.trim();
+    const dpVal = document.getElementById('addVigDp').value;
+    const dpObs = document.getElementById('addVigDpObs').value.trim();
+
+    const cleanId = rawName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+    const vigDatos = {
+      hospUltimoMes: hospVal,
+      hospObs: hospObs,
+      accesos: accesos,
+      dp: dpVal,
+      dpObs: dpObs
+    };
+
+    let summaryNote = `[VIGILANCIA: ${accesos.actual}`;
+    if (accesos.fechaColocacion) summaryNote += ` (${accesos.fechaColocacion})`;
+    if (hospVal === 'SI') summaryNote += ` | Hosp mes previo: ${hospObs || 'Sí'}`;
+    if (dpVal === 'SI') summaryNote += ` | Antecedente DP: ${dpObs || 'Sí'}`;
+    summaryNote += `]`;
+
+    const newP = {
+      id: cleanId,
+      nombre: rawName.toUpperCase(),
+      maquina: maquina,
+      turno: turno,
+      dias: selectedDias,
+      ps: '60',
+      pp: '',
+      uf: '',
+      tiempo: '2:30',
+      filtro: '400',
+      qs: '310',
+      qd: '600',
+      na: '138',
+      k: '2',
+      bic: '3.0',
+      anticoag: 'SH',
+      ta_in: '',
+      fc_in: '',
+      ta_out: '',
+      fc_out: '',
+      temp: '36.0',
+      lastAnnotation: summaryNote,
+      vigilanciaAcceso: true,
+      vigilanciaDatos: vigDatos,
+      noAcudio: false,
+      isSaved: false
+    };
+
+    // Update or add locally
+    if (selectedDias.includes(currentDay)) {
+      const existIdx = currentPatients.findIndex(p => p.id === cleanId);
+      if (existIdx !== -1) {
+        currentPatients[existIdx] = Object.assign(currentPatients[existIdx], newP);
+      } else {
+        currentPatients.push(newP);
+      }
+    }
+
+    // Persist to Firestore
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", cleanId);
+        await window.fsSetDoc(pRef, newP, { merge: true });
+      } catch (err) {
+        console.error("Error al guardar paciente de vigilancia en Firestore:", err);
+      }
+    }
+
+    closeAddVigManualModal();
+    renderCards();
+    await openReporteVigilanciaModal();
+    showToast(`✓ ${newP.nombre} agregado a Vigilancia de Accesos`);
+  }
+
 </script>
 </head>
 <body>
@@ -688,11 +984,14 @@
         <option value="SABADO">Sábado</option>
       </select>
       <input type="date" id="sessionDate" onchange="onDateChanged()">
+      <span id="barSummary" style="font-size: 11.5px; font-weight: 700; color: #1e40af; background: #eff6ff; padding: 5px 9px; border-radius: 6px; border: 1px solid #bfdbfe;">0 pacientes</span>
     </div>
-    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-      <button class="btn-light" onclick="togglePastePanel()">📋 <span id="pastePanelToggleTxt">Pegar Tabla de Archivo</span></button>
-      <button class="btn-light" onclick="openMoverDiaModal()">🔄 Mover Censo de Día</button>
-      <button class="btn-light" onclick="addPatientPrompt()">➕ Agregar Paciente</button>
+    <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+      <button class="btn-action" style="padding: 6px 11px; font-size: 12px;" onclick="copyAllDocNotes()">📋 Copiar Notas Expediente</button>
+      <button class="btn-save" style="padding: 6px 11px; font-size: 12px;" onclick="openNotaPisoModal()">📝 Nota de piso</button>
+      <button class="btn-warn" style="padding: 6px 11px; font-size: 12px; font-weight: 700;" onclick="openReporteVigilanciaModal()">🛡️ Reporte Vigilancia</button>
+      <button class="btn-light" style="padding: 6px 10px; font-size: 12px;" onclick="togglePastePanel()">📋 <span id="pastePanelToggleTxt">Pegar Tabla</span></button>
+      <button class="btn-light" style="padding: 6px 10px; font-size: 12px;" onclick="openMoverDiaModal()">🔄 Mover Censo</button>
     </div>
   </div>
 
@@ -725,14 +1024,7 @@
     <p style="text-align: center; color: var(--muted); margin-top: 40px;">Cargando censo de pacientes desde la nube...</p>
   </div>
 
-  <!-- Floating Bottom Bar -->
-  <div class="floating-bar">
-    <div class="bar-info" id="barSummary">0 pacientes</div>
-    <div class="bar-buttons">
-      <button class="btn-action" onclick="copyAllDocNotes()">📋 Copiar Notas Expediente</button>
-      <button class="btn-save" onclick="openNotaPisoModal()">📝 Nota de piso</button>
-    </div>
-  </div>
+
 
   <!-- Modal Previsualización Nota Expediente -->
   <div id="previewDocModal" class="modal-overlay">
@@ -1015,15 +1307,7 @@
               ${p.nombre}
               ${p.noAcudio ? '<span class="badge-no-acudio">NO ACUDIÓ</span>' : ''}${p.vigilanciaAcceso ? '<span class="badge-vigilancia">⚠️ VIGILANCIA ACCESO</span>' : ''}${p.isSaved ? '<span class="badge-visitado">✓ VISITADO</span>' : ''}
             </div>
-            <div class="card-sub" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 3px;">
-              <select style="font-size: 11px; padding: 2px 6px; border-radius: 4px; border: 1px solid #cbd5e1; font-weight: 700; background: #eff6ff; color: #1e40af; outline: none;" onchange="changePatientTurno('${p.id}', this.value)">
-                <option value="MATUTINO_1" ${p.turno === 'MATUTINO_1' ? 'selected' : ''}>1er Turno (Mat)</option>
-                <option value="MATUTINO_2" ${p.turno === 'MATUTINO_2' ? 'selected' : ''}>2do Turno (Mat)</option>
-                <option value="VESPERTINO_1" ${p.turno === 'VESPERTINO_1' ? 'selected' : ''}>Vesp. 1</option>
-                <option value="VESPERTINO_2" ${p.turno === 'VESPERTINO_2' ? 'selected' : ''}>Vesp. 2</option>
-              </select>
-              <span>&bull; PS: <strong>${p.ps || '-'} kg</strong> &bull; Filtro: <strong>${p.filtro || '400'}</strong></span>
-            </div>
+            <div class="card-sub">${shiftTag} &bull; PS: <strong>${p.ps || '-'} kg</strong> &bull; Filtro: <strong>${p.filtro || '400'}</strong></div>
           </div>
           <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
             <label style="font-size: 10px; font-weight: 700; color: #1e40af; text-transform: uppercase;">Cama / Máq:</label>
@@ -2155,6 +2439,321 @@ MÉDICOS RESPONSABLES: ${medico}`;
     showToast(`✓ ${p.nombre} retirado de vigilancia`);
   }
 
+
+  // GENERACIÓN DE REPORTE DE VIGILANCIA DE ACCESO
+  let reportePacientesData = [];
+
+  function formatTurnoNombre(code) {
+    if (!code) return 'No especificado';
+    if (code === 'MATUTINO_1') return '1er Turno Matutino';
+    if (code === 'MATUTINO_2') return '2do Turno Matutino';
+    if (code === 'VESPERTINO_1') return '1er Turno Vespertino';
+    if (code === 'VESPERTINO_2') return '2do Turno Vespertino';
+    return code;
+  }
+
+  async function openReporteVigilanciaModal() {
+    document.getElementById('reporteVigilanciaModal').style.display = 'flex';
+    document.getElementById('reporteTotalPacientes').innerText = 'Consultando base de datos...';
+    document.getElementById('reporteContenidoHtml').innerHTML = '<p style="text-align:center; color:#64748b; padding:20px;">Cargando censo completo de vigilancia...</p>';
+
+    let allVig = [];
+
+    // Consultar todos los pacientes de la base de datos completa
+    if (window.db) {
+      try {
+        const patientsRef = window.fsCollection(window.db, "pacientes");
+        const snap = await window.fsGetDocs(patientsRef);
+        snap.forEach(docSnap => {
+          const data = { id: docSnap.id, ...docSnap.data() };
+          if (data.vigilanciaAcceso === true) {
+            allVig.push(data);
+          }
+        });
+      } catch (err) {
+        console.error("Error al obtener pacientes en vigilancia:", err);
+      }
+    }
+
+    // Fallback con pacientes locales si la nube no devolvió o está offline
+    if (allVig.length === 0) {
+      allVig = currentPatients.filter(p => p.vigilanciaAcceso === true);
+    }
+
+    reportePacientesData = allVig;
+    document.getElementById('reporteTotalPacientes').innerText = `Total de pacientes en vigilancia activa: ${allVig.length}`;
+
+    if (allVig.length === 0) {
+      document.getElementById('reporteContenidoHtml').innerHTML = `
+        <div style="text-align:center; padding:30px; color:#64748b;">
+          <p style="font-size:14px; font-weight:700; color:#0f172a; margin-bottom:6px;">No hay pacientes con bandera de vigilancia activa.</p>
+          <p style="font-size:12px;">Para agregar un paciente a este reporte, haz clic en el botón <strong>🛡️ Vigilar Acceso</strong> en su tarjeta.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Render HTML Table
+    let tableHtml = `
+      <table border="1" cellspacing="0" cellpadding="6" style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:11.5px; border-color:#cbd5e1;">
+        <thead>
+          <tr style="background:#fef3c7; color:#92400e; text-align:left; font-size:11px;">
+            <th style="padding:6px; border:1px solid #cbd5e1;">Paciente</th>
+            <th style="padding:6px; border:1px solid #cbd5e1;">Días / Turno</th>
+            <th style="padding:6px; border:1px solid #cbd5e1;">Historial de Accesos</th>
+            <th style="padding:6px; border:1px solid #cbd5e1;">Hospitalizaciones (Último Mes)</th>
+            <th style="padding:6px; border:1px solid #cbd5e1;">Diálisis Peritoneal</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    allVig.forEach(p => {
+      const v = p.vigilanciaDatos || {};
+      const acc = v.accesos || {};
+      
+      const diasStr = (p.dias && p.dias.length > 0) ? p.dias.join(', ') : 'Sin días asignados';
+      const turnoStr = formatTurnoNombre(p.turno);
+
+      // Accesos
+      let accesosText = `<strong>Actual:</strong> ${acc.actual || 'No registrado'}`;
+      if (acc.fechaColocacion) accesosText += `<br><small style="color:#64748b;">Fecha colocación: ${acc.fechaColocacion}</small>`;
+      
+      let previosArr = [];
+      if (acc.yd_cant) previosArr.push(`Yugular Der: ${acc.yd_cant}`);
+      if (acc.yi_cant) previosArr.push(`Yugular Izq: ${acc.yi_cant}`);
+      if (acc.fd_cant) previosArr.push(`Femoral Der: ${acc.fd_cant}`);
+      if (acc.fi_cant) previosArr.push(`Femoral Izq: ${acc.fi_cant}`);
+      
+      if (previosArr.length > 0) {
+        accesosText += `<br><small style="color:#475569;">Previos: ${previosArr.join(' | ')}</small>`;
+      }
+
+      // Hospitalizaciones
+      let hospText = `<strong>${v.hospUltimoMes || 'No'}</strong>`;
+      if (v.hospObs) {
+        hospText += `<br><span style="font-size:11px; color:#475569;">${v.hospObs}</span>`;
+      }
+
+      // DP
+      let dpText = `<strong>${v.dp || 'No'}</strong>`;
+      if (v.dpObs) {
+        dpText += `<br><span style="font-size:11px; color:#475569;">${v.dpObs}</span>`;
+      }
+
+      tableHtml += `
+        <tr style="vertical-align:top;">
+          <td style="padding:6px; border:1px solid #cbd5e1; font-weight:700; color:#1e3a8a;">
+            ${p.nombre}
+            <br><small style="font-weight:normal; color:#64748b;">Máq/Cama: ${p.maquina || '-'}</small>
+          </td>
+          <td style="padding:6px; border:1px solid #cbd5e1;">
+            <strong>${diasStr}</strong>
+            <br><small style="color:#475569;">${turnoStr}</small>
+          </td>
+          <td style="padding:6px; border:1px solid #cbd5e1;">${accesosText}</td>
+          <td style="padding:6px; border:1px solid #cbd5e1;">${hospText}</td>
+          <td style="padding:6px; border:1px solid #cbd5e1;">${dpText}</td>
+        </tr>
+      `;
+    });
+
+    tableHtml += `
+        </tbody>
+      </table>
+    `;
+
+    document.getElementById('reporteContenidoHtml').innerHTML = tableHtml;
+  }
+
+  function closeReporteVigilanciaModal() {
+    document.getElementById('reporteVigilanciaModal').style.display = 'none';
+  }
+
+  async function copyReporteVigilanciaHtml() {
+    const cont = document.getElementById('reporteContenidoHtml');
+    if (!cont || reportePacientesData.length === 0) {
+      alert("No hay pacientes para copiar.");
+      return;
+    }
+    await copyRichHtml(cont.innerHTML);
+    showToast("¡Tabla de reporte copiada! Lista para Google Docs o Word");
+  }
+
+  async function copyReporteVigilanciaTexto() {
+    if (reportePacientesData.length === 0) {
+      alert("No hay pacientes para copiar.");
+      return;
+    }
+
+    let txt = `REPORTE EPIDEMIOLÓGICO: VIGILANCIA DE ACCESOS VASCULARES\n`;
+    txt += `Fecha de emisión: ${getSelectedDateFormatted()}\n`;
+    txt += `Total pacientes: ${reportePacientesData.length}\n\n`;
+
+    reportePacientesData.forEach((p, idx) => {
+      const v = p.vigilanciaDatos || {};
+      const acc = v.accesos || {};
+      const diasStr = (p.dias && p.dias.length > 0) ? p.dias.join(', ') : '-';
+      const turnoStr = formatTurnoNombre(p.turno);
+
+      let previos = [];
+      if (acc.yd_cant) previos.push(`YD: ${acc.yd_cant}`);
+      if (acc.yi_cant) previos.push(`YI: ${acc.yi_cant}`);
+      if (acc.fd_cant) previos.push(`FD: ${acc.fd_cant}`);
+      if (acc.fi_cant) previos.push(`FI: ${acc.fi_cant}`);
+
+      txt += `${idx + 1}. PACIENTE: ${p.nombre} (Máq: ${p.maquina || '-'})
+`;
+      txt += `   - Días y Turno: ${diasStr} | ${turnoStr}
+`;
+      txt += `   - Acceso Actual: ${acc.actual || 'No registrado'}${acc.fechaColocacion ? ' (Colocado: ' + acc.fechaColocacion + ')' : ''}
+`;
+      if (previos.length > 0) txt += `   - Historial Accesos Previos: ${previos.join(', ')}
+`;
+      txt += `   - Hospitalizaciones Último Mes: ${v.hospUltimoMes || 'No'}${v.hospObs ? ' (' + v.hospObs + ')' : ''}
+`;
+      txt += `   - Antecedente Diálisis Peritoneal: ${v.dp || 'No'}${v.dpObs ? ' (' + v.dpObs + ')' : ''}
+
+`;
+    });
+
+    await navigator.clipboard.writeText(txt);
+    showToast("¡Texto plano del reporte copiado al portapapeles!");
+  }
+
+
+  // FUNCIONALIDAD: AGREGAR PACIENTE MANUAL AL REPORTE DE VIGILANCIA
+  function openAddVigManualModal() {
+    const currentDay = document.getElementById('daySelect').value;
+    document.getElementById('addVigNombre').value = '';
+    document.getElementById('addVigMaquina').value = '';
+    document.getElementById('addVigTurno').value = (currentShiftFilter !== 'TODOS') ? currentShiftFilter : 'MATUTINO_1';
+    document.getElementById('addVig_yd').value = '0';
+    document.getElementById('addVig_yi').value = '0';
+    document.getElementById('addVig_fd').value = '0';
+    document.getElementById('addVig_fi').value = '0';
+    document.getElementById('addVigActual').value = 'Yugular Derecho';
+    document.getElementById('addVigFechaColocacion').value = '';
+    document.getElementById('addVigHosp').value = 'NO';
+    document.getElementById('addVigHospObs').value = '';
+    document.getElementById('addVigDp').value = 'NO';
+    document.getElementById('addVigDpObs').value = '';
+
+    const dayChecks = document.getElementsByName('addVigDias');
+    for (let c of dayChecks) {
+      c.checked = (c.value === currentDay);
+    }
+
+    document.getElementById('addVigManualModal').style.display = 'flex';
+  }
+
+  function closeAddVigManualModal() {
+    document.getElementById('addVigManualModal').style.display = 'none';
+  }
+
+  async function guardarPacienteVigilanciaManual() {
+    const rawName = document.getElementById('addVigNombre').value.trim();
+    if (!rawName || rawName.length < 3) {
+      alert("Por favor ingresa un nombre válido para el paciente.");
+      return;
+    }
+
+    const maquina = document.getElementById('addVigMaquina').value.trim() || '1';
+    const turno = document.getElementById('addVigTurno').value;
+
+    let selectedDias = [];
+    const dayChecks = document.getElementsByName('addVigDias');
+    for (let c of dayChecks) {
+      if (c.checked) selectedDias.push(c.value);
+    }
+    const currentDay = document.getElementById('daySelect').value;
+    if (selectedDias.length === 0) selectedDias.push(currentDay);
+
+    const accesos = {
+      yd_cant: parseInt(document.getElementById('addVig_yd').value, 10) || 0,
+      yi_cant: parseInt(document.getElementById('addVig_yi').value, 10) || 0,
+      fd_cant: parseInt(document.getElementById('addVig_fd').value, 10) || 0,
+      fi_cant: parseInt(document.getElementById('addVig_fi').value, 10) || 0,
+      actual: document.getElementById('addVigActual').value,
+      fechaColocacion: document.getElementById('addVigFechaColocacion').value || ''
+    };
+
+    const hospVal = document.getElementById('addVigHosp').value;
+    const hospObs = document.getElementById('addVigHospObs').value.trim();
+    const dpVal = document.getElementById('addVigDp').value;
+    const dpObs = document.getElementById('addVigDpObs').value.trim();
+
+    const cleanId = rawName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+    const vigDatos = {
+      hospUltimoMes: hospVal,
+      hospObs: hospObs,
+      accesos: accesos,
+      dp: dpVal,
+      dpObs: dpObs
+    };
+
+    let summaryNote = `[VIGILANCIA: ${accesos.actual}`;
+    if (accesos.fechaColocacion) summaryNote += ` (${accesos.fechaColocacion})`;
+    if (hospVal === 'SI') summaryNote += ` | Hosp mes previo: ${hospObs || 'Sí'}`;
+    if (dpVal === 'SI') summaryNote += ` | Antecedente DP: ${dpObs || 'Sí'}`;
+    summaryNote += `]`;
+
+    const newP = {
+      id: cleanId,
+      nombre: rawName.toUpperCase(),
+      maquina: maquina,
+      turno: turno,
+      dias: selectedDias,
+      ps: '60',
+      pp: '',
+      uf: '',
+      tiempo: '2:30',
+      filtro: '400',
+      qs: '310',
+      qd: '600',
+      na: '138',
+      k: '2',
+      bic: '3.0',
+      anticoag: 'SH',
+      ta_in: '',
+      fc_in: '',
+      ta_out: '',
+      fc_out: '',
+      temp: '36.0',
+      lastAnnotation: summaryNote,
+      vigilanciaAcceso: true,
+      vigilanciaDatos: vigDatos,
+      noAcudio: false,
+      isSaved: false
+    };
+
+    // Update or add locally
+    if (selectedDias.includes(currentDay)) {
+      const existIdx = currentPatients.findIndex(p => p.id === cleanId);
+      if (existIdx !== -1) {
+        currentPatients[existIdx] = Object.assign(currentPatients[existIdx], newP);
+      } else {
+        currentPatients.push(newP);
+      }
+    }
+
+    // Persist to Firestore
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", cleanId);
+        await window.fsSetDoc(pRef, newP, { merge: true });
+      } catch (err) {
+        console.error("Error al guardar paciente de vigilancia en Firestore:", err);
+      }
+    }
+
+    closeAddVigManualModal();
+    renderCards();
+    await openReporteVigilanciaModal();
+    showToast(`✓ ${newP.nombre} agregado a Vigilancia de Accesos`);
+  }
+
 </script>
 
   <!-- Modal Mover Censo de Día -->
@@ -2314,6 +2913,150 @@ MÉDICOS RESPONSABLES: ${medico}`;
         </div>
       </div>
 
+    </div>
+  </div>
+
+
+  <!-- MODAL: REPORTE DE VIGILANCIA DE ACCESOS -->
+  <div id="reporteVigilanciaModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 850px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 2px solid #f59e0b; padding-bottom: 8px;">
+        <h3 style="font-size: 16.5px; color: #92400e; display: flex; align-items: center; gap: 6px;">
+          🛡️ Reporte Epidemiológico: Vigilancia de Accesos Vasculares
+        </h3>
+        <button onclick="closeReporteVigilanciaModal()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #78350f;">&times;</button>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+        <span id="reporteTotalPacientes" style="font-size: 12.5px; font-weight: 700; color: #b45309;">Cargando pacientes en vigilancia...</span>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <button class="btn-save" style="padding: 6px 12px; font-size: 12px;" onclick="openAddVigManualModal()">➕ Paciente Extra a Vigilancia</button>
+          <button class="btn-action" style="padding: 6px 12px; font-size: 12px;" onclick="copyReporteVigilanciaHtml()">📋 Copiar Tabla para Docs</button>
+          <button class="btn-light" style="padding: 6px 12px; font-size: 12px;" onclick="copyReporteVigilanciaTexto()">📝 Copiar Texto</button>
+        </div>
+      </div>
+
+      <div id="reporteContenidoHtml" style="max-height: 60vh; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px; background: #fff;"></div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
+        <button class="btn-light" onclick="closeReporteVigilanciaModal()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL: AGREGAR PACIENTE EXTRA A REPORTE DE VIGILANCIA -->
+  <div id="addVigManualModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 580px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 2px solid #f59e0b; padding-bottom: 8px;">
+        <h3 style="font-size: 16px; color: #92400e; display: flex; align-items: center; gap: 6px;">
+          ➕ Agregar Paciente a Vigilancia de Accesos
+        </h3>
+        <button onclick="closeAddVigManualModal()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #78350f;">&times;</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div>
+          <label style="font-size: 11.5px; font-weight: 700; color: #334155; display: block; margin-bottom: 3px;">Nombre completo del paciente:</label>
+          <input type="text" id="addVigNombre" placeholder="Ej. PEREZ GARCIA JUAN" style="width: 100%; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 13px; font-weight: 700; text-transform: uppercase;">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1.3fr; gap: 10px;">
+          <div>
+            <label style="font-size: 11.5px; font-weight: 700; color: #334155; display: block; margin-bottom: 3px;">Máquina / Cama:</label>
+            <input type="text" id="addVigMaquina" placeholder="Ej. 1, 2, 5" style="width: 100%; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 13px; font-weight: 700;">
+          </div>
+          <div>
+            <label style="font-size: 11.5px; font-weight: 700; color: #334155; display: block; margin-bottom: 3px;">Turno (1 o 2, Mat/Vesp):</label>
+            <select id="addVigTurno" style="width: 100%; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; font-weight: 700; background: #fff;">
+              <option value="MATUTINO_1">Turno 1 - Matutino</option>
+              <option value="MATUTINO_2">Turno 2 - Matutino</option>
+              <option value="VESPERTINO_1">Turno 1 - Vespertino</option>
+              <option value="VESPERTINO_2">Turno 2 - Vespertino</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size: 11.5px; font-weight: 700; color: #334155; display: block; margin-bottom: 3px;">Días de sesión:</label>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; background: #f8fafc; padding: 7px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addVigDias" value="LUNES"> Lun</label>
+            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addVigDias" value="MARTES"> Mar</label>
+            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addVigDias" value="MIERCOLES"> Mié</label>
+            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addVigDias" value="JUEVES"> Jue</label>
+            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addVigDias" value="VIERNES"> Vie</label>
+            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addVigDias" value="SABADO"> Sáb</label>
+          </div>
+        </div>
+
+        <!-- Historial de Accesos -->
+        <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 6px; padding: 8px 10px;">
+          <strong style="font-size: 12px; color: #92400e; display: block; margin-bottom: 6px;">🩺 Historial de Accesos Vasculares:</strong>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 4px 8px; border-radius: 4px; border: 1px solid #e2e8f0;">
+              <span style="font-size: 11.5px;">Yugular Der:</span>
+              <input type="number" id="addVig_yd" value="0" min="0" style="width: 44px; padding: 2px; text-align: center; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px;">
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 4px 8px; border-radius: 4px; border: 1px solid #e2e8f0;">
+              <span style="font-size: 11.5px;">Yugular Izq:</span>
+              <input type="number" id="addVig_yi" value="0" min="0" style="width: 44px; padding: 2px; text-align: center; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px;">
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 4px 8px; border-radius: 4px; border: 1px solid #e2e8f0;">
+              <span style="font-size: 11.5px;">Femoral Der:</span>
+              <input type="number" id="addVig_fd" value="0" min="0" style="width: 44px; padding: 2px; text-align: center; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px;">
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 4px 8px; border-radius: 4px; border: 1px solid #e2e8f0;">
+              <span style="font-size: 11.5px;">Femoral Izq:</span>
+              <input type="number" id="addVig_fi" value="0" min="0" style="width: 44px; padding: 2px; text-align: center; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px;">
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 8px;">
+            <div>
+              <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 2px;">Acceso actual:</label>
+              <select id="addVigActual" style="width: 100%; padding: 5px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; background: #fff;">
+                <option value="Yugular Derecho">Yugular Derecho</option>
+                <option value="Yugular Izquierdo">Yugular Izquierdo</option>
+                <option value="Femoral Derecho">Femoral Derecho</option>
+                <option value="Femoral Izquierdo">Femoral Izquierdo</option>
+                <option value="Fístula Arteriovenosa">Fístula Arteriovenosa</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 2px;">Fecha colocación:</label>
+              <input type="date" id="addVigFechaColocacion" style="width: 100%; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px;">
+            </div>
+          </div>
+        </div>
+
+        <!-- Hospitalizaciones -->
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <label style="font-size: 11.5px; font-weight: 700; color: #334155;">¿Hospitalizaciones último mes?</label>
+            <select id="addVigHosp" style="padding: 3px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px;">
+              <option value="NO">No</option>
+              <option value="SI">Sí</option>
+            </select>
+          </div>
+          <input type="text" id="addVigHospObs" placeholder="Observaciones / Causa hospitalización" style="width: 100%; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px;">
+        </div>
+
+        <!-- Diálisis Peritoneal -->
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <label style="font-size: 11.5px; font-weight: 700; color: #334155;">¿Antecedente Diálisis Peritoneal?</label>
+            <select id="addVigDp" style="padding: 3px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px;">
+              <option value="NO">No</option>
+              <option value="SI">Sí</option>
+            </select>
+          </div>
+          <input type="text" id="addVigDpObs" placeholder="Observaciones / Motivo de cambio a hemodiálisis" style="width: 100%; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px;">
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
+        <button class="btn-light" onclick="closeAddVigManualModal()">Cancelar</button>
+        <button class="btn-save" onclick="guardarPacienteVigilanciaManual()">💾 Guardar en Reporte</button>
+      </div>
     </div>
   </div>
 
