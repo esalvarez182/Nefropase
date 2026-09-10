@@ -602,18 +602,15 @@
       dpObs: dpObs
     };
 
-    // Also enrich annotation if there is valuable clinical vigilance info
-    let summaryNote = `[VIGILANCIA: ${actualAcceso}`;
-    if (accesos.fechaColocacion) summaryNote += ` (${accesos.fechaColocacion})`;
-    if (hospVal === 'SI') summaryNote += ` | Hosp mes previo: ${hospObs || 'Sí'}`;
-    if (dpVal === 'SI') summaryNote += ` | Antecedente DP: ${dpObs || 'Sí'}`;
-    summaryNote += `]`;
-
-    if (!p.lastAnnotation || p.lastAnnotation === 'Ninguna') {
-      p.lastAnnotation = summaryNote;
-    } else if (!p.lastAnnotation.includes('[VIGILANCIA:')) {
-      p.lastAnnotation = `${p.lastAnnotation} ${summaryNote}`;
-    }
+    // Redactar resumen clínico estructurado
+    const summaryNote = formatRedaccionVigilancia(p.vigilanciaDatos);
+    let prevNote = (p.lastAnnotation || '').replace(/\[VIGILANCIA:[^\]]+\]/gi, '').replace(/Historial de angioaccesos:[^.]+/gi, '').trim();
+    if (prevNote === 'Ninguna' || prevNote === '-') prevNote = '';
+    
+    p.lastAnnotation = prevNote ? `${prevNote}. ${summaryNote}` : summaryNote;
+    p.anotaciones = p.lastAnnotation;
+    const obsTextarea = document.getElementById(`obs_${p.id}`);
+    if (obsTextarea) obsTextarea.value = p.lastAnnotation;
 
     if (window.db) {
       try {
@@ -908,11 +905,7 @@
       dpObs: dpObs
     };
 
-    let summaryNote = `[VIGILANCIA: ${accesos.actual}`;
-    if (accesos.fechaColocacion) summaryNote += ` (${accesos.fechaColocacion})`;
-    if (hospVal === 'SI') summaryNote += ` | Hosp mes previo: ${hospObs || 'Sí'}`;
-    if (dpVal === 'SI') summaryNote += ` | Antecedente DP: ${dpObs || 'Sí'}`;
-    summaryNote += `]`;
+    const summaryNote = formatRedaccionVigilancia(vigDatos);
 
     const newP = {
       id: cleanId,
@@ -1101,6 +1094,76 @@
   <div id="toast" class="toast">Guardado</div>
 
   <script>
+  
+  // Formateo de redacción médica para Observaciones y Eventualidades
+  function formatRedaccionVigilancia(v) {
+    if (!v) return '';
+    let parts = [];
+
+    // 1. Historial de angioaccesos:
+    const acc = v.accesos || {};
+    const actual = acc.actual || '';
+    const fecha = acc.fechaColocacion ? ` (${acc.fechaColocacion})` : '';
+
+    const sites = [
+      { key: 'yd_cant', name: 'Yugular derecho' },
+      { key: 'yi_cant', name: 'yugular izquierdo' },
+      { key: 'fd_cant', name: 'femoral derecho' },
+      { key: 'fi_cant', name: 'femoral izquierdo' }
+    ];
+
+    let accList = [];
+    sites.forEach(s => {
+      const isActual = (actual.toLowerCase() === s.name.toLowerCase());
+      const cant = acc[s.key] || 0;
+      if (isActual) {
+        accList.push(`${s.name} (actual)${fecha} ${cant > 0 ? cant : 1}`);
+      } else if (cant > 0) {
+        accList.push(`${s.name}: ${cant}`);
+      }
+    });
+
+    if (accList.length === 0 && actual) {
+      accList.push(`${actual} (actual)${fecha} 1`);
+    }
+
+    const angioText = accList.join(', ');
+    parts.push(`Historial de angioaccesos: ${angioText || 'No registrado'}`);
+
+    // 2. Historial de dialisis:
+    const dpObs = (v.dpObs || '').trim();
+    const dpVal = v.dp === 'SI' ? (dpObs || 'Sí') : (dpObs || 'No');
+    parts.push(`Historial de dialisis: ${dpVal}`);
+
+    // 3. Hospitalizaciones:
+    const hospObs = (v.hospObs || '').trim();
+    const hospVal = v.hospUltimoMes === 'SI' ? (hospObs || 'Sí') : (hospObs || 'No');
+    parts.push(`Hospitalizaciones: ${hospVal}`);
+
+    return parts.join(', ');
+  }
+
+  function getTextoObservaciones(p) {
+    let baseObs = (p.lastAnnotation || p.anotaciones || '').trim();
+
+    // Eliminar formato anterior si existía [VIGILANCIA: ...]
+    baseObs = baseObs.replace(/\[VIGILANCIA:[^\]]+\]/gi, '').trim();
+    // Eliminar redacción repetida si ya estaba en baseObs
+    baseObs = baseObs.replace(/Historial de angioaccesos:[^.]+/gi, '').trim();
+
+    if (baseObs === 'Ninguna' || baseObs === '-') baseObs = '';
+
+    if (p.vigilanciaAcceso && p.vigilanciaDatos) {
+      const vigTexto = formatRedaccionVigilancia(p.vigilanciaDatos);
+      if (baseObs) {
+        return `${baseObs}. ${vigTexto}`;
+      }
+      return vigTexto;
+    }
+
+    return baseObs || 'Ninguna';
+  }
+
   // Helper functions
   function clean(s) {
     if (!s) return '';
@@ -1869,7 +1932,7 @@
     const fecha = getSelectedDateFormatted();
     const isVesp = p.turno && p.turno.includes('VESPERTINO');
     const medico = isVesp ? "Dra. Farris / Dr Sanchez" : "Dra. Hernandez / Dr. Sanchez";
-    const obs = p.lastAnnotation && p.lastAnnotation.trim() !== '' ? p.lastAnnotation : 'Ninguna';
+    const obs = getTextoObservaciones(p);
 
     const tdBase = 'border: 1px solid #000; padding: 1px 2px; font-size: 7.5pt; line-height: 1.0; height: 13px; mso-line-height-rule: exactly; vertical-align: middle;';
     const tdLeft = tdBase + ' text-align: left;';
@@ -2058,7 +2121,7 @@
   function formatNotaPiso(p, tiempo, potasio) {
     const isVesp = p.turno && p.turno.includes('VESPERTINO');
     const medico = isVesp ? "Dra. Farris / Dr Sanchez" : "Dra. Hernandez / Dr. Sanchez";
-    const eventualidades = p.lastAnnotation && p.lastAnnotation.trim() !== '' ? p.lastAnnotation : 'Ninguna';
+    const eventualidades = getTextoObservaciones(p);
 
     const taIn = p.ta_in ? `${p.ta_in} mmHg` : '-';
     const fcIn = p.fc_in ? `${p.fc_in} lpm` : '-';
@@ -2457,18 +2520,15 @@ MÉDICOS RESPONSABLES: ${medico}`;
       dpObs: dpObs
     };
 
-    // Also enrich annotation if there is valuable clinical vigilance info
-    let summaryNote = `[VIGILANCIA: ${actualAcceso}`;
-    if (accesos.fechaColocacion) summaryNote += ` (${accesos.fechaColocacion})`;
-    if (hospVal === 'SI') summaryNote += ` | Hosp mes previo: ${hospObs || 'Sí'}`;
-    if (dpVal === 'SI') summaryNote += ` | Antecedente DP: ${dpObs || 'Sí'}`;
-    summaryNote += `]`;
-
-    if (!p.lastAnnotation || p.lastAnnotation === 'Ninguna') {
-      p.lastAnnotation = summaryNote;
-    } else if (!p.lastAnnotation.includes('[VIGILANCIA:')) {
-      p.lastAnnotation = `${p.lastAnnotation} ${summaryNote}`;
-    }
+    // Redactar resumen clínico estructurado
+    const summaryNote = formatRedaccionVigilancia(p.vigilanciaDatos);
+    let prevNote = (p.lastAnnotation || '').replace(/\[VIGILANCIA:[^\]]+\]/gi, '').replace(/Historial de angioaccesos:[^.]+/gi, '').trim();
+    if (prevNote === 'Ninguna' || prevNote === '-') prevNote = '';
+    
+    p.lastAnnotation = prevNote ? `${prevNote}. ${summaryNote}` : summaryNote;
+    p.anotaciones = p.lastAnnotation;
+    const obsTextarea = document.getElementById(`obs_${p.id}`);
+    if (obsTextarea) obsTextarea.value = p.lastAnnotation;
 
     if (window.db) {
       try {
@@ -2763,11 +2823,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
       dpObs: dpObs
     };
 
-    let summaryNote = `[VIGILANCIA: ${accesos.actual}`;
-    if (accesos.fechaColocacion) summaryNote += ` (${accesos.fechaColocacion})`;
-    if (hospVal === 'SI') summaryNote += ` | Hosp mes previo: ${hospObs || 'Sí'}`;
-    if (dpVal === 'SI') summaryNote += ` | Antecedente DP: ${dpObs || 'Sí'}`;
-    summaryNote += `]`;
+    const summaryNote = formatRedaccionVigilancia(vigDatos);
 
     const newP = {
       id: cleanId,
