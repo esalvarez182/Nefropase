@@ -369,7 +369,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { 
-      getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, onSnapshot 
+      getFirestore, enableIndexedDbPersistence, collection, doc, setDoc, getDoc, getDocs, updateDoc, onSnapshot 
     } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -384,6 +384,17 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+
+    // Activar persistencia offline en IndexedDB para trabajar sin señal
+    try {
+      enableIndexedDbPersistence(db).then(() => {
+        console.log("Persistencia offline activada en IndexedDB.");
+      }).catch(err => {
+        console.warn("Aviso de persistencia offline:", err.message);
+      });
+    } catch (e) {
+      console.warn("Error iniciando persistencia:", e);
+    }
 
     window.db = db;
     window.fsCollection = collection;
@@ -958,6 +969,24 @@
     showToast(`✓ ${newP.nombre} agregado a Vigilancia de Accesos`);
   }
 
+
+  // GESTIÓN DE CONEXIÓN OFFLINE / ONLINE AUTOMÁTICA
+  window.addEventListener('online', () => {
+    const dot = document.getElementById('cloudDot');
+    const status = document.getElementById('cloudStatus');
+    if (dot) dot.style.background = "#4ade80";
+    if (status) status.innerText = "Sincronizado";
+    showToast("📶 Conexión restaurada: Cambios sincronizados con la nube");
+  });
+
+  window.addEventListener('offline', () => {
+    const dot = document.getElementById('cloudDot');
+    const status = document.getElementById('cloudStatus');
+    if (dot) dot.style.background = "#f59e0b";
+    if (status) status.innerText = "Modo Offline (Guardando en dispositivo)";
+    showToast("⚠️ Sin internet: Puedes seguir pasando visita, los datos se sincronizarán al volver la red");
+  });
+
 </script>
 </head>
 <body>
@@ -1229,9 +1258,7 @@
           currentPatients.forEach(p => {
             if (sessionData[p.id]) {
               Object.assign(p, sessionData[p.id]);
-              if (sessionData[p.id].isSaved || sessionData[p.id].ta_in || sessionData[p.id].pp) {
-                p.isSaved = true;
-              }
+              p.visitado = (sessionData[p.id].visitado === true);
             }
           });
         }
@@ -1297,7 +1324,7 @@
       const shiftTag = isVesp ? 'Turno Vespertino' : 'Turno Matutino';
 
       const card = document.createElement('div');
-      card.className = 'patient-card' + (p.isSaved ? ' saved' : '') + (p.noAcudio ? ' no-acudio' : '') + (p.vigilanciaAcceso ? ' vigilancia-acceso' : '');
+      card.className = 'patient-card' + (p.visitado ? ' saved' : '') + (p.noAcudio ? ' no-acudio' : '') + (p.vigilanciaAcceso ? ' vigilancia-acceso' : '');
       card.id = `card_${p.id}`;
 
       card.innerHTML = `
@@ -1305,7 +1332,7 @@
           <div style="flex: 1; padding-right: 10px;">
             <div class="card-title" style="${p.noAcudio ? 'text-decoration: line-through; color: #94a3b8;' : ''}">
               ${p.nombre}
-              ${p.noAcudio ? '<span class="badge-no-acudio">NO ACUDIÓ</span>' : ''}${p.vigilanciaAcceso ? '<span class="badge-vigilancia">⚠️ VIGILANCIA ACCESO</span>' : ''}${p.isSaved ? '<span class="badge-visitado">✓ VISITADO</span>' : ''}
+              ${p.noAcudio ? '<span class="badge-no-acudio">NO ACUDIÓ</span>' : ''}${p.vigilanciaAcceso ? '<span class="badge-vigilancia">⚠️ VIGILANCIA ACCESO</span>' : ''}${p.visitado ? '<span class="badge-visitado">✓ VISITADO</span>' : ''}
             </div>
             <div class="card-sub">${shiftTag} &bull; PS: <strong>${p.ps || '-'} kg</strong> &bull; Filtro: <strong>${p.filtro || '400'}</strong></div>
           </div>
@@ -1408,7 +1435,7 @@
     });
   }
 
-  async function savePatientData(id, isSilent = false) {
+  async function savePatientData(id, isSilent = false, markVisitado = false) {
     const p = currentPatients.find(item => item.id === id);
     if (!p) return;
 
@@ -1444,9 +1471,51 @@
     const newAnnotation = document.getElementById(`obs_${id}`).value.trim();
     p.lastAnnotation = newAnnotation;
     p.anotaciones = newAnnotation;
-    p.isSaved = true;
+
+    // Solo marcar visitado y cambiar de color si se presionó explícitamente el botón "💾 Guardar"
+    if (markVisitado) {
+      p.visitado = true;
+      const cardEl = document.getElementById(`card_${id}`);
+      if (cardEl) {
+        cardEl.classList.add('saved');
+        const titleEl = cardEl.querySelector('.card-title');
+        if (titleEl && !titleEl.innerHTML.includes('badge-visitado')) {
+          titleEl.innerHTML += '<span class="badge-visitado">✓ VISITADO</span>';
+        }
+      }
+    }
 
     const dateKey = document.getElementById('sessionDate').value;
+
+    // Guardar copia de respaldo en almacenamiento local de inmediato
+    try {
+      const localKey = `nefro_local_session_${dateKey}`;
+      let localSession = JSON.parse(localStorage.getItem(localKey) || '{}');
+      localSession[id] = {
+        maquina: p.maquina,
+        ps: p.ps,
+        pp: p.pp,
+        uf: p.uf,
+        tiempo: p.tiempo || '2:30',
+        filtro: p.filtro,
+        qs: p.qs,
+        qd: p.qd,
+        na: p.na,
+        k: p.k,
+        bic: p.bic,
+        anticoag: p.anticoag,
+        ta_in: p.ta_in,
+        fc_in: p.fc_in,
+        ta_out: p.ta_out,
+        fc_out: p.fc_out,
+        temp: p.temp,
+        anotaciones: newAnnotation,
+        visitado: p.visitado || false
+      };
+      localStorage.setItem(localKey, JSON.stringify(localSession));
+    } catch (e) {
+      console.warn("Error guardando en localStorage backup:", e);
+    }
 
     if (window.db) {
       try {
@@ -1485,23 +1554,24 @@
           fc_out: p.fc_out,
           temp: p.temp,
           anotaciones: newAnnotation,
-          isSaved: true
+          visitado: p.visitado || false
         };
         await window.fsSetDoc(sRef, sessionPayload, { merge: true });
 
-        document.getElementById(`card_${id}`).classList.add('saved');
-        if (!isSilent) showToast(`✓ Datos de ${p.nombre} sincronizados en la nube`);
+        if (!isSilent) {
+          showToast(navigator.onLine ? `✓ Datos de ${p.nombre} sincronizados en la nube` : `✓ Guardado en tu dispositivo. Se sincronizará automáticamente al volver la red`);
+        }
       } catch (err) {
-        console.error("Error guardando en Firestore:", err);
-        if (!isSilent) showToast("Guardado localmente (Offline)");
+        console.warn("Guardado en cola IndexedDB Firestore:", err);
+        if (!isSilent) showToast("✓ Guardado localmente (Offline)");
       }
     } else {
       if (!isSilent) showToast(`✓ Datos de ${p.nombre} guardados`);
     }
   }
 
-  function autoSavePatient(id) { savePatientData(id, true); }
-  function savePatientManual(id) { savePatientData(id, false); }
+  function autoSavePatient(id) { savePatientData(id, true, false); }
+  function savePatientManual(id) { savePatientData(id, false, true); }
 
   // ROBUST PARSER (Adapted directly from v11 dynamic column mapping)
   
@@ -2753,6 +2823,24 @@ MÉDICOS RESPONSABLES: ${medico}`;
     await openReporteVigilanciaModal();
     showToast(`✓ ${newP.nombre} agregado a Vigilancia de Accesos`);
   }
+
+
+  // GESTIÓN DE CONEXIÓN OFFLINE / ONLINE AUTOMÁTICA
+  window.addEventListener('online', () => {
+    const dot = document.getElementById('cloudDot');
+    const status = document.getElementById('cloudStatus');
+    if (dot) dot.style.background = "#4ade80";
+    if (status) status.innerText = "Sincronizado";
+    showToast("📶 Conexión restaurada: Cambios sincronizados con la nube");
+  });
+
+  window.addEventListener('offline', () => {
+    const dot = document.getElementById('cloudDot');
+    const status = document.getElementById('cloudStatus');
+    if (dot) dot.style.background = "#f59e0b";
+    if (status) status.innerText = "Modo Offline (Guardando en dispositivo)";
+    showToast("⚠️ Sin internet: Puedes seguir pasando visita, los datos se sincronizarán al volver la red");
+  });
 
 </script>
 
