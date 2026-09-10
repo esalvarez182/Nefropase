@@ -980,6 +980,149 @@
     showToast("⚠️ Sin internet: Puedes seguir pasando visita, los datos se sincronizarán al volver la red");
   });
 
+
+  // FUNCIONALIDAD: AGREGAR PACIENTE (NUEVO O ESPORÁDICO)
+  function openAddPatientModal() {
+    const currentDay = document.getElementById('daySelect').value;
+    document.getElementById('addPatNombre').value = '';
+    document.getElementById('addPatMaquina').value = '';
+    document.getElementById('addPatTurno').value = (currentShiftFilter !== 'TODOS') ? currentShiftFilter : 'MATUTINO_1';
+    document.getElementById('addPatPs').value = '60';
+    document.getElementById('addPatPp').value = '';
+    document.getElementById('addPatUf').value = '';
+    document.getElementById('addPatFiltro').value = '400';
+    document.getElementById('addPatQs').value = '310';
+    document.getElementById('addPatQd').value = '600';
+    document.getElementById('addPatAnticoag').value = 'SH';
+    document.getElementById('addPatObs').value = '';
+
+    const dayChecks = document.getElementsByName('addPatDias');
+    for (let c of dayChecks) {
+      c.checked = (c.value === currentDay);
+    }
+
+    document.getElementById('addPatientModal').style.display = 'flex';
+  }
+
+  function closeAddPatientModal() {
+    document.getElementById('addPatientModal').style.display = 'none';
+  }
+
+  async function guardarNuevoPacienteGeneral() {
+    const rawName = document.getElementById('addPatNombre').value.trim();
+    if (!rawName || rawName.length < 2) {
+      alert("Por favor ingresa un nombre para el paciente.");
+      return;
+    }
+
+    const maquina = document.getElementById('addPatMaquina').value.trim() || '1';
+    const turno = document.getElementById('addPatTurno').value;
+    const ps = document.getElementById('addPatPs').value.trim() || '60';
+    const pp = document.getElementById('addPatPp').value.trim();
+    const uf = document.getElementById('addPatUf').value.trim();
+    const filtro = document.getElementById('addPatFiltro').value.trim() || '400';
+    const qs = document.getElementById('addPatQs').value.trim() || '310';
+    const qd = document.getElementById('addPatQd').value.trim() || '600';
+    const anticoag = document.getElementById('addPatAnticoag').value || 'SH';
+    const obs = document.getElementById('addPatObs').value.trim() || 'Ninguna';
+
+    let selectedDias = [];
+    const dayChecks = document.getElementsByName('addPatDias');
+    for (let c of dayChecks) {
+      if (c.checked) selectedDias.push(c.value);
+    }
+    const currentDay = document.getElementById('daySelect').value;
+    if (selectedDias.length === 0) selectedDias.push(currentDay);
+
+    const cleanId = rawName.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now().toString().slice(-4);
+
+    const newP = {
+      id: cleanId,
+      nombre: rawName.toUpperCase(),
+      maquina: maquina,
+      turno: turno,
+      dias: selectedDias,
+      ps: ps,
+      pp: pp,
+      uf: uf,
+      tiempo: '2:30',
+      filtro: filtro,
+      qs: qs,
+      qd: qd,
+      na: '138',
+      k: '2',
+      bic: '3.0',
+      anticoag: anticoag,
+      ta_in: '',
+      fc_in: '',
+      ta_out: '',
+      fc_out: '',
+      temp: '36.0',
+      lastAnnotation: obs,
+      vigilanciaAcceso: false,
+      noAcudio: false,
+      visitado: false
+    };
+
+    if (selectedDias.includes(currentDay)) {
+      currentPatients.push(newP);
+    }
+
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", cleanId);
+        await window.fsSetDoc(pRef, newP);
+
+        const dateKey = document.getElementById('sessionDate').value;
+        const sRef = window.fsDoc(window.db, "sesiones", dateKey);
+        const payload = {};
+        payload[cleanId] = {
+          maquina: newP.maquina,
+          ps: newP.ps,
+          pp: newP.pp,
+          uf: newP.uf,
+          tiempo: '2:30',
+          filtro: newP.filtro,
+          qs: newP.qs,
+          qd: newP.qd,
+          na: newP.na,
+          k: newP.k,
+          bic: newP.bic,
+          anticoag: newP.anticoag,
+          anotaciones: obs,
+          visitado: false
+        };
+        await window.fsSetDoc(sRef, payload, { merge: true });
+      } catch (err) {
+        console.error("Error al guardar paciente en Firestore:", err);
+      }
+    }
+
+    closeAddPatientModal();
+    renderCards();
+    showToast(`✓ Paciente ${newP.nombre} agregado correctamente`);
+  }
+
+  // ACTUALIZACIÓN DINÁMICA DE NOMBRE Y ORDEN ASCENDENTE DE CAMA
+  async function onMaquinaChanged(id, newVal) {
+    const p = currentPatients.find(item => item.id === id);
+    if (!p) return;
+    p.maquina = newVal.trim();
+    await savePatientData(id, true, false);
+    renderCards();
+    showToast(`Cama actualizada a: ${p.maquina || 'S/N'}`);
+  }
+
+  async function onNombreChanged(id, newVal) {
+    const p = currentPatients.find(item => item.id === id);
+    if (!p) return;
+    const cleanName = newVal.trim().toUpperCase();
+    if (!cleanName || cleanName === p.nombre) return;
+    p.nombre = cleanName;
+    await savePatientData(id, true, false);
+    showToast(`Nombre actualizado a: ${p.nombre}`);
+  }
+
 </script>
 </head>
 <body>
@@ -1010,7 +1153,7 @@
     </div>
     <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
       <button class="btn-action" style="padding: 6px 11px; font-size: 12px;" onclick="copyAllDocNotes()">📋 Copiar Notas Expediente</button>
-      <button class="btn-save" style="padding: 6px 11px; font-size: 12px;" onclick="openNotaPisoModal()">📝 Nota de piso</button>
+      <button class="btn-save" style="padding: 6px 11px; font-size: 12px; font-weight: 700;" onclick="openAddPatientModal()">➕ Agregar Paciente</button>
       <button class="btn-warn" style="padding: 6px 11px; font-size: 12px; font-weight: 700;" onclick="openReporteVigilanciaModal()">🛡️ Reporte Vigilancia</button>
       <button class="btn-light" style="padding: 6px 10px; font-size: 12px;" onclick="togglePastePanel()">📋 <span id="pastePanelToggleTxt">Pegar Tabla</span></button>
       <button class="btn-light" style="padding: 6px 10px; font-size: 12px;" onclick="openMoverDiaModal()">🔄 Mover Censo</button>
@@ -1393,15 +1536,15 @@
       card.innerHTML = `
         <div class="card-header">
           <div style="flex: 1; padding-right: 10px;">
-            <div class="card-title" style="${p.noAcudio ? 'text-decoration: line-through; color: #94a3b8;' : ''}">
-              ${p.nombre}
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <input type="text" id="nombre_${p.id}" value="${p.nombre}" title="Clic para editar nombre" style="font-size: 14px; font-weight: 700; color: #0f172a; border: 1.5px solid transparent; border-radius: 6px; padding: 2px 4px; flex: 1; min-width: 200px; background: transparent; text-transform: uppercase; outline: none; ${p.noAcudio ? 'text-decoration: line-through; color: #94a3b8;' : ''}" onfocus="this.style.borderColor='#93c5fd'; this.style.background='#eff6ff';" onblur="this.style.borderColor='transparent'; this.style.background='transparent'; onNombreChanged('${p.id}', this.value)" onchange="onNombreChanged('${p.id}', this.value)">
               ${p.noAcudio ? '<span class="badge-no-acudio">NO ACUDIÓ</span>' : ''}${p.vigilanciaAcceso ? '<span class="badge-vigilancia">⚠️ VIGILANCIA ACCESO</span>' : ''}${p.visitado ? '<span class="badge-visitado">✓ VISITADO</span>' : ''}
             </div>
-            <div class="card-sub">${shiftTag} &bull; PS: <strong>${p.ps || '-'} kg</strong> &bull; Filtro: <strong>${p.filtro || '400'}</strong></div>
+            <div class="card-sub" style="padding-left: 4px; margin-top: 2px;">${shiftTag} &bull; PS: <strong>${p.ps || '-'} kg</strong> &bull; Filtro: <strong>${p.filtro || '400'}</strong></div>
           </div>
           <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
             <label style="font-size: 10px; font-weight: 700; color: #1e40af; text-transform: uppercase;">Cama / Máq:</label>
-            <input type="text" id="maq_${p.id}" value="${p.maquina || ''}" placeholder="N°" style="width: 58px; padding: 4px; font-size: 13px; font-weight: 800; text-align: center; border: 1.5px solid #93c5fd; border-radius: 6px; background: #eff6ff; color: #1e40af; outline: none;" onchange="autoSavePatient('${p.id}')">
+            <input type="text" id="maq_${p.id}" value="${p.maquina || ''}" placeholder="N°" style="width: 58px; padding: 4px; font-size: 13px; font-weight: 800; text-align: center; border: 1.5px solid #93c5fd; border-radius: 6px; background: #eff6ff; color: #1e40af; outline: none;" onchange="onMaquinaChanged('${p.id}', this.value)">
           </div>
         </div>
 
@@ -2898,6 +3041,149 @@ MÉDICOS RESPONSABLES: ${medico}`;
     showToast("⚠️ Sin internet: Puedes seguir pasando visita, los datos se sincronizarán al volver la red");
   });
 
+
+  // FUNCIONALIDAD: AGREGAR PACIENTE (NUEVO O ESPORÁDICO)
+  function openAddPatientModal() {
+    const currentDay = document.getElementById('daySelect').value;
+    document.getElementById('addPatNombre').value = '';
+    document.getElementById('addPatMaquina').value = '';
+    document.getElementById('addPatTurno').value = (currentShiftFilter !== 'TODOS') ? currentShiftFilter : 'MATUTINO_1';
+    document.getElementById('addPatPs').value = '60';
+    document.getElementById('addPatPp').value = '';
+    document.getElementById('addPatUf').value = '';
+    document.getElementById('addPatFiltro').value = '400';
+    document.getElementById('addPatQs').value = '310';
+    document.getElementById('addPatQd').value = '600';
+    document.getElementById('addPatAnticoag').value = 'SH';
+    document.getElementById('addPatObs').value = '';
+
+    const dayChecks = document.getElementsByName('addPatDias');
+    for (let c of dayChecks) {
+      c.checked = (c.value === currentDay);
+    }
+
+    document.getElementById('addPatientModal').style.display = 'flex';
+  }
+
+  function closeAddPatientModal() {
+    document.getElementById('addPatientModal').style.display = 'none';
+  }
+
+  async function guardarNuevoPacienteGeneral() {
+    const rawName = document.getElementById('addPatNombre').value.trim();
+    if (!rawName || rawName.length < 2) {
+      alert("Por favor ingresa un nombre para el paciente.");
+      return;
+    }
+
+    const maquina = document.getElementById('addPatMaquina').value.trim() || '1';
+    const turno = document.getElementById('addPatTurno').value;
+    const ps = document.getElementById('addPatPs').value.trim() || '60';
+    const pp = document.getElementById('addPatPp').value.trim();
+    const uf = document.getElementById('addPatUf').value.trim();
+    const filtro = document.getElementById('addPatFiltro').value.trim() || '400';
+    const qs = document.getElementById('addPatQs').value.trim() || '310';
+    const qd = document.getElementById('addPatQd').value.trim() || '600';
+    const anticoag = document.getElementById('addPatAnticoag').value || 'SH';
+    const obs = document.getElementById('addPatObs').value.trim() || 'Ninguna';
+
+    let selectedDias = [];
+    const dayChecks = document.getElementsByName('addPatDias');
+    for (let c of dayChecks) {
+      if (c.checked) selectedDias.push(c.value);
+    }
+    const currentDay = document.getElementById('daySelect').value;
+    if (selectedDias.length === 0) selectedDias.push(currentDay);
+
+    const cleanId = rawName.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now().toString().slice(-4);
+
+    const newP = {
+      id: cleanId,
+      nombre: rawName.toUpperCase(),
+      maquina: maquina,
+      turno: turno,
+      dias: selectedDias,
+      ps: ps,
+      pp: pp,
+      uf: uf,
+      tiempo: '2:30',
+      filtro: filtro,
+      qs: qs,
+      qd: qd,
+      na: '138',
+      k: '2',
+      bic: '3.0',
+      anticoag: anticoag,
+      ta_in: '',
+      fc_in: '',
+      ta_out: '',
+      fc_out: '',
+      temp: '36.0',
+      lastAnnotation: obs,
+      vigilanciaAcceso: false,
+      noAcudio: false,
+      visitado: false
+    };
+
+    if (selectedDias.includes(currentDay)) {
+      currentPatients.push(newP);
+    }
+
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", cleanId);
+        await window.fsSetDoc(pRef, newP);
+
+        const dateKey = document.getElementById('sessionDate').value;
+        const sRef = window.fsDoc(window.db, "sesiones", dateKey);
+        const payload = {};
+        payload[cleanId] = {
+          maquina: newP.maquina,
+          ps: newP.ps,
+          pp: newP.pp,
+          uf: newP.uf,
+          tiempo: '2:30',
+          filtro: newP.filtro,
+          qs: newP.qs,
+          qd: newP.qd,
+          na: newP.na,
+          k: newP.k,
+          bic: newP.bic,
+          anticoag: newP.anticoag,
+          anotaciones: obs,
+          visitado: false
+        };
+        await window.fsSetDoc(sRef, payload, { merge: true });
+      } catch (err) {
+        console.error("Error al guardar paciente en Firestore:", err);
+      }
+    }
+
+    closeAddPatientModal();
+    renderCards();
+    showToast(`✓ Paciente ${newP.nombre} agregado correctamente`);
+  }
+
+  // ACTUALIZACIÓN DINÁMICA DE NOMBRE Y ORDEN ASCENDENTE DE CAMA
+  async function onMaquinaChanged(id, newVal) {
+    const p = currentPatients.find(item => item.id === id);
+    if (!p) return;
+    p.maquina = newVal.trim();
+    await savePatientData(id, true, false);
+    renderCards();
+    showToast(`Cama actualizada a: ${p.maquina || 'S/N'}`);
+  }
+
+  async function onNombreChanged(id, newVal) {
+    const p = currentPatients.find(item => item.id === id);
+    if (!p) return;
+    const cleanName = newVal.trim().toUpperCase();
+    if (!cleanName || cleanName === p.nombre) return;
+    p.nombre = cleanName;
+    await savePatientData(id, true, false);
+    showToast(`Nombre actualizado a: ${p.nombre}`);
+  }
+
 </script>
 
   <!-- Modal Mover Censo de Día -->
@@ -3200,6 +3486,102 @@ MÉDICOS RESPONSABLES: ${medico}`;
       <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
         <button class="btn-light" onclick="closeAddVigManualModal()">Cancelar</button>
         <button class="btn-save" onclick="guardarPacienteVigilanciaManual()">💾 Guardar en Reporte</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL: AGREGAR PACIENTE (NUEVO O ESPORÁDICO) -->
+  <div id="addPatientModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 560px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 2px solid #93c5fd; padding-bottom: 8px;">
+        <h3 style="font-size: 16px; color: #1e3a8a; display: flex; align-items: center; gap: 6px;">
+          ➕ Agregar Paciente (Nuevo o Esporádico)
+        </h3>
+        <button onclick="closeAddPatientModal()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #64748b;">&times;</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div>
+          <label style="font-size: 11.5px; font-weight: 700; color: #334155; display: block; margin-bottom: 3px;">Nombre completo del paciente:</label>
+          <input type="text" id="addPatNombre" placeholder="Ej. LOPEZ PEREZ JUAN" style="width: 100%; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 13px; font-weight: 700; text-transform: uppercase;">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1.3fr; gap: 10px;">
+          <div>
+            <label style="font-size: 11.5px; font-weight: 700; color: #334155; display: block; margin-bottom: 3px;">Máquina / Cama:</label>
+            <input type="text" id="addPatMaquina" placeholder="Ej. 1, 2, 5" style="width: 100%; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 13px; font-weight: 700;">
+          </div>
+          <div>
+            <label style="font-size: 11.5px; font-weight: 700; color: #334155; display: block; margin-bottom: 3px;">Turno:</label>
+            <select id="addPatTurno" style="width: 100%; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; font-weight: 700; background: #fff;">
+              <option value="MATUTINO_1">Turno 1 - Matutino</option>
+              <option value="MATUTINO_2">Turno 2 - Matutino</option>
+              <option value="VESPERTINO_1">Turno 1 - Vespertino</option>
+              <option value="VESPERTINO_2">Turno 2 - Vespertino</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size: 11.5px; font-weight: 700; color: #334155; display: block; margin-bottom: 3px;">Días que acude (Marcar solo hoy si es esporádico):</label>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; background: #f8fafc; padding: 7px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addPatDias" value="LUNES"> Lun</label>
+            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addPatDias" value="MARTES"> Mar</label>
+            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addPatDias" value="MIERCOLES"> Mié</label>
+            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addPatDias" value="JUEVES"> Jue</label>
+            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addPatDias" value="VIERNES"> Vie</label>
+            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addPatDias" value="SABADO"> Sáb</label>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+          <div>
+            <label style="font-size: 11px; font-weight: 600; color: #475569;">PS (kg):</label>
+            <input type="text" id="addPatPs" value="60" placeholder="60" style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 12.5px;">
+          </div>
+          <div>
+            <label style="font-size: 11px; font-weight: 600; color: #475569;">PP (kg):</label>
+            <input type="text" id="addPatPp" placeholder="62" style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 12.5px;">
+          </div>
+          <div>
+            <label style="font-size: 11px; font-weight: 600; color: #475569;">UF (L):</label>
+            <input type="text" id="addPatUf" placeholder="2.0 L" style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 12.5px;">
+          </div>
+          <div>
+            <label style="font-size: 11px; font-weight: 600; color: #475569;">Filtro:</label>
+            <input type="text" id="addPatFiltro" value="400" placeholder="400" style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 12.5px;">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+          <div>
+            <label style="font-size: 11px; font-weight: 600; color: #475569;">QS (ml/min):</label>
+            <input type="text" id="addPatQs" value="310" style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 12.5px;">
+          </div>
+          <div>
+            <label style="font-size: 11px; font-weight: 600; color: #475569;">QD (ml/min):</label>
+            <input type="text" id="addPatQd" value="600" style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 12.5px;">
+          </div>
+          <div>
+            <label style="font-size: 11px; font-weight: 600; color: #475569;">Anticoagulación:</label>
+            <select id="addPatAnticoag" style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 12px; background: #fff;">
+              <option value="SH">Sin heparina (SH)</option>
+              <option value="Enoxaparina">Enoxaparina</option>
+              <option value="Heparina">Heparina</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size: 11.5px; font-weight: 700; color: #334155; display: block; margin-bottom: 3px;">Anotación / Observación inicial:</label>
+          <textarea id="addPatObs" placeholder="Ej. Paciente esporádico, cambio de turno, foráneo..." style="width: 100%; height: 50px; padding: 6px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 12px;"></textarea>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
+        <button class="btn-light" onclick="closeAddPatientModal()">Cancelar</button>
+        <button class="btn-save" onclick="guardarNuevoPacienteGeneral()">💾 Guardar e Incorporar</button>
       </div>
     </div>
   </div>
