@@ -833,15 +833,16 @@
       card.className = 'patient-card' + (p.visitado ? ' saved' : '') + (p.noAcudio ? ' no-acudio' : '') + (p.vigilanciaAcceso ? ' vigilancia-acceso' : '');
       card.id = `card_${p.id}`;
 
-      card.innerHTML = `
+            card.innerHTML = `
         <div class="card-header">
           <div style="flex: 1; padding-right: 10px;">
             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
               <input type="text" id="nombre_${p.id}" value="${p.nombre}" title="Clic para editar nombre" style="font-size: 14px; font-weight: 700; color: #0f172a; border: 1.5px solid transparent; border-radius: 6px; padding: 2px 4px; flex: 1; min-width: 200px; background: transparent; text-transform: uppercase; outline: none; ${p.noAcudio ? 'text-decoration: line-through; color: #94a3b8;' : ''}" onfocus="this.style.borderColor='#93c5fd'; this.style.background='#eff6ff';" onblur="this.style.borderColor='transparent'; this.style.background='transparent'; onNombreChanged('${p.id}', this.value)" onchange="onNombreChanged('${p.id}', this.value)">
               ${p.noAcudio ? '<span class="badge-no-acudio">NO ACUDIÓ</span>' : ''}${p.vigilanciaAcceso ? '<span class="badge-vigilancia">⚠️ VIGILANCIA ACCESO</span>' : ''}${p.visitado ? '<span class="badge-visitado">✓ VISITADO</span>' : ''}
             </div>
-            <!-- NSS Atenuado de 2 Casillas -->
-            <div style="display: flex; align-items: center; gap: 4px; padding-left: 4px; margin-top: 3px;">
+            
+            <!-- NSS Atenuado de 2 Casillas Debajo del Nombre -->
+            <div style="display: flex; align-items: center; gap: 4px; padding-left: 4px; margin-top: 4px;">
               <span style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 0.5px;">NSS:</span>
               <input type="text" id="nss_base_${p.id}" value="${p.nss_base || ''}" placeholder="XXXX000000" maxlength="10" title="Número de Seguridad Social (4 letras + 6 números)" style="width: 102px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 5px; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); text-transform: uppercase; outline: none;" onfocus="this.style.borderStyle='solid'; this.style.borderColor='#93c5fd'; this.style.background='#fff';" onblur="this.style.borderStyle='dashed'; this.style.borderColor='#cbd5e1'; this.style.background='rgba(241, 245, 249, 0.6)';" onchange="actualizarNssPaciente('${p.id}')">
               <span style="color: #94a3b8; font-weight: bold; font-size: 11px;">-</span>
