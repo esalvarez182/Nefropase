@@ -363,13 +363,22 @@
       z-index: 3000;
     }
     .toast.show { opacity: 1; }
+  
+    @keyframes cardHighlightFlash {
+      0% { box-shadow: 0 0 0 4px #3b82f6; transform: scale(1.02); }
+      100% { box-shadow: 0 1px 3px rgba(0,0,0,0.04); transform: scale(1.0); }
+    }
+    .card-highlight {
+      animation: cardHighlightFlash 1.6s ease-out;
+    }
+
   </style>
 
   <!-- Firebase SDKs -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { 
-      getFirestore, enableIndexedDbPersistence, collection, doc, setDoc, getDoc, getDocs, updateDoc, onSnapshot 
+      getFirestore, enableIndexedDbPersistence, collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot 
     } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -403,6 +412,7 @@
     window.fsGetDoc = getDoc;
     window.fsGetDocs = getDocs;
     window.fsUpdateDoc = updateDoc;
+    window.fsDeleteDoc = deleteDoc;
     window.fsOnSnapshot = onSnapshot;
 
     window.dispatchEvent(new Event('firebase-ready'));
@@ -1123,6 +1133,350 @@
     showToast(`Nombre actualizado a: ${p.nombre}`);
   }
 
+
+  // ==========================================
+  // BUSCADOR GENERAL Y DIRECTORIO DE PACIENTES
+  // ==========================================
+
+  let todosLosPacientesDirectorio = [];
+
+  function onSearchInput(query) {
+    renderCards();
+  }
+
+  function formatTurnoLabelCorto(code) {
+    if (!code) return 'Sin turno';
+    if (code === 'MATUTINO_1') return 'Turno 1 Matutino';
+    if (code === 'MATUTINO_2') return 'Turno 2 Matutino';
+    if (code === 'VESPERTINO_1') return 'Turno 1 Vespertino';
+    if (code === 'VESPERTINO_2') return 'Turno 2 Vespertino';
+    return code;
+  }
+
+  async function openDirectorioPacientesModal() {
+    document.getElementById('directorioPacientesModal').style.display = 'flex';
+    document.getElementById('dirSearchInput').value = '';
+    document.getElementById('dirTotalLabel').innerText = 'Consultando pacientes...';
+    document.getElementById('directorioListaContenido').innerHTML = '<p style="text-align:center; color:#64748b; padding:20px;">Cargando directorio completo...</p>';
+
+    let all = [];
+    if (window.db) {
+      try {
+        const patientsRef = window.fsCollection(window.db, "pacientes");
+        const snap = await window.fsGetDocs(patientsRef);
+        snap.forEach(docSnap => {
+          all.push({ id: docSnap.id, ...docSnap.data() });
+        });
+      } catch (err) {
+        console.error("Error al cargar pacientes del directorio:", err);
+      }
+    }
+
+    if (all.length === 0) {
+      all = [...currentPatients];
+    }
+
+    // Ordenar alfabéticamente por nombre
+    all.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+
+    todosLosPacientesDirectorio = all;
+    document.getElementById('dirTotalLabel').innerText = `Total: ${all.length} pacientes`;
+    renderDirectorioPacientes(all);
+  }
+
+  function closeDirectorioPacientesModal() {
+    document.getElementById('directorioPacientesModal').style.display = 'none';
+  }
+
+  function filtrarEnDirectorio(query) {
+    const q = (query || '').trim().toLowerCase();
+    if (!q) {
+      renderDirectorioPacientes(todosLosPacientesDirectorio);
+      return;
+    }
+    const filtrados = todosLosPacientesDirectorio.filter(p => 
+      (p.nombre || '').toLowerCase().includes(q) ||
+      (p.maquina || '').includes(q) ||
+      (p.dias || []).some(d => d.toLowerCase().includes(q))
+    );
+    renderDirectorioPacientes(filtrados);
+  }
+
+  function normalizeName(name) {
+    return (name || '').toLowerCase()
+      .normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]/g, "");
+  }
+
+  function renderDirectorioPacientes(lista, highlightingDuplicates = false) {
+    const cont = document.getElementById('directorioListaContenido');
+    cont.innerHTML = '';
+
+    if (lista.length === 0) {
+      cont.innerHTML = '<p style="text-align:center; color:#64748b; padding:20px;">No se encontraron pacientes con ese criterio.</p>';
+      return;
+    }
+
+    // Mapa para identificar duplicados por nombre normalizado
+    const countMap = {};
+    todosLosPacientesDirectorio.forEach(p => {
+      const k = normalizeName(p.nombre);
+      if (k) countMap[k] = (countMap[k] || 0) + 1;
+    });
+
+    lista.forEach(p => {
+      const norm = normalizeName(p.nombre);
+      const isDuplicate = countMap[norm] > 1;
+
+      // Buscar si tiene duplicados
+      const duplicates = isDuplicate ? todosLosPacientesDirectorio.filter(other => other.id !== p.id && normalizeName(other.nombre) === norm) : [];
+
+      const diasBadges = (p.dias && p.dias.length > 0)
+        ? p.dias.map(d => `<span style="background:#dbeafe; color:#1e40af; font-size:10.5px; font-weight:700; padding:2px 6px; border-radius:4px;">${d}</span>`).join(' ')
+        : '<span style="color:#94a3b8; font-size:11px;">Sin días</span>';
+
+      const row = document.createElement('div');
+      row.style.cssText = `background: ${isDuplicate ? '#fffbeb' : '#ffffff'}; border: 1.5px solid ${isDuplicate ? '#fcd34d' : '#e2e8f0'}; border-radius: 8px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; box-shadow: 0 1px 2px rgba(0,0,0,0.03);`;
+
+      let duplicateMergeBtn = '';
+      if (duplicates.length > 0) {
+        const partner = duplicates[0];
+        duplicateMergeBtn = `
+          <button class="btn-warn" style="padding: 5px 9px; font-size: 11px; font-weight: 700;" onclick="confirmarFusion('${p.id}', '${partner.id}')">
+            🔗 Fusionar con registro duplicado
+          </button>
+        `;
+      }
+
+      const primerDia = (p.dias && p.dias.length > 0) ? p.dias[0] : document.getElementById('daySelect').value;
+      const turnoCode = p.turno || 'MATUTINO_1';
+
+      row.innerHTML = `
+        <div style="flex: 1; min-width: 260px;">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <strong style="font-size: 13.5px; color: #1e3a8a; cursor: pointer;" onclick="irAPacienteDesdeDirectorio('${p.id}', '${primerDia}', '${turnoCode}')" title="Clic para abrir tarjeta">
+              ${p.nombre}
+            </strong>
+            <span style="font-size: 11px; background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; padding: 2px 6px; border-radius: 4px; font-weight: 700;">
+              Cama: ${p.maquina || 'S/N'}
+            </span>
+            ${isDuplicate ? '<span style="background:#fee2e2; color:#b91c1c; font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px;">⚠️ REPETIDO</span>' : ''}
+            ${p.vigilanciaAcceso ? '<span style="background:#fef3c7; color:#92400e; font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px;">🛡️ VIGILANCIA</span>' : ''}
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px; margin-top: 5px; flex-wrap: wrap;">
+            <span style="font-size: 11.5px; color: #475569; font-weight: 600;">${formatTurnoLabelCorto(p.turno)}</span>
+            <span>&bull;</span>
+            <div>${diasBadges}</div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+          ${duplicateMergeBtn}
+          <button class="btn-light" style="padding: 5px 9px; font-size: 11px; font-weight: 600;" onclick="abrirSelectorFusionManual('${p.id}')" title="Elegir manualmente con qué otro expediente fusionar este registro">
+            🔗 Fusionar con...
+          </button>
+          <button class="btn-save" style="padding: 5px 10px; font-size: 11.5px;" onclick="irAPacienteDesdeDirectorio('${p.id}', '${primerDia}', '${turnoCode}')">
+            👁️ Ver Tarjeta
+          </button>
+        </div>
+      `;
+
+      cont.appendChild(row);
+    });
+  }
+
+  function detectarYMostrarDuplicados() {
+    const countMap = {};
+    todosLosPacientesDirectorio.forEach(p => {
+      const k = normalizeName(p.nombre);
+      if (k) countMap[k] = (countMap[k] || 0) + 1;
+    });
+
+    const duplicados = todosLosPacientesDirectorio.filter(p => countMap[normalizeName(p.nombre)] > 1);
+
+    if (duplicados.length === 0) {
+      alert("✓ ¡No se detectaron expedientes duplicados en el censo!");
+      return;
+    }
+
+    renderDirectorioPacientes(duplicados, true);
+    document.getElementById('dirTotalLabel').innerText = `Se encontraron ${duplicados.length} registros repetidos`;
+    showToast(`Se encontraron ${duplicados.length} expedientes repetidos`);
+  }
+
+  async function irAPacienteDesdeDirectorio(patientId, dia, turno) {
+    closeDirectorioPacientesModal();
+
+    const daySelect = document.getElementById('daySelect');
+    if (daySelect.value !== dia) {
+      daySelect.value = dia;
+      updatePasteDayLabel();
+      await loadDayPatients();
+    }
+
+    // Poner filtro en TODOS para garantizar visibilidad
+    currentShiftFilter = 'TODOS';
+    document.querySelectorAll('.shift-btn').forEach(b => b.classList.remove('active'));
+    const btnTodos = document.querySelector('.shift-btn');
+    if (btnTodos) btnTodos.classList.add('active');
+    
+    // Limpiar buscador
+    const sInput = document.getElementById('patientSearchInput');
+    if (sInput) sInput.value = '';
+
+    renderCards();
+
+    // Scroll y animación de destello
+    setTimeout(() => {
+      const cardEl = document.getElementById(`card_${patientId}`);
+      if (cardEl) {
+        cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        cardEl.classList.remove('card-highlight');
+        void cardEl.offsetWidth; // forzar reflow
+        cardEl.classList.add('card-highlight');
+      } else {
+        showToast(`Tarjeta de paciente abierta en ${dia}`);
+      }
+    }, 200);
+  }
+
+  // ==========================================
+  // FUSIÓN DE EXPEDIENTES REPETIDOS
+  // ==========================================
+
+  async function confirmarFusion(id1, id2) {
+    const p1 = todosLosPacientesDirectorio.find(p => p.id === id1);
+    const p2 = todosLosPacientesDirectorio.find(p => p.id === id2);
+
+    if (!p1 || !p2) {
+      alert("No se pudieron localizar ambos expedientes para fusionar.");
+      return;
+    }
+
+    const conf = confirm(`¿Deseas fusionar las tarjetas de "${p1.nombre}"?\n\n- Se conservarán los datos de la tarjeta más reciente.\n- Se juntarán las observaciones y notas de ambos expedientes.\n- Se combinarán los días de sesión de ambos turnos.`);
+    if (!conf) return;
+
+    showToast("Fusionando expedientes...");
+
+    // 1. Combinar días
+    const combinedDias = Array.from(new Set([...(p1.dias || []), ...(p2.dias || [])]));
+
+    // 2. Combinar observaciones
+    let obs1 = (p1.lastAnnotation || p1.anotaciones || '').trim();
+    let obs2 = (p2.lastAnnotation || p2.anotaciones || '').trim();
+    if (obs1 === 'Ninguna' || obs1 === '-') obs1 = '';
+    if (obs2 === 'Ninguna' || obs2 === '-') obs2 = '';
+
+    let combinedObs = '';
+    if (obs1 && obs2 && obs1 !== obs2) {
+      combinedObs = `${obs1} | ${obs2}`;
+    } else {
+      combinedObs = obs1 || obs2 || 'Ninguna';
+    }
+
+    // 3. Priorizar datos más completos/recientes
+    const p1Score = (p1.pp ? 1 : 0) + (p1.ta_in ? 1 : 0) + (p1.uf ? 1 : 0);
+    const p2Score = (p2.pp ? 1 : 0) + (p2.ta_in ? 1 : 0) + (p2.uf ? 1 : 0);
+    const primary = (p2Score > p1Score) ? p2 : p1;
+    const secondary = (primary.id === p1.id) ? p2 : p1;
+
+    const mergedPatient = {
+      ...secondary,
+      ...primary,
+      id: primary.id,
+      nombre: primary.nombre || secondary.nombre,
+      dias: combinedDias,
+      lastAnnotation: combinedObs,
+      anotaciones: combinedObs,
+      vigilanciaAcceso: primary.vigilanciaAcceso || secondary.vigilanciaAcceso || false,
+      vigilanciaDatos: primary.vigilanciaDatos || secondary.vigilanciaDatos || null
+    };
+
+    // 4. Actualizar en Firestore y borrar secundario
+    if (window.db) {
+      try {
+        const primRef = window.fsDoc(window.db, "pacientes", primary.id);
+        await window.fsSetDoc(primRef, mergedPatient, { merge: true });
+
+        if (window.fsDeleteDoc) {
+          const secRef = window.fsDoc(window.db, "pacientes", secondary.id);
+          await window.fsDeleteDoc(secRef);
+        } else {
+          const secRef = window.fsDoc(window.db, "pacientes", secondary.id);
+          await window.fsUpdateDoc(secRef, { dias: [] });
+        }
+      } catch (err) {
+        console.error("Error al persistir fusión en Firestore:", err);
+      }
+    }
+
+    // 5. Actualizar listas locales
+    todosLosPacientesDirectorio = todosLosPacientesDirectorio.filter(p => p.id !== secondary.id);
+    const primIdx = todosLosPacientesDirectorio.findIndex(p => p.id === primary.id);
+    if (primIdx !== -1) todosLosPacientesDirectorio[primIdx] = mergedPatient;
+
+    currentPatients = currentPatients.filter(p => p.id !== secondary.id);
+    const curIdx = currentPatients.findIndex(p => p.id === primary.id);
+    if (curIdx !== -1) {
+      currentPatients[curIdx] = mergedPatient;
+    } else if (combinedDias.includes(document.getElementById('daySelect').value)) {
+      currentPatients.push(mergedPatient);
+    }
+
+    renderDirectorioPacientes(todosLosPacientesDirectorio);
+    renderCards();
+    showToast(`✓ Se fusionó el expediente de ${mergedPatient.nombre} exitosamente`);
+  }
+
+
+  // ==========================================
+  // FUSIÓN MANUAL DE EXPEDIENTES A ELECCIÓN
+  // ==========================================
+
+  let pacienteOrigenParaFusion = null;
+
+  function abrirSelectorFusionManual(idOrigen) {
+    const pOrigen = todosLosPacientesDirectorio.find(p => p.id === idOrigen);
+    if (!pOrigen) return;
+
+    pacienteOrigenParaFusion = pOrigen;
+    document.getElementById('fusionOrigenLabel').innerText = `${pOrigen.nombre} (Cama: ${pOrigen.maquina || 'S/N'} | Días: ${(pOrigen.dias || []).join(', ')})`;
+
+    const select = document.getElementById('selectFusionDestino');
+    select.innerHTML = '';
+
+    // Filtrar todos los demás pacientes
+    const otrosPacientes = todosLosPacientesDirectorio.filter(p => p.id !== idOrigen);
+    if (otrosPacientes.length === 0) {
+      alert("No hay otros pacientes disponibles en el censo para fusionar.");
+      return;
+    }
+
+    otrosPacientes.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      const diasTxt = (p.dias && p.dias.length > 0) ? p.dias.join(', ') : 'Sin días';
+      opt.textContent = `${p.nombre} (Cama: ${p.maquina || 'S/N'} | Días: ${diasTxt} | ${p.turno || ''})`;
+      select.appendChild(opt);
+    });
+
+    document.getElementById('modalSelectorFusion').style.display = 'flex';
+  }
+
+  function cerrarSelectorFusionManual() {
+    document.getElementById('modalSelectorFusion').style.display = 'none';
+    pacienteOrigenParaFusion = null;
+  }
+
+  async function ejecutarFusionManual() {
+    if (!pacienteOrigenParaFusion) return;
+    const idDestino = document.getElementById('selectFusionDestino').value;
+    if (!idDestino) return;
+
+    cerrarSelectorFusionManual();
+    await confirmarFusion(pacienteOrigenParaFusion.id, idDestino);
+  }
+
 </script>
 </head>
 <body>
@@ -1151,11 +1505,13 @@
       <input type="date" id="sessionDate" onchange="onDateChanged()">
       <span id="barSummary" style="font-size: 11.5px; font-weight: 700; color: #1e40af; background: #eff6ff; padding: 5px 9px; border-radius: 6px; border: 1px solid #bfdbfe;">0 pacientes</span>
     </div>
-    <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
-      <button class="btn-action" style="padding: 6px 11px; font-size: 12px;" onclick="copyAllDocNotes()">📋 Copiar Notas Expediente</button>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; flex: 1; justify-content: flex-end;">
+      <div style="position: relative; flex: 1; min-width: 170px; max-width: 280px;">
+        <input type="text" id="patientSearchInput" placeholder="🔍 Buscar paciente por nombre..." oninput="onSearchInput(this.value)" style="width: 100%; padding: 6px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; outline: none; background: #fff;">
+      </div>
+      <button class="btn-action" style="padding: 6px 13px; font-size: 12px; font-weight: 700;" onclick="openDirectorioPacientesModal()">👥 Pacientes</button>
       <button class="btn-save" style="padding: 6px 11px; font-size: 12px; font-weight: 700;" onclick="openAddPatientModal()">➕ Agregar Paciente</button>
       <button class="btn-warn" style="padding: 6px 11px; font-size: 12px; font-weight: 700;" onclick="openReporteVigilanciaModal()">🛡️ Reporte Vigilancia</button>
-      <button class="btn-light" style="padding: 6px 10px; font-size: 12px;" onclick="togglePastePanel()">📋 <span id="pastePanelToggleTxt">Pegar Tabla</span></button>
       <button class="btn-light" style="padding: 6px 10px; font-size: 12px;" onclick="openMoverDiaModal()">🔄 Mover Censo</button>
     </div>
   </div>
@@ -1504,8 +1860,13 @@
     const container = document.getElementById('patientsContainer');
     container.innerHTML = '';
 
+    const searchInput = document.getElementById('patientSearchInput');
+    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
     let list = currentPatients;
-    if (currentShiftFilter !== 'TODOS') {
+    if (query) {
+      list = currentPatients.filter(p => (p.nombre || '').toLowerCase().includes(query) || (p.maquina || '').includes(query));
+    } else if (currentShiftFilter !== 'TODOS') {
       list = currentPatients.filter(p => p.turno === currentShiftFilter);
     }
     // Ordenar camas por turno en orden numérico ascendente (1, 2, 3... 10)
@@ -2199,8 +2560,13 @@
   }
 
   async function copyAllDocNotes() {
+    const searchInput = document.getElementById('patientSearchInput');
+    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
     let list = currentPatients;
-    if (currentShiftFilter !== 'TODOS') {
+    if (query) {
+      list = currentPatients.filter(p => (p.nombre || '').toLowerCase().includes(query) || (p.maquina || '').includes(query));
+    } else if (currentShiftFilter !== 'TODOS') {
       list = currentPatients.filter(p => p.turno === currentShiftFilter);
     }
     // Ordenar camas por turno en orden numérico ascendente (1, 2, 3... 10)
@@ -2304,8 +2670,13 @@ MÉDICOS RESPONSABLES: ${medico}`;
   }
 
   async function copyPisoAllText() {
+    const searchInput = document.getElementById('patientSearchInput');
+    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
     let list = currentPatients;
-    if (currentShiftFilter !== 'TODOS') {
+    if (query) {
+      list = currentPatients.filter(p => (p.nombre || '').toLowerCase().includes(query) || (p.maquina || '').includes(query));
+    } else if (currentShiftFilter !== 'TODOS') {
       list = currentPatients.filter(p => p.turno === currentShiftFilter);
     }
     // Ordenar camas por turno en orden numérico ascendente (1, 2, 3... 10)
@@ -3184,6 +3555,350 @@ MÉDICOS RESPONSABLES: ${medico}`;
     showToast(`Nombre actualizado a: ${p.nombre}`);
   }
 
+
+  // ==========================================
+  // BUSCADOR GENERAL Y DIRECTORIO DE PACIENTES
+  // ==========================================
+
+  let todosLosPacientesDirectorio = [];
+
+  function onSearchInput(query) {
+    renderCards();
+  }
+
+  function formatTurnoLabelCorto(code) {
+    if (!code) return 'Sin turno';
+    if (code === 'MATUTINO_1') return 'Turno 1 Matutino';
+    if (code === 'MATUTINO_2') return 'Turno 2 Matutino';
+    if (code === 'VESPERTINO_1') return 'Turno 1 Vespertino';
+    if (code === 'VESPERTINO_2') return 'Turno 2 Vespertino';
+    return code;
+  }
+
+  async function openDirectorioPacientesModal() {
+    document.getElementById('directorioPacientesModal').style.display = 'flex';
+    document.getElementById('dirSearchInput').value = '';
+    document.getElementById('dirTotalLabel').innerText = 'Consultando pacientes...';
+    document.getElementById('directorioListaContenido').innerHTML = '<p style="text-align:center; color:#64748b; padding:20px;">Cargando directorio completo...</p>';
+
+    let all = [];
+    if (window.db) {
+      try {
+        const patientsRef = window.fsCollection(window.db, "pacientes");
+        const snap = await window.fsGetDocs(patientsRef);
+        snap.forEach(docSnap => {
+          all.push({ id: docSnap.id, ...docSnap.data() });
+        });
+      } catch (err) {
+        console.error("Error al cargar pacientes del directorio:", err);
+      }
+    }
+
+    if (all.length === 0) {
+      all = [...currentPatients];
+    }
+
+    // Ordenar alfabéticamente por nombre
+    all.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+
+    todosLosPacientesDirectorio = all;
+    document.getElementById('dirTotalLabel').innerText = `Total: ${all.length} pacientes`;
+    renderDirectorioPacientes(all);
+  }
+
+  function closeDirectorioPacientesModal() {
+    document.getElementById('directorioPacientesModal').style.display = 'none';
+  }
+
+  function filtrarEnDirectorio(query) {
+    const q = (query || '').trim().toLowerCase();
+    if (!q) {
+      renderDirectorioPacientes(todosLosPacientesDirectorio);
+      return;
+    }
+    const filtrados = todosLosPacientesDirectorio.filter(p => 
+      (p.nombre || '').toLowerCase().includes(q) ||
+      (p.maquina || '').includes(q) ||
+      (p.dias || []).some(d => d.toLowerCase().includes(q))
+    );
+    renderDirectorioPacientes(filtrados);
+  }
+
+  function normalizeName(name) {
+    return (name || '').toLowerCase()
+      .normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]/g, "");
+  }
+
+  function renderDirectorioPacientes(lista, highlightingDuplicates = false) {
+    const cont = document.getElementById('directorioListaContenido');
+    cont.innerHTML = '';
+
+    if (lista.length === 0) {
+      cont.innerHTML = '<p style="text-align:center; color:#64748b; padding:20px;">No se encontraron pacientes con ese criterio.</p>';
+      return;
+    }
+
+    // Mapa para identificar duplicados por nombre normalizado
+    const countMap = {};
+    todosLosPacientesDirectorio.forEach(p => {
+      const k = normalizeName(p.nombre);
+      if (k) countMap[k] = (countMap[k] || 0) + 1;
+    });
+
+    lista.forEach(p => {
+      const norm = normalizeName(p.nombre);
+      const isDuplicate = countMap[norm] > 1;
+
+      // Buscar si tiene duplicados
+      const duplicates = isDuplicate ? todosLosPacientesDirectorio.filter(other => other.id !== p.id && normalizeName(other.nombre) === norm) : [];
+
+      const diasBadges = (p.dias && p.dias.length > 0)
+        ? p.dias.map(d => `<span style="background:#dbeafe; color:#1e40af; font-size:10.5px; font-weight:700; padding:2px 6px; border-radius:4px;">${d}</span>`).join(' ')
+        : '<span style="color:#94a3b8; font-size:11px;">Sin días</span>';
+
+      const row = document.createElement('div');
+      row.style.cssText = `background: ${isDuplicate ? '#fffbeb' : '#ffffff'}; border: 1.5px solid ${isDuplicate ? '#fcd34d' : '#e2e8f0'}; border-radius: 8px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; box-shadow: 0 1px 2px rgba(0,0,0,0.03);`;
+
+      let duplicateMergeBtn = '';
+      if (duplicates.length > 0) {
+        const partner = duplicates[0];
+        duplicateMergeBtn = `
+          <button class="btn-warn" style="padding: 5px 9px; font-size: 11px; font-weight: 700;" onclick="confirmarFusion('${p.id}', '${partner.id}')">
+            🔗 Fusionar con registro duplicado
+          </button>
+        `;
+      }
+
+      const primerDia = (p.dias && p.dias.length > 0) ? p.dias[0] : document.getElementById('daySelect').value;
+      const turnoCode = p.turno || 'MATUTINO_1';
+
+      row.innerHTML = `
+        <div style="flex: 1; min-width: 260px;">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <strong style="font-size: 13.5px; color: #1e3a8a; cursor: pointer;" onclick="irAPacienteDesdeDirectorio('${p.id}', '${primerDia}', '${turnoCode}')" title="Clic para abrir tarjeta">
+              ${p.nombre}
+            </strong>
+            <span style="font-size: 11px; background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; padding: 2px 6px; border-radius: 4px; font-weight: 700;">
+              Cama: ${p.maquina || 'S/N'}
+            </span>
+            ${isDuplicate ? '<span style="background:#fee2e2; color:#b91c1c; font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px;">⚠️ REPETIDO</span>' : ''}
+            ${p.vigilanciaAcceso ? '<span style="background:#fef3c7; color:#92400e; font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px;">🛡️ VIGILANCIA</span>' : ''}
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px; margin-top: 5px; flex-wrap: wrap;">
+            <span style="font-size: 11.5px; color: #475569; font-weight: 600;">${formatTurnoLabelCorto(p.turno)}</span>
+            <span>&bull;</span>
+            <div>${diasBadges}</div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+          ${duplicateMergeBtn}
+          <button class="btn-light" style="padding: 5px 9px; font-size: 11px; font-weight: 600;" onclick="abrirSelectorFusionManual('${p.id}')" title="Elegir manualmente con qué otro expediente fusionar este registro">
+            🔗 Fusionar con...
+          </button>
+          <button class="btn-save" style="padding: 5px 10px; font-size: 11.5px;" onclick="irAPacienteDesdeDirectorio('${p.id}', '${primerDia}', '${turnoCode}')">
+            👁️ Ver Tarjeta
+          </button>
+        </div>
+      `;
+
+      cont.appendChild(row);
+    });
+  }
+
+  function detectarYMostrarDuplicados() {
+    const countMap = {};
+    todosLosPacientesDirectorio.forEach(p => {
+      const k = normalizeName(p.nombre);
+      if (k) countMap[k] = (countMap[k] || 0) + 1;
+    });
+
+    const duplicados = todosLosPacientesDirectorio.filter(p => countMap[normalizeName(p.nombre)] > 1);
+
+    if (duplicados.length === 0) {
+      alert("✓ ¡No se detectaron expedientes duplicados en el censo!");
+      return;
+    }
+
+    renderDirectorioPacientes(duplicados, true);
+    document.getElementById('dirTotalLabel').innerText = `Se encontraron ${duplicados.length} registros repetidos`;
+    showToast(`Se encontraron ${duplicados.length} expedientes repetidos`);
+  }
+
+  async function irAPacienteDesdeDirectorio(patientId, dia, turno) {
+    closeDirectorioPacientesModal();
+
+    const daySelect = document.getElementById('daySelect');
+    if (daySelect.value !== dia) {
+      daySelect.value = dia;
+      updatePasteDayLabel();
+      await loadDayPatients();
+    }
+
+    // Poner filtro en TODOS para garantizar visibilidad
+    currentShiftFilter = 'TODOS';
+    document.querySelectorAll('.shift-btn').forEach(b => b.classList.remove('active'));
+    const btnTodos = document.querySelector('.shift-btn');
+    if (btnTodos) btnTodos.classList.add('active');
+    
+    // Limpiar buscador
+    const sInput = document.getElementById('patientSearchInput');
+    if (sInput) sInput.value = '';
+
+    renderCards();
+
+    // Scroll y animación de destello
+    setTimeout(() => {
+      const cardEl = document.getElementById(`card_${patientId}`);
+      if (cardEl) {
+        cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        cardEl.classList.remove('card-highlight');
+        void cardEl.offsetWidth; // forzar reflow
+        cardEl.classList.add('card-highlight');
+      } else {
+        showToast(`Tarjeta de paciente abierta en ${dia}`);
+      }
+    }, 200);
+  }
+
+  // ==========================================
+  // FUSIÓN DE EXPEDIENTES REPETIDOS
+  // ==========================================
+
+  async function confirmarFusion(id1, id2) {
+    const p1 = todosLosPacientesDirectorio.find(p => p.id === id1);
+    const p2 = todosLosPacientesDirectorio.find(p => p.id === id2);
+
+    if (!p1 || !p2) {
+      alert("No se pudieron localizar ambos expedientes para fusionar.");
+      return;
+    }
+
+    const conf = confirm(`¿Deseas fusionar las tarjetas de "${p1.nombre}"?\n\n- Se conservarán los datos de la tarjeta más reciente.\n- Se juntarán las observaciones y notas de ambos expedientes.\n- Se combinarán los días de sesión de ambos turnos.`);
+    if (!conf) return;
+
+    showToast("Fusionando expedientes...");
+
+    // 1. Combinar días
+    const combinedDias = Array.from(new Set([...(p1.dias || []), ...(p2.dias || [])]));
+
+    // 2. Combinar observaciones
+    let obs1 = (p1.lastAnnotation || p1.anotaciones || '').trim();
+    let obs2 = (p2.lastAnnotation || p2.anotaciones || '').trim();
+    if (obs1 === 'Ninguna' || obs1 === '-') obs1 = '';
+    if (obs2 === 'Ninguna' || obs2 === '-') obs2 = '';
+
+    let combinedObs = '';
+    if (obs1 && obs2 && obs1 !== obs2) {
+      combinedObs = `${obs1} | ${obs2}`;
+    } else {
+      combinedObs = obs1 || obs2 || 'Ninguna';
+    }
+
+    // 3. Priorizar datos más completos/recientes
+    const p1Score = (p1.pp ? 1 : 0) + (p1.ta_in ? 1 : 0) + (p1.uf ? 1 : 0);
+    const p2Score = (p2.pp ? 1 : 0) + (p2.ta_in ? 1 : 0) + (p2.uf ? 1 : 0);
+    const primary = (p2Score > p1Score) ? p2 : p1;
+    const secondary = (primary.id === p1.id) ? p2 : p1;
+
+    const mergedPatient = {
+      ...secondary,
+      ...primary,
+      id: primary.id,
+      nombre: primary.nombre || secondary.nombre,
+      dias: combinedDias,
+      lastAnnotation: combinedObs,
+      anotaciones: combinedObs,
+      vigilanciaAcceso: primary.vigilanciaAcceso || secondary.vigilanciaAcceso || false,
+      vigilanciaDatos: primary.vigilanciaDatos || secondary.vigilanciaDatos || null
+    };
+
+    // 4. Actualizar en Firestore y borrar secundario
+    if (window.db) {
+      try {
+        const primRef = window.fsDoc(window.db, "pacientes", primary.id);
+        await window.fsSetDoc(primRef, mergedPatient, { merge: true });
+
+        if (window.fsDeleteDoc) {
+          const secRef = window.fsDoc(window.db, "pacientes", secondary.id);
+          await window.fsDeleteDoc(secRef);
+        } else {
+          const secRef = window.fsDoc(window.db, "pacientes", secondary.id);
+          await window.fsUpdateDoc(secRef, { dias: [] });
+        }
+      } catch (err) {
+        console.error("Error al persistir fusión en Firestore:", err);
+      }
+    }
+
+    // 5. Actualizar listas locales
+    todosLosPacientesDirectorio = todosLosPacientesDirectorio.filter(p => p.id !== secondary.id);
+    const primIdx = todosLosPacientesDirectorio.findIndex(p => p.id === primary.id);
+    if (primIdx !== -1) todosLosPacientesDirectorio[primIdx] = mergedPatient;
+
+    currentPatients = currentPatients.filter(p => p.id !== secondary.id);
+    const curIdx = currentPatients.findIndex(p => p.id === primary.id);
+    if (curIdx !== -1) {
+      currentPatients[curIdx] = mergedPatient;
+    } else if (combinedDias.includes(document.getElementById('daySelect').value)) {
+      currentPatients.push(mergedPatient);
+    }
+
+    renderDirectorioPacientes(todosLosPacientesDirectorio);
+    renderCards();
+    showToast(`✓ Se fusionó el expediente de ${mergedPatient.nombre} exitosamente`);
+  }
+
+
+  // ==========================================
+  // FUSIÓN MANUAL DE EXPEDIENTES A ELECCIÓN
+  // ==========================================
+
+  let pacienteOrigenParaFusion = null;
+
+  function abrirSelectorFusionManual(idOrigen) {
+    const pOrigen = todosLosPacientesDirectorio.find(p => p.id === idOrigen);
+    if (!pOrigen) return;
+
+    pacienteOrigenParaFusion = pOrigen;
+    document.getElementById('fusionOrigenLabel').innerText = `${pOrigen.nombre} (Cama: ${pOrigen.maquina || 'S/N'} | Días: ${(pOrigen.dias || []).join(', ')})`;
+
+    const select = document.getElementById('selectFusionDestino');
+    select.innerHTML = '';
+
+    // Filtrar todos los demás pacientes
+    const otrosPacientes = todosLosPacientesDirectorio.filter(p => p.id !== idOrigen);
+    if (otrosPacientes.length === 0) {
+      alert("No hay otros pacientes disponibles en el censo para fusionar.");
+      return;
+    }
+
+    otrosPacientes.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      const diasTxt = (p.dias && p.dias.length > 0) ? p.dias.join(', ') : 'Sin días';
+      opt.textContent = `${p.nombre} (Cama: ${p.maquina || 'S/N'} | Días: ${diasTxt} | ${p.turno || ''})`;
+      select.appendChild(opt);
+    });
+
+    document.getElementById('modalSelectorFusion').style.display = 'flex';
+  }
+
+  function cerrarSelectorFusionManual() {
+    document.getElementById('modalSelectorFusion').style.display = 'none';
+    pacienteOrigenParaFusion = null;
+  }
+
+  async function ejecutarFusionManual() {
+    if (!pacienteOrigenParaFusion) return;
+    const idDestino = document.getElementById('selectFusionDestino').value;
+    if (!idDestino) return;
+
+    cerrarSelectorFusionManual();
+    await confirmarFusion(pacienteOrigenParaFusion.id, idDestino);
+  }
+
 </script>
 
   <!-- Modal Mover Censo de Día -->
@@ -3582,6 +4297,77 @@ MÉDICOS RESPONSABLES: ${medico}`;
       <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
         <button class="btn-light" onclick="closeAddPatientModal()">Cancelar</button>
         <button class="btn-save" onclick="guardarNuevoPacienteGeneral()">💾 Guardar e Incorporar</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL: DIRECTORIO GENERAL DE PACIENTES Y FUSIÓN DE DUPLICADOS -->
+  <div id="directorioPacientesModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 820px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 2px solid #3b82f6; padding-bottom: 8px;">
+        <h3 style="font-size: 16.5px; color: #1e3a8a; display: flex; align-items: center; gap: 6px;">
+          👥 Directorio General de Pacientes
+        </h3>
+        <button onclick="closeDirectorioPacientesModal()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #64748b;">&times;</button>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+        <div style="position: relative; flex: 1; min-width: 220px;">
+          <input type="text" id="dirSearchInput" placeholder="🔍 Filtrar en el directorio..." oninput="filtrarEnDirectorio(this.value)" style="width: 100%; padding: 6px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; outline: none;">
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <span id="dirTotalLabel" style="font-size: 12px; font-weight: 700; color: #1e40af;">Cargando...</span>
+          <button class="btn-warn" id="btnAutoDetectDuplicates" style="padding: 6px 11px; font-size: 11.5px; font-weight: 700;" onclick="detectarYMostrarDuplicados()">🔍 Ver Posibles Duplicados</button>
+        </div>
+      </div>
+
+      <div id="directorioListaContenido" style="max-height: 60vh; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; background: #f8fafc; display: flex; flex-direction: column; gap: 8px;">
+        <!-- Elementos del directorio cargados dinámicamente -->
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
+        <button class="btn-light" onclick="closeDirectorioPacientesModal()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL: SELECTOR MANUAL DE FUSIÓN DE EXPEDIENTES -->
+  <div id="modalSelectorFusion" class="modal-overlay" style="z-index: 3000;">
+    <div class="modal-card" style="max-width: 540px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 2px solid #f59e0b; padding-bottom: 8px;">
+        <h3 style="font-size: 16px; color: #92400e; display: flex; align-items: center; gap: 6px;">
+          🔗 Fusionar Expediente Manualmente
+        </h3>
+        <button onclick="cerrarSelectorFusionManual()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #78350f;">&times;</button>
+      </div>
+
+      <p style="font-size: 12.5px; color: #334155; margin-bottom: 10px; line-height: 1.4;">
+        Paciente seleccionado: <br>
+        <strong id="fusionOrigenLabel" style="font-size: 14px; color: #1e3a8a;"></strong>
+      </p>
+
+      <div style="margin-bottom: 14px;">
+        <label style="font-size: 11.5px; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">
+          Selecciona el segundo expediente con el que deseas fusionarlo:
+        </label>
+        <select id="selectFusionDestino" style="width: 100%; padding: 8px 10px; border: 1.5px solid #93c5fd; border-radius: 6px; font-size: 13px; font-weight: 600; color: #1e293b; background: #eff6ff; outline: none;">
+          <!-- Opciones cargadas dinámicamente -->
+        </select>
+      </div>
+
+      <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px; margin-bottom: 16px; font-size: 11.5px; color: #92400e; line-height: 1.4;">
+        <strong>¿Qué pasará al fusionar?</strong><br>
+        • Se conservarán los signos y parámetros clínicos de la tarjeta más reciente.<br>
+        • Se <strong>unirán todas las observaciones y notas clínicas</strong> de ambos registros.<br>
+        • Se combinarán los días de sesión (ej. L-M-V + M-J-S).<br>
+        • La tarjeta duplicada se eliminará automáticamente de la base de datos.
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button class="btn-light" onclick="cerrarSelectorFusionManual()">Cancelar</button>
+        <button class="btn-save" style="background: #b45309;" onclick="ejecutarFusionManual()">🔗 Confirmar y Fusionar</button>
       </div>
     </div>
   </div>
