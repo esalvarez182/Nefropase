@@ -2037,7 +2037,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
     if (window.db) {
       try {
-        const pRef = window.fsDoc(window.db, "pacientes", id);
+        const pRef = window.fsDoc(window.db, "pacientes", p.id);
         await window.fsUpdateDoc(pRef, { vigilanciaAcceso: false });
       } catch (err) {
         console.error("Error al retirar vigilancia en Firestore:", err);
@@ -2654,14 +2654,13 @@ MÉDICOS RESPONSABLES: ${medico}`;
   let todosLosPacientesDirectorio = [];
 
 
-  async function onSearchInput(query) {
+    async function onSearchInput(query) {
     const q = (query || '').trim().toLowerCase();
     if (!q) {
       renderCards();
       return;
     }
 
-    // If searching globally, fetch all active patients if needed
     if (todosLosPacientesDirectorio.length === 0 && window.db) {
       try {
         const snap = await window.fsGetDocs(window.fsCollection(window.db, "pacientes"));
@@ -2682,7 +2681,6 @@ MÉDICOS RESPONSABLES: ${medico}`;
       (p.maquina || '').includes(q)
     );
 
-    // Temporarily set currentPatients to matches for rendering
     const container = document.getElementById('patientsContainer');
     container.innerHTML = '';
     
@@ -2695,11 +2693,10 @@ MÉDICOS RESPONSABLES: ${medico}`;
       return;
     }
 
-    // Render cards for matches
     matches.forEach((p) => {
       const isVesp = p.turno && p.turno.includes('VESPERTINO');
       const shiftTag = isVesp ? 'Turno Vespertino' : 'Turno Matutino';
-      const diasStr = (p.dias || []).join(', ') / (p.dias || []).length > 0 ? (p.dias || []).join(', ') : 'Sin días';
+      const diasStr = (p.dias && p.dias.length > 0) ? p.dias.join(', ') : 'Sin días asignados';
 
       const card = document.createElement('div');
       card.className = 'patient-card' + (p.visitado ? ' saved' : '') + (p.noAcudio ? ' no-acudio' : '') + (p.vigilanciaAcceso ? ' vigilancia-acceso' : '');
@@ -2712,17 +2709,21 @@ MÉDICOS RESPONSABLES: ${medico}`;
               <input type="text" id="nombre_${p.id}" value="${p.nombre}" title="Clic para editar nombre" style="font-size: 14px; font-weight: 700; color: #0f172a; border: 1.5px solid transparent; border-radius: 6px; padding: 2px 4px; flex: 1; min-width: 200px; background: transparent; text-transform: uppercase; outline: none;" onblur="onNombreChanged('${p.id}', this.value)" onchange="onNombreChanged('${p.id}', this.value)">
               ${p.vigilanciaAcceso ? '<span class="badge-vigilancia">⚠️ VIGILANCIA</span>' : ''}
             </div>
-            <!-- NSS Atenuado de 2 Casillas -->
-            <div style="display: flex; align-items: center; gap: 4px; padding-left: 4px; margin-top: 3px;">
+            
+            <!-- NSS Atenuado de 2 Casillas Debajo del Nombre -->
+            <div style="display: flex; align-items: center; gap: 4px; padding-left: 4px; margin-top: 4px;">
               <span style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 0.5px;">NSS:</span>
-              <input type="text" id="nss_base_${p.id}" value="${p.nss_base || ''}" placeholder="XXXX000000" maxlength="10" style="width: 102px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 5px; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); text-transform: uppercase; outline: none;" onchange="actualizarNssPaciente('${p.id}')">
+              <input type="text" id="nss_base_${p.id}" value="${p.nss_base || ''}" placeholder="XXXX000000" maxlength="10" title="Número de Seguridad Social (4 letras + 6 números)" style="width: 102px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 5px; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); text-transform: uppercase; outline: none;" onfocus="this.style.borderStyle='solid'; this.style.borderColor='#93c5fd'; this.style.background='#fff';" onblur="this.style.borderStyle='dashed'; this.style.borderColor='#cbd5e1'; this.style.background='rgba(241, 245, 249, 0.6)';" onchange="actualizarNssPaciente('${p.id}')">
               <span style="color: #94a3b8; font-weight: bold; font-size: 11px;">-</span>
-              <input type="text" id="nss_dig_${p.id}" value="${p.nss_dig || ''}" placeholder="00" maxlength="2" style="width: 32px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 3px; text-align: center; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); outline: none;" onchange="actualizarNssPaciente('${p.id}')">
+              <input type="text" id="nss_dig_${p.id}" value="${p.nss_dig || ''}" placeholder="00" maxlength="2" title="2 dígitos agregados" style="width: 32px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 3px; text-align: center; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); outline: none;" onfocus="this.style.borderStyle='solid'; this.style.borderColor='#93c5fd'; this.style.background='#fff';" onblur="this.style.borderStyle='dashed'; this.style.borderColor='#cbd5e1'; this.style.background='rgba(241, 245, 249, 0.6)';" onchange="actualizarNssPaciente('${p.id}')">
             </div>
-            <div class="card-sub" style="padding-left: 4px; margin-top: 3px;">${shiftTag} &bull; Días: <strong>${diasStr}</strong> &bull; Cama: <strong>${p.maquina || 'S/N'}</strong></div>
+
+            <div class="card-sub" style="padding-left: 4px; margin-top: 4px;">${shiftTag} &bull; Días: <strong>${diasStr}</strong> &bull; Cama: <strong>${p.maquina || 'S/N'}</strong></div>
           </div>
-          <div style="display: flex; gap: 6px;">
-            <button class="btn-save" style="padding: 6px 12px; font-size: 12px;" onclick="irAPacienteDesdeDirectorio('${p.id}', '${(p.dias||[])[0] || 'MARTES'}', '${p.turno || 'MATUTINO_1'}')">👁️ Abrir Tarjeta</button>
+          
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <button class="btn-save" style="padding: 6px 12px; font-size: 12px;" onclick="irAPacienteDesdeDirectorio('${p.id}', '${(p.dias||[])[0] || document.getElementById('daySelect').value}', '${p.turno || 'MATUTINO_1'}')">👁️ Abrir Tarjeta</button>
+            <button class="btn-danger" style="padding: 6px 10px; font-size: 12px;" onclick="deletePatientConfirm('${p.id}')">🗑️ Eliminar</button>
           </div>
         </div>
       `;
