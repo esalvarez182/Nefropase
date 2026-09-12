@@ -840,7 +840,14 @@
               <input type="text" id="nombre_${p.id}" value="${p.nombre}" title="Clic para editar nombre" style="font-size: 14px; font-weight: 700; color: #0f172a; border: 1.5px solid transparent; border-radius: 6px; padding: 2px 4px; flex: 1; min-width: 200px; background: transparent; text-transform: uppercase; outline: none; ${p.noAcudio ? 'text-decoration: line-through; color: #94a3b8;' : ''}" onfocus="this.style.borderColor='#93c5fd'; this.style.background='#eff6ff';" onblur="this.style.borderColor='transparent'; this.style.background='transparent'; onNombreChanged('${p.id}', this.value)" onchange="onNombreChanged('${p.id}', this.value)">
               ${p.noAcudio ? '<span class="badge-no-acudio">NO ACUDIÓ</span>' : ''}${p.vigilanciaAcceso ? '<span class="badge-vigilancia">⚠️ VIGILANCIA ACCESO</span>' : ''}${p.visitado ? '<span class="badge-visitado">✓ VISITADO</span>' : ''}
             </div>
-            <div class="card-sub" style="padding-left: 4px; margin-top: 2px;">${shiftTag} &bull; PS: <strong>${p.ps || '-'} kg</strong> &bull; Filtro: <strong>${p.filtro || '400'}</strong></div>
+            <!-- NSS Atenuado de 2 Casillas -->
+            <div style="display: flex; align-items: center; gap: 4px; padding-left: 4px; margin-top: 3px;">
+              <span style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 0.5px;">NSS:</span>
+              <input type="text" id="nss_base_${p.id}" value="${p.nss_base || ''}" placeholder="XXXX000000" maxlength="10" title="Número de Seguridad Social (4 letras + 6 números)" style="width: 102px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 5px; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); text-transform: uppercase; outline: none;" onfocus="this.style.borderStyle='solid'; this.style.borderColor='#93c5fd'; this.style.background='#fff';" onblur="this.style.borderStyle='dashed'; this.style.borderColor='#cbd5e1'; this.style.background='rgba(241, 245, 249, 0.6)';" onchange="actualizarNssPaciente('${p.id}')">
+              <span style="color: #94a3b8; font-weight: bold; font-size: 11px;">-</span>
+              <input type="text" id="nss_dig_${p.id}" value="${p.nss_dig || ''}" placeholder="00" maxlength="2" title="2 dígitos agregados" style="width: 32px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 3px; text-align: center; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); outline: none;" onfocus="this.style.borderStyle='solid'; this.style.borderColor='#93c5fd'; this.style.background='#fff';" onblur="this.style.borderStyle='dashed'; this.style.borderColor='#cbd5e1'; this.style.background='rgba(241, 245, 249, 0.6)';" onchange="actualizarNssPaciente('${p.id}')">
+            </div>
+            <div class="card-sub" style="padding-left: 4px; margin-top: 3px;">${shiftTag} &bull; PS: <strong>${p.ps || '-'} kg</strong> &bull; Filtro: <strong>${p.filtro || '400'}</strong></div>
           </div>
           <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
             <label style="font-size: 10px; font-weight: 700; color: #1e40af; text-transform: uppercase;">Cama / Máq:</label>
@@ -977,6 +984,12 @@
     const newAnnotation = document.getElementById(`obs_${id}`).value.trim();
     p.lastAnnotation = newAnnotation;
     p.anotaciones = newAnnotation;
+
+    const baseInput = document.getElementById(`nss_base_${id}`);
+    const digInput = document.getElementById(`nss_dig_${id}`);
+    if (baseInput) p.nss_base = baseInput.value.trim().toUpperCase();
+    if (digInput) p.nss_dig = digInput.value.trim();
+    if (p.nss_base) p.nss = (p.nss_base && p.nss_dig) ? `${p.nss_base}-${p.nss_dig}` : p.nss_base;
 
     // Solo marcar visitado y cambiar de color si se presionó explícitamente el botón "💾 Guardar"
     if (markVisitado) {
@@ -2355,6 +2368,10 @@ MÉDICOS RESPONSABLES: ${medico}`;
   // FUNCIONALIDAD: AGREGAR PACIENTE (NUEVO O ESPORÁDICO)
   function openAddPatientModal() {
     const currentDay = document.getElementById('daySelect').value;
+    const nssBaseInput = document.getElementById('addPatNssBase');
+    const nssDigInput = document.getElementById('addPatNssDig');
+    if (nssBaseInput) nssBaseInput.value = '';
+    if (nssDigInput) nssDigInput.value = '';
     document.getElementById('addPatNombre').value = '';
     document.getElementById('addPatMaquina').value = '';
     document.getElementById('addPatTurno').value = (currentShiftFilter !== 'TODOS') ? currentShiftFilter : 'MATUTINO_1';
@@ -2386,6 +2403,12 @@ MÉDICOS RESPONSABLES: ${medico}`;
       return;
     }
 
+    const baseInput = document.getElementById('addPatNssBase');
+    const digInput = document.getElementById('addPatNssDig');
+    const nssBase = baseInput ? baseInput.value.trim().toUpperCase() : '';
+    const nssDig = digInput ? digInput.value.trim() : '';
+    const nssCompleto = (nssBase && nssDig) ? `${nssBase}-${nssDig}` : nssBase;
+
     const maquina = document.getElementById('addPatMaquina').value.trim() || '1';
     const turno = document.getElementById('addPatTurno').value;
     const ps = document.getElementById('addPatPs').value.trim() || '60';
@@ -2405,11 +2428,64 @@ MÉDICOS RESPONSABLES: ${medico}`;
     const currentDay = document.getElementById('daySelect').value;
     if (selectedDias.length === 0) selectedDias.push(currentDay);
 
+    // Comprobar si ya existe un paciente con este NSS para UNIFICARLO automáticamente
+    if (nssCompleto && nssCompleto.length >= 8 && window.db) {
+      try {
+        const snap = await window.fsGetDocs(window.fsCollection(window.db, "pacientes"));
+        let pacienteExistente = null;
+        snap.forEach(docSnap => {
+          const data = docSnap.data();
+          if ((data.nss === nssCompleto || (data.nss_base && data.nss_base === nssBase && data.nss_dig === nssDig)) && !data.eliminado && !data.fusionadoEn) {
+            pacienteExistente = { id: docSnap.id, ...data };
+          }
+        });
+
+        if (pacienteExistente) {
+          // Unificar con el paciente existente
+          const combinedDias = Array.from(new Set([...(pacienteExistente.dias || []), ...selectedDias]));
+          let prevObs = (pacienteExistente.lastAnnotation || '').trim();
+          let mergedObs = prevObs && obs && prevObs !== obs ? `${prevObs} | ${obs}` : (prevObs || obs);
+
+          const updatedDoc = {
+            ...pacienteExistente,
+            nombre: rawName.toUpperCase(),
+            maquina: maquina,
+            turno: turno,
+            dias: combinedDias,
+            ps: ps || pacienteExistente.ps,
+            pp: pp || pacienteExistente.pp,
+            uf: uf || pacienteExistente.uf,
+            filtro: filtro || pacienteExistente.filtro,
+            qs: qs || pacienteExistente.qs,
+            qd: qd || pacienteExistente.qd,
+            anticoag: anticoag || pacienteExistente.anticoag,
+            lastAnnotation: mergedObs,
+            nss_base: nssBase,
+            nss_dig: nssDig,
+            nss: nssCompleto
+          };
+
+          const pRef = window.fsDoc(window.db, "pacientes", pacienteExistente.id);
+          await window.fsSetDoc(pRef, updatedDoc, { merge: true });
+
+          closeAddPatientModal();
+          await loadDayPatients();
+          showToast(`✓ Paciente unificado automáticamente con NSS existente: ${nssCompleto}`);
+          return;
+        }
+      } catch (errCheck) {
+        console.warn("Aviso comprobación NSS duplicado:", errCheck);
+      }
+    }
+
     const cleanId = rawName.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now().toString().slice(-4);
 
     const newP = {
       id: cleanId,
       nombre: rawName.toUpperCase(),
+      nss_base: nssBase,
+      nss_dig: nssDig,
+      nss: nssCompleto,
       maquina: maquina,
       turno: turno,
       dias: selectedDias,
@@ -2472,6 +2548,61 @@ MÉDICOS RESPONSABLES: ${medico}`;
     closeAddPatientModal();
     renderCards();
     showToast(`✓ Paciente ${newP.nombre} agregado correctamente`);
+  }
+
+  
+  // =======================================================
+  // GESTIÓN DE NÚMERO DE SEGURIDAD SOCIAL (NSS) Y AUTO-UNIFICACIÓN
+  // =======================================================
+
+  async function actualizarNssPaciente(patientId) {
+    const p = currentPatients.find(item => item.id === patientId);
+    if (!p) return;
+
+    const baseInput = document.getElementById(`nss_base_${patientId}`);
+    const digInput = document.getElementById(`nss_dig_${patientId}`);
+
+    const nssBase = baseInput ? baseInput.value.trim().toUpperCase() : '';
+    const nssDig = digInput ? digInput.value.trim() : '';
+
+    p.nss_base = nssBase;
+    p.nss_dig = nssDig;
+    const nssCompleto = (nssBase && nssDig) ? `${nssBase}-${nssDig}` : nssBase;
+    p.nss = nssCompleto;
+
+    // 1. Guardar en Firestore
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", patientId);
+        await window.fsUpdateDoc(pRef, {
+          nss_base: nssBase,
+          nss_dig: nssDig,
+          nss: nssCompleto
+        });
+
+        // 2. Si tiene NSS completo, comprobar si otro registro ya lo tenía para UNIFICAR AUTOMÁTICAMENTE
+        if (nssCompleto && nssCompleto.length >= 8) {
+          const snap = await window.fsGetDocs(window.fsCollection(window.db, "pacientes"));
+          let duplicadoDoc = null;
+          snap.forEach(docSnap => {
+            const data = docSnap.data();
+            if (docSnap.id !== patientId && (data.nss === nssCompleto || (data.nss_base && data.nss_base === nssBase && data.nss_dig === nssDig)) && !data.eliminado && !data.fusionadoEn) {
+              duplicadoDoc = { id: docSnap.id, ...data };
+            }
+          });
+
+          if (duplicadoDoc) {
+            showToast(`🔗 NSS idéntico detectado: Unificando automáticamente con "${duplicadoDoc.nombre}"...`);
+            await confirmarFusion(patientId, duplicadoDoc.id);
+            return;
+          }
+        }
+
+        showToast("✓ NSS actualizado");
+      } catch (err) {
+        console.warn("Error al actualizar NSS:", err);
+      }
+    }
   }
 
   // ACTUALIZACIÓN DINÁMICA DE NOMBRE Y ORDEN ASCENDENTE DE CAMA
@@ -3175,6 +3306,19 @@ MÉDICOS RESPONSABLES: ${medico}`;
       </div>
 
       <div style="display: flex; flex-direction: column; gap: 10px;">
+        <!-- Solicitud de NSS (4 letras + 6 números - 2 dígitos) -->
+        <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 8px 10px;">
+          <label style="font-size: 11.5px; font-weight: 800; color: #0369a1; display: block; margin-bottom: 4px;">
+            NÚMERO DE SEGURIDAD SOCIAL (NSS - Identificador Único):
+          </label>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <input type="text" id="addPatNssBase" placeholder="4 letras + 6 números (ej. ABCD123456)" maxlength="10" style="flex: 1; padding: 7px 10px; border: 1.5px solid #7dd3fc; border-radius: 6px; font-size: 12.5px; font-weight: 700; text-transform: uppercase; font-family: monospace; outline: none; background: #fff;">
+            <span style="font-weight: 800; color: #0284c7; font-size: 14px;">-</span>
+            <input type="text" id="addPatNssDig" placeholder="00" maxlength="2" style="width: 60px; padding: 7px 6px; border: 1.5px solid #7dd3fc; border-radius: 6px; font-size: 12.5px; font-weight: 700; text-align: center; font-family: monospace; outline: none; background: #fff;">
+          </div>
+          <small style="font-size: 10.5px; color: #0284c7; display: block; margin-top: 3px;">💡 Si el paciente ya existe en otro turno o día con este NSS, se unificará automáticamente.</small>
+        </div>
+
         <div>
           <label style="font-size: 11.5px; font-weight: 700; color: #334155; display: block; margin-bottom: 3px;">Nombre completo del paciente:</label>
           <input type="text" id="addPatNombre" placeholder="Ej. LOPEZ PEREZ JUAN" style="width: 100%; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 13px; font-weight: 700; text-transform: uppercase;">
