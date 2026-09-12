@@ -806,7 +806,11 @@
     if (query) {
       list = currentPatients.filter(p => (p.nombre || '').toLowerCase().includes(query) || (p.maquina || '').includes(query));
     } else if (currentShiftFilter !== 'TODOS') {
-      list = currentPatients.filter(p => p.turno === currentShiftFilter);
+      const currentDay = document.getElementById('daySelect').value;
+      list = currentPatients.filter(p => {
+        const shiftForDay = (p.agenda && p.agenda[currentDay]) ? p.agenda[currentDay] : p.turno;
+        return shiftForDay === currentShiftFilter;
+      });
     }
     // Ordenar camas por turno en orden numérico ascendente (1, 2, 3... 10)
     list.sort((a, b) => {
@@ -841,26 +845,31 @@
               ${p.noAcudio ? '<span class="badge-no-acudio">NO ACUDIÓ</span>' : ''}${p.vigilanciaAcceso ? '<span class="badge-vigilancia">⚠️ VIGILANCIA ACCESO</span>' : ''}${p.visitado ? '<span class="badge-visitado">✓ VISITADO</span>' : ''}
             </div>
             
-            <!-- NSS Atenuado de 2 Casillas Debajo del Nombre -->
-            <div style="display: flex; align-items: center; gap: 4px; padding-left: 4px; margin-top: 4px;">
-              <span style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 0.5px;">NSS:</span>
-              <input type="text" id="nss_base_${p.id}" value="${p.nss_base || ''}" placeholder="XXXX000000" maxlength="10" title="Número de Seguridad Social (4 letras + 6 números)" style="width: 102px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 5px; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); text-transform: uppercase; outline: none;" onfocus="this.style.borderStyle='solid'; this.style.borderColor='#93c5fd'; this.style.background='#fff';" onblur="this.style.borderStyle='dashed'; this.style.borderColor='#cbd5e1'; this.style.background='rgba(241, 245, 249, 0.6)';" onchange="actualizarNssPaciente('${p.id}')">
-              <span style="color: #94a3b8; font-weight: bold; font-size: 11px;">-</span>
-              <input type="text" id="nss_dig_${p.id}" value="${p.nss_dig || ''}" placeholder="00" maxlength="2" title="2 dígitos agregados" style="width: 32px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 3px; text-align: center; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); outline: none;" onfocus="this.style.borderStyle='solid'; this.style.borderColor='#93c5fd'; this.style.background='#fff';" onblur="this.style.borderStyle='dashed'; this.style.borderColor='#cbd5e1'; this.style.background='rgba(241, 245, 249, 0.6)';" onchange="actualizarNssPaciente('${p.id}')">
+            <!-- Agenda y Días de Sesión -->
+            <div style="display: flex; align-items: center; gap: 8px; padding-left: 4px; margin-top: 5px; flex-wrap: wrap;">
+              <div style="font-size: 11px; background: #f8fafc; padding: 4px 8px; border-radius: 6px; border: 1px solid #e2e8f0; color: #475569; font-weight: 600;">
+                📅 Agenda: <strong style="color: #1e40af;">${(() => {
+                  const arr = (p.dias || []).map(d => {
+                    const t = (p.agenda && p.agenda[d]) ? p.agenda[d] : p.turno;
+                    let tC = t === 'MATUTINO_1' ? 'M1' : t === 'MATUTINO_2' ? 'M2' : t === 'VESPERTINO_1' ? 'V1' : 'V2';
+                    return d.substring(0,3) + '(' + tC + ')';
+                  });
+                  return arr.length > 0 ? arr.join(', ') : 'Sin días';
+                })()}</strong>
+              </div>
+              <button class="btn-light" style="padding: 3px 8px; font-size: 10.5px; font-weight: 700;" onclick="openAgendaModal('${p.id}')">🗓️ Modificar Agenda</button>
             </div>
 
-            <!-- Selector Rápido de Días de Sesión -->
-            <div style="display: flex; align-items: center; gap: 6px; padding-left: 4px; margin-top: 5px; flex-wrap: wrap; background: #f8fafc; padding: 4px 8px; border-radius: 6px; border: 1px solid #e2e8f0; max-width: fit-content;">
-              <span style="font-size: 10.5px; font-weight: 700; color: #475569;">📅 Días:</span>
-              <label style="font-size: 10.5px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 2px;"><input type="checkbox" ${(p.dias||[]).includes('LUNES')?'checked':''} onchange="togglePatientDay('${p.id}', 'LUNES', this.checked)"> Lun</label>
-              <label style="font-size: 10.5px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 2px;"><input type="checkbox" ${(p.dias||[]).includes('MARTES')?'checked':''} onchange="togglePatientDay('${p.id}', 'MARTES', this.checked)"> Mar</label>
-              <label style="font-size: 10.5px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 2px;"><input type="checkbox" ${(p.dias||[]).includes('MIERCOLES')?'checked':''} onchange="togglePatientDay('${p.id}', 'MIERCOLES', this.checked)"> Mié</label>
-              <label style="font-size: 10.5px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 2px;"><input type="checkbox" ${(p.dias||[]).includes('JUEVES')?'checked':''} onchange="togglePatientDay('${p.id}', 'JUEVES', this.checked)"> Jue</label>
-              <label style="font-size: 10.5px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 2px;"><input type="checkbox" ${(p.dias||[]).includes('VIERNES')?'checked':''} onchange="togglePatientDay('${p.id}', 'VIERNES', this.checked)"> Vie</label>
-              <label style="font-size: 10.5px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 2px;"><input type="checkbox" ${(p.dias||[]).includes('SABADO')?'checked':''} onchange="togglePatientDay('${p.id}', 'SABADO', this.checked)"> Sáb</label>
-            </div>
-
-            <div class="card-sub" style="padding-left: 4px; margin-top: 3px;">${shiftTag} &bull; PS: <strong>${p.ps || '-'} kg</strong> &bull; Filtro: <strong>${p.filtro || '400'}</strong></div>
+            <div class="card-sub" style="padding-left: 4px; margin-top: 4px; font-size: 11.5px;">Turno de Hoy: <strong>${(() => {
+              const cDay = document.getElementById('daySelect').value;
+              const tDay = (p.agenda && p.agenda[cDay]) ? p.agenda[cDay] : p.turno;
+              if(!tDay) return '-';
+              if(tDay==='MATUTINO_1') return '1er Matutino';
+              if(tDay==='MATUTINO_2') return '2do Matutino';
+              if(tDay==='VESPERTINO_1') return '1er Vespertino';
+              if(tDay==='VESPERTINO_2') return '2do Vespertino';
+              return tDay;
+            })()}</strong> &bull; PS: <strong>${p.ps || '-'} kg</strong> &bull; Filtro: <strong>${p.filtro || '400'}</strong></div>
           </div>
           <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
             <label style="font-size: 10px; font-weight: 700; color: #1e40af; text-transform: uppercase;">Cama / Máq:</label>
@@ -2468,12 +2477,17 @@ MÉDICOS RESPONSABLES: ${medico}`;
           let prevObs = (pacienteExistente.lastAnnotation || '').trim();
           let mergedObs = prevObs && obs && prevObs !== obs ? `${prevObs} | ${obs}` : (prevObs || obs);
 
+          // Si el existente no tenía agenda, crearla
+          let mergedAgenda = pacienteExistente.agenda || {};
+          selectedDias.forEach(d => { if(!mergedAgenda[d]) mergedAgenda[d] = turno; });
+
           const updatedDoc = {
             ...pacienteExistente,
             nombre: rawName.toUpperCase(),
             maquina: maquina,
             turno: turno,
             dias: combinedDias,
+            agenda: mergedAgenda,
             ps: ps || pacienteExistente.ps,
             pp: pp || pacienteExistente.pp,
             uf: uf || pacienteExistente.uf,
@@ -2511,6 +2525,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
       maquina: maquina,
       turno: turno,
       dias: selectedDias,
+      agenda: selectedDias.reduce((acc, d) => { acc[d] = turno; return acc; }, {}),
       ps: ps,
       pp: pp,
       uf: uf,
@@ -2574,8 +2589,123 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
   
   // =======================================================
-  // GESTIÓN DE NÚMERO DE SEGURIDAD SOCIAL (NSS) Y AUTO-UNIFICACIÓN
+  // GESTIÓN DE AGENDA (DÍAS Y TURNOS INDEPENDIENTES)
   // =======================================================
+  let activeAgendaPatientId = null;
+
+  function openAgendaModal(id) {
+    const p = currentPatients.find(item => item.id === id) || todosLosPacientesDirectorio.find(item => item.id === id);
+    if (!p) return;
+    activeAgendaPatientId = id;
+    document.getElementById('agendaPatientName').innerText = p.nombre;
+    
+    const days = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
+    const cont = document.getElementById('agendaDaysContainer');
+    cont.innerHTML = '';
+    
+    const pDias = p.dias || [];
+    const pAgenda = p.agenda || {};
+    
+    days.forEach(d => {
+        const isChecked = pDias.includes(d);
+        const shift = pAgenda[d] || p.turno || 'MATUTINO_1';
+        
+        const labelDay = d.charAt(0) + d.slice(1).toLowerCase();
+        
+        cont.innerHTML += `
+            <div style="display: flex; align-items: center; justify-content: space-between; background: ${isChecked ? '#f0f9ff' : '#f8fafc'}; padding: 8px 12px; border: 1px solid ${isChecked ? '#93c5fd' : '#e2e8f0'}; border-radius: 6px; transition: 0.2s;">
+                <label style="font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; width: 120px; color: ${isChecked ? '#1e40af' : '#475569'};">
+                    <input type="checkbox" id="chk_agenda_${d}" ${isChecked ? 'checked' : ''} onchange="toggleAgendaRow('${d}', this)">
+                    ${labelDay}
+                </label>
+                <select id="sel_agenda_${d}" style="padding: 6px; font-size: 12.5px; font-weight: 600; border-radius: 4px; border: 1px solid #cbd5e1; outline: none; flex: 1; background: #fff; ${isChecked ? '' : 'opacity: 0.4; pointer-events: none;'}">
+                    <option value="MATUTINO_1" ${shift === 'MATUTINO_1' ? 'selected' : ''}>Turno 1 - Matutino</option>
+                    <option value="MATUTINO_2" ${shift === 'MATUTINO_2' ? 'selected' : ''}>Turno 2 - Matutino</option>
+                    <option value="VESPERTINO_1" ${shift === 'VESPERTINO_1' ? 'selected' : ''}>Turno 1 - Vespertino</option>
+                    <option value="VESPERTINO_2" ${shift === 'VESPERTINO_2' ? 'selected' : ''}>Turno 2 - Vespertino</option>
+                </select>
+            </div>
+        `;
+    });
+    document.getElementById('agendaModal').style.display = 'flex';
+  }
+
+  window.toggleAgendaRow = function(day, chkEl) {
+    const sel = document.getElementById(`sel_agenda_${day}`);
+    const parentDiv = chkEl.closest('div');
+    if (chkEl.checked) {
+        sel.style.opacity = '1';
+        sel.style.pointerEvents = 'auto';
+        parentDiv.style.background = '#f0f9ff';
+        parentDiv.style.borderColor = '#93c5fd';
+        parentDiv.querySelector('label').style.color = '#1e40af';
+    } else {
+        sel.style.opacity = '0.4';
+        sel.style.pointerEvents = 'none';
+        parentDiv.style.background = '#f8fafc';
+        parentDiv.style.borderColor = '#e2e8f0';
+        parentDiv.querySelector('label').style.color = '#475569';
+    }
+  };
+
+  function closeAgendaModal() {
+    document.getElementById('agendaModal').style.display = 'none';
+    activeAgendaPatientId = null;
+  }
+
+  async function saveAgenda() {
+    if (!activeAgendaPatientId) return;
+    const p = currentPatients.find(item => item.id === activeAgendaPatientId) || todosLosPacientesDirectorio.find(item => item.id === activeAgendaPatientId);
+    if (!p) return;
+
+    const days = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
+    const newDias = [];
+    const newAgenda = {};
+
+    days.forEach(d => {
+        const chk = document.getElementById(`chk_agenda_${d}`);
+        const sel = document.getElementById(`sel_agenda_${d}`);
+        if (chk && chk.checked) {
+            newDias.push(d);
+            newAgenda[d] = sel.value;
+        }
+    });
+
+    p.dias = newDias;
+    p.agenda = newAgenda;
+    // Si quitaron todos los días
+    if (newDias.length > 0) p.turno = newAgenda[newDias[0]]; // fallback principal
+
+    if (window.db) {
+        try {
+            const pRef = window.fsDoc(window.db, "pacientes", p.id);
+            await window.fsUpdateDoc(pRef, { dias: newDias, agenda: newAgenda, turno: p.turno });
+            showToast(`✓ Agenda guardada exitosamente`);
+        } catch (err) {
+            console.error("Error al guardar agenda:", err);
+            showToast(`⚠️ Guardado localmente`);
+        }
+    }
+    
+    // Si se quitó del día actual, remover de list local
+    const currentDay = document.getElementById('daySelect').value;
+    if (!newDias.includes(currentDay)) {
+        currentPatients = currentPatients.filter(item => item.id !== p.id);
+    } else {
+        // Verificar si existe en currentPatients, si no, agregarlo
+        const idx = currentPatients.findIndex(item => item.id === p.id);
+        if(idx === -1) currentPatients.push(p);
+    }
+
+    closeAgendaModal();
+    renderCards();
+    
+    // Si el modal de directorio está abierto, refrescarlo
+    if(document.getElementById('directorioPacientesModal').style.display === 'flex') {
+        const query = document.getElementById('dirSearchInput').value;
+        filtrarEnDirectorio(query);
+    }
+  }
 
   async function actualizarNssPaciente(patientId) {
     const p = currentPatients.find(item => item.id === patientId);
@@ -2654,8 +2784,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
   let todosLosPacientesDirectorio = [];
 
-
-    async function onSearchInput(query) {
+async function onSearchInput(query) {
     const q = (query || '').trim().toLowerCase();
     if (!q) {
       renderCards();
@@ -2695,66 +2824,65 @@ MÉDICOS RESPONSABLES: ${medico}`;
     }
 
     matches.forEach((p) => {
-      const isVesp = p.turno && p.turno.includes('VESPERTINO');
+      const primerDia = (p.dias && p.dias.length > 0) ? p.dias[0] : document.getElementById('daySelect').value;
+      const turnoParaElDia = (p.agenda && p.agenda[primerDia]) ? p.agenda[primerDia] : (p.turno || 'MATUTINO_1');
+      const isVesp = turnoParaElDia.includes('VESPERTINO');
       const shiftTag = isVesp ? 'Turno Vespertino' : 'Turno Matutino';
-      const diasStr = (p.dias && p.dias.length > 0) ? p.dias.join(', ') : 'Sin días asignados';
+      
+      const agendaTextArr = (p.dias || []).map(d => {
+          const t = (p.agenda && p.agenda[d]) ? p.agenda[d] : p.turno;
+          let tCorto = t === 'MATUTINO_1' ? 'M1' : t === 'MATUTINO_2' ? 'M2' : t === 'VESPERTINO_1' ? 'V1' : 'V2';
+          return `${d.substring(0,3)} (${tCorto})`;
+      });
+      const agendaStr = agendaTextArr.length > 0 ? agendaTextArr.join(' • ') : 'Sin días programados';
 
       const card = document.createElement('div');
-      card.className = 'patient-card' + (p.visitado ? ' saved' : '') + (p.noAcudio ? ' no-acudio' : '') + (p.vigilanciaAcceso ? ' vigilancia-acceso' : '');
+      // Hacer la tarjeta interactiva globalmente, excluyendo inputs
+      card.className = 'patient-card search-result-card' + (p.noAcudio ? ' no-acudio' : '') + (p.vigilanciaAcceso ? ' vigilancia-acceso' : '');
       card.id = `card_${p.id}`;
+      card.style.cursor = "pointer";
+      card.style.border = "2px solid #93c5fd";
+      card.style.transition = "0.2s ease";
+      
+      // OnClick para toda la tarjeta: abre la ficha, pero ignora si clican en los inputs o botones
+      card.onclick = function(e) {
+         if(['INPUT','SELECT','BUTTON','TEXTAREA'].includes(e.target.tagName)) return;
+         irAPacienteDesdeDirectorio(p.id, primerDia, turnoParaElDia);
+      };
+
+      card.onmouseover = () => { card.style.background = '#f0f9ff'; card.style.transform = 'scale(1.01)'; };
+      card.onmouseout = () => { card.style.background = '#fff'; card.style.transform = 'scale(1)'; };
 
       card.innerHTML = `
-        <div class="card-header">
+        <div class="card-header" style="pointer-events: auto;">
           <div style="flex: 1; padding-right: 10px;">
             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-              <input type="text" id="nombre_${p.id}" value="${p.nombre}" title="Clic para editar nombre" style="font-size: 14px; font-weight: 700; color: #0f172a; border: 1.5px solid transparent; border-radius: 6px; padding: 2px 4px; flex: 1; min-width: 200px; background: transparent; text-transform: uppercase; outline: none;" onblur="onNombreChanged('${p.id}', this.value)" onchange="onNombreChanged('${p.id}', this.value)">
+              <input type="text" id="nombre_${p.id}" value="${p.nombre}" title="Clic para editar nombre" style="font-size: 14px; font-weight: 800; color: #1e3a8a; border: 1.5px solid transparent; border-radius: 6px; padding: 2px 4px; flex: 1; min-width: 200px; background: transparent; text-transform: uppercase; outline: none;" onblur="onNombreChanged('${p.id}', this.value)" onchange="onNombreChanged('${p.id}', this.value)">
               ${p.vigilanciaAcceso ? '<span class="badge-vigilancia">⚠️ VIGILANCIA</span>' : ''}
+              <span style="font-size: 10px; background: #e2e8f0; color: #475569; padding: 3px 6px; border-radius: 10px;">📌 Clic en la tarjeta para abrir</span>
             </div>
             
             <!-- NSS Atenuado de 2 Casillas Debajo del Nombre -->
-            <div style="display: flex; align-items: center; gap: 4px; padding-left: 4px; margin-top: 4px;">
-              <span style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 0.5px;">NSS:</span>
-              <input type="text" id="nss_base_${p.id}" value="${p.nss_base || ''}" placeholder="XXXX000000" maxlength="10" title="Número de Seguridad Social (4 letras + 6 números)" style="width: 102px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 5px; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); text-transform: uppercase; outline: none;" onfocus="this.style.borderStyle='solid'; this.style.borderColor='#93c5fd'; this.style.background='#fff';" onblur="this.style.borderStyle='dashed'; this.style.borderColor='#cbd5e1'; this.style.background='rgba(241, 245, 249, 0.6)';" onchange="actualizarNssPaciente('${p.id}')">
+            <div style="display: flex; align-items: center; gap: 4px; padding-left: 4px; margin-top: 6px;">
+              <span style="font-size: 10.5px; font-weight: 800; color: #64748b;">NSS:</span>
+              <input type="text" id="nss_base_${p.id}" value="${p.nss_base || ''}" placeholder="XXXX000000" maxlength="10" title="Número de Seguridad Social (4 letras + 6 números)" style="width: 102px; font-size: 11.5px; font-family: monospace; font-weight: 700; color: #1e293b; padding: 3px 5px; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(255, 255, 255, 0.9); text-transform: uppercase; outline: none;" onfocus="this.style.borderStyle='solid'; this.style.borderColor='#93c5fd';" onblur="this.style.borderStyle='dashed'; this.style.borderColor='#cbd5e1';" onchange="actualizarNssPaciente('${p.id}')">
               <span style="color: #94a3b8; font-weight: bold; font-size: 11px;">-</span>
-              <input type="text" id="nss_dig_${p.id}" value="${p.nss_dig || ''}" placeholder="00" maxlength="2" title="2 dígitos agregados" style="width: 32px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 3px; text-align: center; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); outline: none;" onfocus="this.style.borderStyle='solid'; this.style.borderColor='#93c5fd'; this.style.background='#fff';" onblur="this.style.borderStyle='dashed'; this.style.borderColor='#cbd5e1'; this.style.background='rgba(241, 245, 249, 0.6)';" onchange="actualizarNssPaciente('${p.id}')">
+              <input type="text" id="nss_dig_${p.id}" value="${p.nss_dig || ''}" placeholder="00" maxlength="2" title="2 dígitos agregados" style="width: 32px; font-size: 11.5px; font-family: monospace; font-weight: 700; color: #1e293b; padding: 3px 3px; text-align: center; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(255, 255, 255, 0.9); outline: none;" onfocus="this.style.borderStyle='solid'; this.style.borderColor='#93c5fd';" onblur="this.style.borderStyle='dashed'; this.style.borderColor='#cbd5e1';" onchange="actualizarNssPaciente('${p.id}')">
             </div>
 
-            <div class="card-sub" style="padding-left: 4px; margin-top: 4px;">${shiftTag} &bull; Días: <strong>${diasStr}</strong> &bull; Cama: <strong>${p.maquina || 'S/N'}</strong></div>
+            <div class="card-sub" style="padding-left: 4px; margin-top: 8px; font-size: 11.5px;">
+               <span style="background: #e0e7ff; color: #3730a3; padding: 3px 6px; border-radius: 4px; font-weight: 600;">📅 Agenda: ${agendaStr}</span> 
+               &bull; Cama Registrada: <strong>${p.maquina || 'S/N'}</strong>
+            </div>
           </div>
           
-          <div style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn-save" style="padding: 6px 12px; font-size: 12px;" onclick="irAPacienteDesdeDirectorio('${p.id}', '${(p.dias||[])[0] || document.getElementById('daySelect').value}', '${p.turno || 'MATUTINO_1'}')">👁️ Abrir Tarjeta</button>
-            <button class="btn-danger" style="padding: 6px 10px; font-size: 12px;" onclick="deletePatientConfirm('${p.id}')">🗑️ Eliminar</button>
+          <div style="display: flex; gap: 6px; align-items: flex-start;">
+            <button class="btn-danger" style="padding: 6px 12px; font-size: 12.5px; font-weight: 700; z-index: 10;" onclick="event.stopPropagation(); deletePatientConfirm('${p.id}')">🗑️ Eliminar</button>
           </div>
         </div>
       `;
       container.appendChild(card);
     });
-  }
-
-
-  async function togglePatientDay(id, day, isChecked) {
-    const p = currentPatients.find(item => item.id === id);
-    if (!p) return;
-
-    let dias = Array.isArray(p.dias) ? [...p.dias] : [];
-    if (isChecked) {
-      if (!dias.includes(day)) dias.push(day);
-    } else {
-      dias = dias.filter(d => d !== day);
-    }
-    p.dias = dias;
-
-    if (window.db) {
-      try {
-        const pRef = window.fsDoc(window.db, "pacientes", id);
-        await window.fsUpdateDoc(pRef, { dias: dias });
-        showToast(`✓ Días actualizados para ${p.nombre}`);
-      } catch (err) {
-        console.error("Error al actualizar días de sesión:", err);
-      }
-    }
-    renderCards();
   }
 
 
@@ -3228,6 +3356,30 @@ function detectarYMostrarDuplicados() {
     </div>
   </div>
 
+
+  <!-- Modal Agenda Semanal -->
+  <div id="agendaModal" class="modal-overlay" style="z-index: 4000;">
+    <div class="modal-card" style="max-width: 440px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 2px solid #93c5fd; padding-bottom: 8px;">
+        <h3 style="font-size: 16px; color: #1e3a8a; display: flex; align-items: center; gap: 6px;">
+          🗓️ Agenda Semanal
+        </h3>
+        <button onclick="closeAgendaModal()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #64748b;">&times;</button>
+      </div>
+      <p id="agendaPatientName" style="font-size: 14px; font-weight: 800; margin-bottom: 15px; color: #0f172a; text-transform: uppercase; background: #eff6ff; padding: 6px 10px; border-radius: 6px; border: 1px solid #bfdbfe;"></p>
+      
+      <p style="font-size: 11.5px; color: #475569; margin-bottom: 10px;">Selecciona los días que asiste el paciente y el turno específico para cada día:</p>
+      
+      <div id="agendaDaysContainer" style="display: flex; flex-direction: column; gap: 8px;">
+        <!-- Injected by JS -->
+      </div>
+      
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;">
+        <button class="btn-light" onclick="closeAgendaModal()">Cancelar</button>
+        <button class="btn-save" onclick="saveAgenda()">💾 Guardar Agenda</button>
+      </div>
+    </div>
+  </div>
 
   <!-- MODAL WIZARD: VIGILANCIA DE ACCESO VASCULAR (3 PASOS) -->
   <div id="vigilanciaWizardModal" class="modal-overlay">
