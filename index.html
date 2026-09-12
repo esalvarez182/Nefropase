@@ -1191,7 +1191,7 @@
               else if (h === 'UR' || h.includes('URESIS')) colMap.ur = idx;
               else if (h === 'PS' || h.includes('PESO S')) colMap.ps = idx;
               else if (h === 'PP' || h.includes('PESO P') || h.includes('PESO A')) colMap.pp = idx;
-              else if (h === 'QS' || h.includes('FS') || h.includes('OS')) colMap.qs = idx;
+              else if (h === 'QS' || h.includes('FS' || h.includes('OS'))) colMap.qs = idx;
               else if (h === 'UF' || h.includes('ULTRA')) colMap.uf = idx;
               else if (h === 'QD' || h.includes('FD') || h.includes('OD')) colMap.qd = idx;
               else if (h === 'NA' || h.includes('SODIO')) colMap.na = idx;
@@ -2397,17 +2397,24 @@ MÉDICOS RESPONSABLES: ${medico}`;
   }
 
   async function guardarNuevoPacienteGeneral() {
+    const baseInput = document.getElementById('addPatNssBase');
+    const digInput = document.getElementById('addPatNssDig');
+    const nssBase = baseInput ? baseInput.value.trim().toUpperCase() : '';
+    const nssDig = digInput ? digInput.value.trim() : '';
+
+    if (!nssBase || nssBase.length < 8 || !nssDig || nssDig.length < 2) {
+      alert("El Número de Seguridad Social (NSS) completo es obligatorio (4 letras + 6 números en la primera casilla y 2 dígitos en la segunda).");
+      if (baseInput) baseInput.focus();
+      return;
+    }
+
+    const nssCompleto = `${nssBase}-${nssDig}`;
+
     const rawName = document.getElementById('addPatNombre').value.trim();
     if (!rawName || rawName.length < 2) {
       alert("Por favor ingresa un nombre para el paciente.");
       return;
     }
-
-    const baseInput = document.getElementById('addPatNssBase');
-    const digInput = document.getElementById('addPatNssDig');
-    const nssBase = baseInput ? baseInput.value.trim().toUpperCase() : '';
-    const nssDig = digInput ? digInput.value.trim() : '';
-    const nssCompleto = (nssBase && nssDig) ? `${nssBase}-${nssDig}` : nssBase;
 
     const maquina = document.getElementById('addPatMaquina').value.trim() || '1';
     const turno = document.getElementById('addPatTurno').value;
@@ -2478,7 +2485,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
       }
     }
 
-    const cleanId = rawName.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now().toString().slice(-4);
+    const cleanId = nssCompleto.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
     const newP = {
       id: cleanId,
