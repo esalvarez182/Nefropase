@@ -2038,7 +2038,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
     if (window.db) {
       try {
-        const pRef = window.fsDoc(window.db, "pacientes", p.id);
+        const pRef = window.fsDoc(window.db, "pacientes", id);
         await window.fsUpdateDoc(pRef, { vigilanciaAcceso: false });
       } catch (err) {
         console.error("Error al retirar vigilancia en Firestore:", err);
@@ -2822,7 +2822,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
       .replace(/[^a-z0-9]/g, "");
   }
 
-  function renderDirectorioPacientes(lista, highlightingDuplicates = false) {
+    function renderDirectorioPacientes(lista, highlightingDuplicates = false) {
     const cont = document.getElementById('directorioListaContenido');
     cont.innerHTML = '';
 
@@ -2831,7 +2831,6 @@ MÉDICOS RESPONSABLES: ${medico}`;
       return;
     }
 
-    // Mapa para identificar duplicados por nombre normalizado
     const countMap = {};
     todosLosPacientesDirectorio.forEach(p => {
       const k = normalizeName(p.nombre);
@@ -2842,7 +2841,6 @@ MÉDICOS RESPONSABLES: ${medico}`;
       const norm = normalizeName(p.nombre);
       const isDuplicate = countMap[norm] > 1;
 
-      // Buscar si tiene duplicados
       const duplicates = isDuplicate ? todosLosPacientesDirectorio.filter(other => other.id !== p.id && normalizeName(other.nombre) === norm) : [];
 
       const diasBadges = (p.dias && p.dias.length > 0)
@@ -2877,6 +2875,15 @@ MÉDICOS RESPONSABLES: ${medico}`;
             ${isDuplicate ? '<span style="background:#fee2e2; color:#b91c1c; font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px;">⚠️ REPETIDO</span>' : ''}
             ${p.vigilanciaAcceso ? '<span style="background:#fef3c7; color:#92400e; font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px;">🛡️ VIGILANCIA</span>' : ''}
           </div>
+
+          <!-- NSS Atenuado de 2 Casillas en el Directorio -->
+          <div style="display: flex; align-items: center; gap: 4px; margin-top: 4px;">
+            <span style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 0.5px;">NSS:</span>
+            <input type="text" id="dir_nss_base_${p.id}" value="${p.nss_base || ''}" placeholder="XXXX000000" maxlength="10" title="Número de Seguridad Social (4 letras + 6 números)" style="width: 102px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 5px; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); text-transform: uppercase; outline: none;" onchange="actualizarNssDesdeDirectorio('${p.id}')">
+            <span style="color: #94a3b8; font-weight: bold; font-size: 11px;">-</span>
+            <input type="text" id="dir_nss_dig_${p.id}" value="${p.nss_dig || ''}" placeholder="00" maxlength="2" title="2 dígitos agregados" style="width: 32px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 3px; text-align: center; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); outline: none;" onchange="actualizarNssDesdeDirectorio('${p.id}')">
+          </div>
+
           <div style="display: flex; align-items: center; gap: 6px; margin-top: 5px; flex-wrap: wrap;">
             <span style="font-size: 11.5px; color: #475569; font-weight: 600;">${formatTurnoLabelCorto(p.turno)}</span>
             <span>&bull;</span>
@@ -2887,10 +2894,13 @@ MÉDICOS RESPONSABLES: ${medico}`;
         <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
           ${duplicateMergeBtn}
           <button class="btn-light" style="padding: 5px 9px; font-size: 11px; font-weight: 600;" onclick="abrirSelectorFusionManual('${p.id}')" title="Elegir manualmente con qué otro expediente fusionar este registro">
-            🔗 Fusionar con...
+            🔗 Fusionar
           </button>
           <button class="btn-save" style="padding: 5px 10px; font-size: 11.5px;" onclick="irAPacienteDesdeDirectorio('${p.id}', '${primerDia}', '${turnoCode}')">
             👁️ Ver Tarjeta
+          </button>
+          <button class="btn-danger" style="padding: 5px 10px; font-size: 11.5px;" onclick="eliminarPacienteDesdeDirectorio('${p.id}')">
+            🗑️ Eliminar
           </button>
         </div>
       `;
@@ -2899,7 +2909,81 @@ MÉDICOS RESPONSABLES: ${medico}`;
     });
   }
 
-  function detectarYMostrarDuplicados() {
+
+  async function eliminarPacienteDesdeDirectorio(id) {
+    const p = todosLosPacientesDirectorio.find(item => item.id === id);
+    const nombre = p ? p.nombre : "este paciente";
+    const conf = confirm(`¿Estás seguro de eliminar permanentemente a "${nombre}" del sistema?`);
+    if (!conf) return;
+
+    todosLosPacientesDirectorio = todosLosPacientesDirectorio.filter(item => item.id !== id);
+    currentPatients = currentPatients.filter(item => item.id !== id);
+
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", id);
+        await window.fsUpdateDoc(pRef, { eliminado: true, dias: [] });
+      } catch (err) {
+        console.error("Error al eliminar paciente:", err);
+      }
+    }
+    renderCards();
+    openDirectorioPacientesModal();
+    showToast(`✓ Paciente eliminado permanentemente`);
+  }
+
+
+
+  async function actualizarNssDesdeDirectorio(patientId) {
+    const baseInput = document.getElementById(`dir_nss_base_${patientId}`);
+    const digInput = document.getElementById(`dir_nss_dig_${patientId}`);
+
+    const nssBase = baseInput ? baseInput.value.trim().toUpperCase() : '';
+    const nssDig = digInput ? digInput.value.trim() : '';
+    const nssCompleto = (nssBase && nssDig) ? `${nssBase}-${nssDig}` : nssBase;
+
+    const p = todosLosPacientesDirectorio.find(item => item.id === patientId);
+    if (p) {
+      p.nss_base = nssBase;
+      p.nss_dig = nssDig;
+      p.nss = nssCompleto;
+    }
+
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", patientId);
+        await window.fsUpdateDoc(pRef, {
+          nss_base: nssBase,
+          nss_dig: nssDig,
+          nss: nssCompleto
+        });
+
+        if (nssCompleto && nssCompleto.length >= 8) {
+          const snap = await window.fsGetDocs(window.fsCollection(window.db, "pacientes"));
+          let duplicadoDoc = null;
+          snap.forEach(docSnap => {
+            const data = docSnap.data();
+            if (docSnap.id !== patientId && (data.nss === nssCompleto || (data.nss_base && data.nss_base === nssBase && data.nss_dig === nssDig)) && !data.eliminado && !data.fusionadoEn) {
+              duplicadoDoc = { id: docSnap.id, ...data };
+            }
+          });
+
+          if (duplicadoDoc) {
+            showToast(`🔗 NSS idéntico detectado: Unificando automáticamente...`);
+            await confirmarFusion(patientId, duplicadoDoc.id);
+            return;
+          }
+        }
+
+        showToast("✓ NSS actualizado en directorio");
+      } catch (err) {
+        console.warn("Error al actualizar NSS en directorio:", err);
+      }
+    }
+  }
+
+
+function detectarYMostrarDuplicados() {
     const countMap = {};
     todosLosPacientesDirectorio.forEach(p => {
       const k = normalizeName(p.nombre);
@@ -3264,7 +3348,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
           <textarea id="vigDpObsText" placeholder="Especifique peritonitis previa, disfunción de catéter, tiempo en DP..." style="width: 100%; height: 65px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px; font-size: 12px; outline: none;"></textarea>
         </div>
         <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 18px;">
-          <button class="btn-light" onclick="irVigPaso2()">⬅ Atrás</button>
+          <button class="btn-light" onclick="irVigPsv2()">⬅ Atrás</button>
           <button class="btn-save" onclick="guardarYFinalizarVigilancia()">💾 Guardar y Finalizar Vigilancia</button>
         </div>
       </div>
