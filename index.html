@@ -1040,6 +1040,10 @@
       try {
         const pRef = window.fsDoc(window.db, "pacientes", id);
         await window.fsUpdateDoc(pRef, {
+          nombre: p.nombre,
+          nss_base: p.nss_base || '',
+          nss_dig: p.nss_dig || '',
+          nss: p.nss || '',
           lastAnnotation: newAnnotation,
           ps: p.ps,
           filtro: p.filtro || '400',
@@ -1055,6 +1059,8 @@
         const sRef = window.fsDoc(window.db, "sesiones", dateKey);
         const sessionPayload = {};
         sessionPayload[id] = {
+          nombre: p.nombre,
+          nss: p.nss || '',
           maquina: p.maquina,
           ps: p.ps,
           pp: p.pp,
@@ -1191,7 +1197,7 @@
               else if (h === 'UR' || h.includes('URESIS')) colMap.ur = idx;
               else if (h === 'PS' || h.includes('PESO S')) colMap.ps = idx;
               else if (h === 'PP' || h.includes('PESO P') || h.includes('PESO A')) colMap.pp = idx;
-              else if (h === 'QS' || h.includes('FS' || h.includes('OS'))) colMap.qs = idx;
+              else if (h === 'QS' || h.includes('FS') || h.includes('OS')) colMap.qs = idx;
               else if (h === 'UF' || h.includes('ULTRA')) colMap.uf = idx;
               else if (h === 'QD' || h.includes('FD') || h.includes('OD')) colMap.qd = idx;
               else if (h === 'NA' || h.includes('SODIO')) colMap.na = idx;
