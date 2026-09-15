@@ -792,10 +792,42 @@
   }
 
   function onDayChanged() {
+    const targetDayName = document.getElementById('daySelect').value;
+    const days = ["DOMINGO", "LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
+    const targetDayIdx = days.indexOf(targetDayName);
+    
+    const dateVal = document.getElementById('sessionDate').value;
+    if (dateVal && targetDayIdx !== -1) {
+      const parts = dateVal.split('-');
+      let current = new Date(parts[0], parts[1] - 1, parts[2]);
+      let currentDayIdx = current.getDay();
+      
+      // Ajustar la fecha hacia el día seleccionado dentro de la misma semana (Domingo a Sábado)
+      let diff = targetDayIdx - currentDayIdx;
+      current.setDate(current.getDate() + diff);
+      
+      const yyyy = current.getFullYear();
+      const mm = String(current.getMonth() + 1).padStart(2, '0');
+      const dd = String(current.getDate()).padStart(2, '0');
+      document.getElementById('sessionDate').value = `${yyyy}-${mm}-${dd}`;
+    }
     loadDayPatients();
   }
 
   function onDateChanged() {
+    const dateVal = document.getElementById('sessionDate').value;
+    if (dateVal) {
+      const parts = dateVal.split('-');
+      const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+      const days = ["DOMINGO", "LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
+      const dayName = days[dateObj.getDay()];
+      
+      if (dayName !== "DOMINGO") {
+        document.getElementById('daySelect').value = dayName;
+      } else {
+        showToast("⚠️ No hay turnos programados los domingos.");
+      }
+    }
     loadDayPatients();
   }
 
