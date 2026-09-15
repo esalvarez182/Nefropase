@@ -26,10 +26,6 @@
       background: var(--primary);
       color: #fff;
       padding: 12px 18px;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -420,6 +416,8 @@
 </head>
 <body>
 
+  <!-- Sticky Wrapper para Buscador Global -->
+  <div style="position: sticky; top: 0; z-index: 2000; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
   <!-- Header -->
   <header class="app-header">
     <h1>🩺 NefroPase Cloud</h1>
@@ -454,6 +452,7 @@
       <button class="btn-light" style="padding: 6px 10px; font-size: 12px;" onclick="openMoverDiaModal()">🔄 Mover Censo</button>
     </div>
   </div>
+  </div>
 
   <!-- DIRECT PC PASTE PANEL -->
   <div class="pc-paste-container" id="pcPasteContainer">
@@ -477,6 +476,8 @@
     <button class="shift-btn" onclick="setShiftFilter('MATUTINO_2', this)">2do Turno</button>
     <button class="shift-btn" onclick="setShiftFilter('VESPERTINO_1', this)">Vesp. 1</button>
     <button class="shift-btn" onclick="setShiftFilter('VESPERTINO_2', this)">Vesp. 2</button>
+    <button class="shift-btn" onclick="setShiftFilter('NOCTURNO_1', this)">Noc. 1</button>
+    <button class="shift-btn" onclick="setShiftFilter('NOCTURNO_2', this)">Noc. 2</button>
   </div>
 
   <!-- Cards Container -->
@@ -600,6 +601,12 @@
     }
 
     return baseObs || 'Ninguna';
+  }
+
+  // Normaliza NSS removiendo guiones o caracteres extraños para comparación exacta
+  function normalizeNSS(nss) {
+    if (!nss) return '';
+    return String(nss).toUpperCase().replace(/[^A-Z0-9]/g, '');
   }
 
   // Helper functions
@@ -830,8 +837,9 @@
     }
 
     list.forEach((p) => {
-      const isVesp = p.turno && p.turno.includes('VESPERTINO');
-      const shiftTag = isVesp ? 'Turno Vespertino' : 'Turno Matutino';
+      let shiftTag = 'Turno Matutino';
+      if (p.turno && p.turno.includes('VESPERTINO')) shiftTag = 'Turno Vespertino';
+      if (p.turno && p.turno.includes('NOCTURNO')) shiftTag = 'Turno Nocturno';
 
       const card = document.createElement('div');
       card.className = 'patient-card' + (p.visitado ? ' saved' : '') + (p.noAcudio ? ' no-acudio' : '') + (p.vigilanciaAcceso ? ' vigilancia-acceso' : '');
@@ -845,13 +853,21 @@
               ${p.noAcudio ? '<span class="badge-no-acudio">NO ACUDIÓ</span>' : ''}${p.vigilanciaAcceso ? '<span class="badge-vigilancia">⚠️ VIGILANCIA ACCESO</span>' : ''}${p.visitado ? '<span class="badge-visitado">✓ VISITADO</span>' : ''}
             </div>
             
+            <!-- NSS Atenuado de 2 Casillas Debajo del Nombre -->
+            <div style="display: flex; align-items: center; gap: 4px; padding-left: 4px; margin-top: 4px;">
+              <span style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 0.5px;">NSS:</span>
+              <input type="text" id="nss_base_${p.id}" value="${p.nss_base || ''}" placeholder="XXXX000000" maxlength="10" title="Número de Seguridad Social (4 letras + 6 números)" style="width: 102px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 5px; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); text-transform: uppercase; outline: none;" onfocus="this.style.borderStyle='solid'; this.style.borderColor='#93c5fd'; this.style.background='#fff';" onblur="this.style.borderStyle='dashed'; this.style.borderColor='#cbd5e1'; this.style.background='rgba(241, 245, 249, 0.6)';" onchange="actualizarNssPaciente('${p.id}')">
+              <span style="color: #94a3b8; font-weight: bold; font-size: 11px;">-</span>
+              <input type="text" id="nss_dig_${p.id}" value="${p.nss_dig || ''}" placeholder="00" maxlength="2" title="2 dígitos agregados" style="width: 32px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 3px; text-align: center; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); outline: none;" onfocus="this.style.borderStyle='solid'; this.style.borderColor='#93c5fd'; this.style.background='#fff';" onblur="this.style.borderStyle='dashed'; this.style.borderColor='#cbd5e1'; this.style.background='rgba(241, 245, 249, 0.6)';" onchange="actualizarNssPaciente('${p.id}')">
+            </div>
+
             <!-- Agenda y Días de Sesión -->
             <div style="display: flex; align-items: center; gap: 8px; padding-left: 4px; margin-top: 5px; flex-wrap: wrap;">
               <div style="font-size: 11px; background: #f8fafc; padding: 4px 8px; border-radius: 6px; border: 1px solid #e2e8f0; color: #475569; font-weight: 600;">
                 📅 Agenda: <strong style="color: #1e40af;">${(() => {
                   const arr = (p.dias || []).map(d => {
                     const t = (p.agenda && p.agenda[d]) ? p.agenda[d] : p.turno;
-                    let tC = t === 'MATUTINO_1' ? 'M1' : t === 'MATUTINO_2' ? 'M2' : t === 'VESPERTINO_1' ? 'V1' : 'V2';
+                    let tC = t === 'MATUTINO_1' ? 'M1' : t === 'MATUTINO_2' ? 'M2' : t === 'VESPERTINO_1' ? 'V1' : t === 'VESPERTINO_2' ? 'V2' : t === 'NOCTURNO_1' ? 'N1' : 'N2';
                     return d.substring(0,3) + '(' + tC + ')';
                   });
                   return arr.length > 0 ? arr.join(', ') : 'Sin días';
@@ -868,6 +884,8 @@
               if(tDay==='MATUTINO_2') return '2do Matutino';
               if(tDay==='VESPERTINO_1') return '1er Vespertino';
               if(tDay==='VESPERTINO_2') return '2do Vespertino';
+              if(tDay==='NOCTURNO_1') return '1er Nocturno';
+              if(tDay==='NOCTURNO_2') return '2do Nocturno';
               return tDay;
             })()}</strong> &bull; PS: <strong>${p.ps || '-'} kg</strong> &bull; Filtro: <strong>${p.filtro || '400'}</strong></div>
           </div>
@@ -1128,32 +1146,16 @@
     if (!text) return null;
     const t = clean(text).toUpperCase();
     
-    // Ignore if this text looks like a patient row or contains blood pressures / numbers
     if (/\d{2,3}\/\d{2,3}/.test(t)) return null;
 
-    // Check Vespertino main header
-    if (t.includes('VESPERTINO') && !t.includes('MATUTINO')) {
-      if (t.includes('SEGUNDO') || t.includes('2DO') || t.includes('2°')) {
-        return { isVesp: true, sub: 2, code: 'VESPERTINO_2' };
-      }
-      return { isVesp: true, sub: 1, code: 'VESPERTINO_1' };
-    }
+    const isSub2 = (t.includes('SEGUNDO') || t.includes('2DO') || t.includes('2°'));
 
-    // Check Matutino main header
-    if (t.includes('MATUTINO')) {
-      if (t.includes('SEGUNDO') || t.includes('2DO') || t.includes('2°')) {
-        return { isVesp: false, sub: 2, code: 'MATUTINO_2' };
-      }
-      return { isVesp: false, sub: 1, code: 'MATUTINO_1' };
-    }
+    if (t.includes('NOCTURNO')) return { type: 'NOCTURNO', sub: isSub2 ? 2 : 1, code: isSub2 ? 'NOCTURNO_2' : 'NOCTURNO_1' };
+    if (t.includes('VESPERTINO')) return { type: 'VESPERTINO', sub: isSub2 ? 2 : 1, code: isSub2 ? 'VESPERTINO_2' : 'VESPERTINO_1' };
+    if (t.includes('MATUTINO')) return { type: 'MATUTINO', sub: isSub2 ? 2 : 1, code: isSub2 ? 'MATUTINO_2' : 'MATUTINO_1' };
 
-    // Sub-headers without specifying matutino/vespertino
-    if (t.includes('SEGUNDO TURNO') || t.includes('2DO TURNO') || t.includes('2° TURNO') || t.includes('2DO. TURNO')) {
-      return { sub: 2 };
-    }
-    if (t.includes('PRIMER TURNO') || t.includes('1ER TURNO') || t.includes('1° TURNO') || t.includes('1ER. TURNO')) {
-      return { sub: 1 };
-    }
+    if (isSub2 || t.includes('2DO. TURNO')) return { sub: 2 };
+    if (t.includes('PRIMER TURNO') || t.includes('1ER TURNO') || t.includes('1° TURNO') || t.includes('1ER. TURNO')) return { sub: 1 };
 
     return null;
   }
@@ -1163,7 +1165,7 @@
     const currentDay = document.getElementById('daySelect').value;
     let extracted = [];
 
-    let isVespertino = false;
+    let currentShiftType = 'MATUTINO';
     let subTurno = 1;
 
     // Collect all elements sequentially
@@ -1193,7 +1195,7 @@
         // If the header row itself says "PRIMER TURNO" or "SEGUNDO TURNO" or "VESPERTINO", extract shift FIRST!
         const shiftDetected = checkShiftHeaderOnly(txt);
         if (shiftDetected) {
-          if (shiftDetected.isVesp !== undefined) isVespertino = shiftDetected.isVesp;
+          if (shiftDetected.type) currentShiftType = shiftDetected.type;
           if (shiftDetected.sub !== undefined) subTurno = shiftDetected.sub;
           
           // If it was JUST a section divider title without column headers, move to next line
@@ -1238,9 +1240,7 @@
           // Relaxed validation: Allow patient even if row only has name and cama
           if (cells.length < 2) continue;
 
-          const currentTurnoCode = isVespertino 
-            ? (subTurno === 2 ? 'VESPERTINO_2' : 'VESPERTINO_1')
-            : (subTurno === 2 ? 'MATUTINO_2' : 'MATUTINO_1');
+          const currentTurnoCode = `${currentShiftType}_${subTurno}`;
 
           let p = extractPatientFromRow(cells, colMap, currentTurnoCode, currentDay);
           if (p && p.nombre && p.nombre.length > 2 && !p.nombre.toUpperCase().includes('NOMBRE') && !p.nombre.toUpperCase().includes('TURNO')) {
@@ -1547,7 +1547,11 @@
     if (query) {
       list = currentPatients.filter(p => (p.nombre || '').toLowerCase().includes(query) || (p.maquina || '').includes(query));
     } else if (currentShiftFilter !== 'TODOS') {
-      list = currentPatients.filter(p => p.turno === currentShiftFilter);
+      const currentDay = document.getElementById('daySelect').value;
+      list = currentPatients.filter(p => {
+        const shiftForDay = (p.agenda && p.agenda[currentDay]) ? p.agenda[currentDay] : p.turno;
+        return shiftForDay === currentShiftFilter;
+      });
     }
     // Ordenar camas por turno en orden numérico ascendente (1, 2, 3... 10)
     list.sort((a, b) => {
@@ -1657,7 +1661,11 @@ MÉDICOS RESPONSABLES: ${medico}`;
     if (query) {
       list = currentPatients.filter(p => (p.nombre || '').toLowerCase().includes(query) || (p.maquina || '').includes(query));
     } else if (currentShiftFilter !== 'TODOS') {
-      list = currentPatients.filter(p => p.turno === currentShiftFilter);
+      const currentDay = document.getElementById('daySelect').value;
+      list = currentPatients.filter(p => {
+        const shiftForDay = (p.agenda && p.agenda[currentDay]) ? p.agenda[currentDay] : p.turno;
+        return shiftForDay === currentShiftFilter;
+      });
     }
     // Ordenar camas por turno en orden numérico ascendente (1, 2, 3... 10)
     list.sort((a, b) => {
@@ -2069,6 +2077,8 @@ MÉDICOS RESPONSABLES: ${medico}`;
     if (code === 'MATUTINO_2') return '2do Turno Matutino';
     if (code === 'VESPERTINO_1') return '1er Turno Vespertino';
     if (code === 'VESPERTINO_2') return '2do Turno Vespertino';
+    if (code === 'NOCTURNO_1') return '1er Turno Nocturno';
+    if (code === 'NOCTURNO_2') return '2do Turno Nocturno';
     return code;
   }
 
@@ -2426,8 +2436,11 @@ MÉDICOS RESPONSABLES: ${medico}`;
     const nssBase = baseInput ? baseInput.value.trim().toUpperCase() : '';
     const nssDig = digInput ? digInput.value.trim() : '';
 
-    if (!nssBase || nssBase.length < 8 || !nssDig || nssDig.length < 2) {
-      alert("El Número de Seguridad Social (NSS) completo es obligatorio (4 letras + 6 números en la primera casilla y 2 dígitos en la segunda).");
+    const cleanBase = nssBase.replace(/[^A-Z0-9]/g, '');
+    const cleanDig = nssDig.replace(/[^0-9]/g, '');
+
+    if (cleanBase.length !== 10 || cleanDig.length !== 2) {
+      alert("El Número de Seguridad Social (NSS) es obligatorio. Debe tener exactamente 10 caracteres base (4 letras + 6 números) en la primera casilla y 2 dígitos finales en la segunda.\n\nIgnoraremos los guiones, pero los caracteres deben estar completos.");
       if (baseInput) baseInput.focus();
       return;
     }
@@ -2466,7 +2479,9 @@ MÉDICOS RESPONSABLES: ${medico}`;
         let pacienteExistente = null;
         snap.forEach(docSnap => {
           const data = docSnap.data();
-          if ((data.nss === nssCompleto || (data.nss_base && data.nss_base === nssBase && data.nss_dig === nssDig)) && !data.eliminado && !data.fusionadoEn) {
+          const dbNSS = normalizeNSS(data.nss || (data.nss_base ? data.nss_base + data.nss_dig : ''));
+          const targetNSS = normalizeNSS(nssCompleto);
+          if (dbNSS && targetNSS && dbNSS === targetNSS && !data.eliminado && !data.fusionadoEn) {
             pacienteExistente = { id: docSnap.id, ...data };
           }
         });
@@ -2589,6 +2604,8 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
   
   // =======================================================
+  
+  // =======================================================
   // GESTIÓN DE AGENDA (DÍAS Y TURNOS INDEPENDIENTES)
   // =======================================================
   let activeAgendaPatientId = null;
@@ -2623,6 +2640,8 @@ MÉDICOS RESPONSABLES: ${medico}`;
                     <option value="MATUTINO_2" ${shift === 'MATUTINO_2' ? 'selected' : ''}>Turno 2 - Matutino</option>
                     <option value="VESPERTINO_1" ${shift === 'VESPERTINO_1' ? 'selected' : ''}>Turno 1 - Vespertino</option>
                     <option value="VESPERTINO_2" ${shift === 'VESPERTINO_2' ? 'selected' : ''}>Turno 2 - Vespertino</option>
+                    <option value="NOCTURNO_1" ${shift === 'NOCTURNO_1' ? 'selected' : ''}>Turno 1 - Nocturno</option>
+                    <option value="NOCTURNO_2" ${shift === 'NOCTURNO_2' ? 'selected' : ''}>Turno 2 - Nocturno</option>
                 </select>
             </div>
         `;
@@ -2707,6 +2726,9 @@ MÉDICOS RESPONSABLES: ${medico}`;
     }
   }
 
+  // GESTIÓN DE NÚMERO DE SEGURIDAD SOCIAL (NSS) Y AUTO-UNIFICACIÓN
+  // =======================================================
+
   async function actualizarNssPaciente(patientId) {
     const p = currentPatients.find(item => item.id === patientId);
     if (!p) return;
@@ -2738,7 +2760,9 @@ MÉDICOS RESPONSABLES: ${medico}`;
           let duplicadoDoc = null;
           snap.forEach(docSnap => {
             const data = docSnap.data();
-            if (docSnap.id !== patientId && (data.nss === nssCompleto || (data.nss_base && data.nss_base === nssBase && data.nss_dig === nssDig)) && !data.eliminado && !data.fusionadoEn) {
+            const dbNSS = normalizeNSS(data.nss || (data.nss_base ? data.nss_base + data.nss_dig : ''));
+            const targetNSS = normalizeNSS(nssCompleto);
+            if (docSnap.id !== patientId && dbNSS && targetNSS && dbNSS === targetNSS && !data.eliminado && !data.fusionadoEn) {
               duplicadoDoc = { id: docSnap.id, ...data };
             }
           });
@@ -2784,7 +2808,8 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
   let todosLosPacientesDirectorio = [];
 
-async function onSearchInput(query) {
+
+    async function onSearchInput(query) {
     const q = (query || '').trim().toLowerCase();
     if (!q) {
       renderCards();
@@ -2826,12 +2851,13 @@ async function onSearchInput(query) {
     matches.forEach((p) => {
       const primerDia = (p.dias && p.dias.length > 0) ? p.dias[0] : document.getElementById('daySelect').value;
       const turnoParaElDia = (p.agenda && p.agenda[primerDia]) ? p.agenda[primerDia] : (p.turno || 'MATUTINO_1');
-      const isVesp = turnoParaElDia.includes('VESPERTINO');
-      const shiftTag = isVesp ? 'Turno Vespertino' : 'Turno Matutino';
+      let shiftTag = 'Turno Matutino';
+      if (turnoParaElDia.includes('VESPERTINO')) shiftTag = 'Turno Vespertino';
+      if (turnoParaElDia.includes('NOCTURNO')) shiftTag = 'Turno Nocturno';
       
       const agendaTextArr = (p.dias || []).map(d => {
           const t = (p.agenda && p.agenda[d]) ? p.agenda[d] : p.turno;
-          let tCorto = t === 'MATUTINO_1' ? 'M1' : t === 'MATUTINO_2' ? 'M2' : t === 'VESPERTINO_1' ? 'V1' : 'V2';
+          let tCorto = t === 'MATUTINO_1' ? 'M1' : t === 'MATUTINO_2' ? 'M2' : t === 'VESPERTINO_1' ? 'V1' : t === 'VESPERTINO_2' ? 'V2' : t === 'NOCTURNO_1' ? 'N1' : 'N2';
           return `${d.substring(0,3)} (${tCorto})`;
       });
       const agendaStr = agendaTextArr.length > 0 ? agendaTextArr.join(' • ') : 'Sin días programados';
@@ -2892,6 +2918,8 @@ async function onSearchInput(query) {
     if (code === 'MATUTINO_2') return 'Turno 2 Matutino';
     if (code === 'VESPERTINO_1') return 'Turno 1 Vespertino';
     if (code === 'VESPERTINO_2') return 'Turno 2 Vespertino';
+    if (code === 'NOCTURNO_1') return 'Turno 1 Nocturno';
+    if (code === 'NOCTURNO_2') return 'Turno 2 Nocturno';
     return code;
   }
 
@@ -3094,7 +3122,9 @@ async function onSearchInput(query) {
           let duplicadoDoc = null;
           snap.forEach(docSnap => {
             const data = docSnap.data();
-            if (docSnap.id !== patientId && (data.nss === nssCompleto || (data.nss_base && data.nss_base === nssBase && data.nss_dig === nssDig)) && !data.eliminado && !data.fusionadoEn) {
+            const dbNSS = normalizeNSS(data.nss || (data.nss_base ? data.nss_base + data.nss_dig : ''));
+            const targetNSS = normalizeNSS(nssCompleto);
+            if (docSnap.id !== patientId && dbNSS && targetNSS && dbNSS === targetNSS && !data.eliminado && !data.fusionadoEn) {
               duplicadoDoc = { id: docSnap.id, ...data };
             }
           });
@@ -3327,6 +3357,31 @@ function detectarYMostrarDuplicados() {
 
 </script>
 
+  
+  <!-- Modal Agenda Semanal -->
+  <div id="agendaModal" class="modal-overlay" style="z-index: 4000;">
+    <div class="modal-card" style="max-width: 440px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 2px solid #93c5fd; padding-bottom: 8px;">
+        <h3 style="font-size: 16px; color: #1e3a8a; display: flex; align-items: center; gap: 6px;">
+          🗓️ Agenda Semanal
+        </h3>
+        <button onclick="closeAgendaModal()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #64748b;">&times;</button>
+      </div>
+      <p id="agendaPatientName" style="font-size: 14px; font-weight: 800; margin-bottom: 15px; color: #0f172a; text-transform: uppercase; background: #eff6ff; padding: 6px 10px; border-radius: 6px; border: 1px solid #bfdbfe;"></p>
+      
+      <p style="font-size: 11.5px; color: #475569; margin-bottom: 10px;">Selecciona los días que asiste el paciente y el turno específico para cada día:</p>
+      
+      <div id="agendaDaysContainer" style="display: flex; flex-direction: column; gap: 8px;">
+        <!-- Injected by JS -->
+      </div>
+      
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;">
+        <button class="btn-light" onclick="closeAgendaModal()">Cancelar</button>
+        <button class="btn-save" onclick="saveAgenda()">💾 Guardar Agenda</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal Mover Censo de Día -->
   <div id="moverDiaModal" class="modal-overlay">
     <div class="modal-card" style="max-width: 460px;">
@@ -3356,30 +3411,6 @@ function detectarYMostrarDuplicados() {
     </div>
   </div>
 
-
-  <!-- Modal Agenda Semanal -->
-  <div id="agendaModal" class="modal-overlay" style="z-index: 4000;">
-    <div class="modal-card" style="max-width: 440px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 2px solid #93c5fd; padding-bottom: 8px;">
-        <h3 style="font-size: 16px; color: #1e3a8a; display: flex; align-items: center; gap: 6px;">
-          🗓️ Agenda Semanal
-        </h3>
-        <button onclick="closeAgendaModal()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #64748b;">&times;</button>
-      </div>
-      <p id="agendaPatientName" style="font-size: 14px; font-weight: 800; margin-bottom: 15px; color: #0f172a; text-transform: uppercase; background: #eff6ff; padding: 6px 10px; border-radius: 6px; border: 1px solid #bfdbfe;"></p>
-      
-      <p style="font-size: 11.5px; color: #475569; margin-bottom: 10px;">Selecciona los días que asiste el paciente y el turno específico para cada día:</p>
-      
-      <div id="agendaDaysContainer" style="display: flex; flex-direction: column; gap: 8px;">
-        <!-- Injected by JS -->
-      </div>
-      
-      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;">
-        <button class="btn-light" onclick="closeAgendaModal()">Cancelar</button>
-        <button class="btn-save" onclick="saveAgenda()">💾 Guardar Agenda</button>
-      </div>
-    </div>
-  </div>
 
   <!-- MODAL WIZARD: VIGILANCIA DE ACCESO VASCULAR (3 PASOS) -->
   <div id="vigilanciaWizardModal" class="modal-overlay">
@@ -3568,6 +3599,8 @@ function detectarYMostrarDuplicados() {
               <option value="MATUTINO_2">Turno 2 - Matutino</option>
               <option value="VESPERTINO_1">Turno 1 - Vespertino</option>
               <option value="VESPERTINO_2">Turno 2 - Vespertino</option>
+              <option value="NOCTURNO_1">Turno 1 - Nocturno</option>
+              <option value="NOCTURNO_2">Turno 2 - Nocturno</option>
             </select>
           </div>
         </div>
@@ -3697,6 +3730,8 @@ function detectarYMostrarDuplicados() {
               <option value="MATUTINO_2">Turno 2 - Matutino</option>
               <option value="VESPERTINO_1">Turno 1 - Vespertino</option>
               <option value="VESPERTINO_2">Turno 2 - Vespertino</option>
+              <option value="NOCTURNO_1">Turno 1 - Nocturno</option>
+              <option value="NOCTURNO_2">Turno 2 - Nocturno</option>
             </select>
           </div>
         </div>
