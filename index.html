@@ -766,7 +766,11 @@
           currentPatients.forEach(p => {
             if (sessionData[p.id]) {
               Object.assign(p, sessionData[p.id]);
-              p.visitado = (sessionData[p.id].visitado === true);
+              if (p.visitadoAt) {
+                p.visitado = (Date.now() - p.visitadoAt) < 24 * 60 * 60 * 1000;
+              } else {
+                p.visitado = (sessionData[p.id].visitado === true);
+              }
             }
           });
         }
@@ -837,6 +841,9 @@
     }
 
     list.forEach((p) => {
+      if (p.visitadoAt) {
+        p.visitado = (Date.now() - p.visitadoAt) < 24 * 60 * 60 * 1000;
+      }
       let shiftTag = 'Turno Matutino';
       if (p.turno && p.turno.includes('VESPERTINO')) shiftTag = 'Turno Vespertino';
       if (p.turno && p.turno.includes('NOCTURNO')) shiftTag = 'Turno Nocturno';
@@ -1034,6 +1041,7 @@
     // Solo marcar visitado y cambiar de color si se presionó explícitamente el botón "💾 Guardar"
     if (markVisitado) {
       p.visitado = true;
+      p.visitadoAt = Date.now();
       const cardEl = document.getElementById(`card_${id}`);
       if (cardEl) {
         cardEl.classList.add('saved');
@@ -1069,7 +1077,8 @@
         fc_out: p.fc_out,
         temp: p.temp,
         anotaciones: newAnnotation,
-        visitado: p.visitado || false
+        visitado: p.visitado || false,
+        visitadoAt: p.visitadoAt || null
       };
       localStorage.setItem(localKey, JSON.stringify(localSession));
     } catch (e) {
@@ -1093,7 +1102,8 @@
           k: p.k || '2',
           bic: p.bic || '3.0',
           anticoag: p.anticoag || 'SH',
-          tiempo: p.tiempo || '2:30'
+          tiempo: p.tiempo || '2:30',
+          visitadoAt: p.visitadoAt || null
         });
 
         const sRef = window.fsDoc(window.db, "sesiones", dateKey);
@@ -1119,7 +1129,8 @@
           fc_out: p.fc_out,
           temp: p.temp,
           anotaciones: newAnnotation,
-          visitado: p.visitado || false
+          visitado: p.visitado || false,
+          visitadoAt: p.visitadoAt || null
         };
         await window.fsSetDoc(sRef, sessionPayload, { merge: true });
 
@@ -2560,7 +2571,8 @@ MÉDICOS RESPONSABLES: ${medico}`;
       lastAnnotation: obs,
       vigilanciaAcceso: false,
       noAcudio: false,
-      visitado: false
+      visitado: false,
+      visitadoAt: null
     };
 
     if (selectedDias.includes(currentDay)) {
@@ -2589,7 +2601,8 @@ MÉDICOS RESPONSABLES: ${medico}`;
           bic: newP.bic,
           anticoag: newP.anticoag,
           anotaciones: obs,
-          visitado: false
+          visitado: false,
+          visitadoAt: null
         };
         await window.fsSetDoc(sRef, payload, { merge: true });
       } catch (err) {
@@ -2849,6 +2862,9 @@ MÉDICOS RESPONSABLES: ${medico}`;
     }
 
     matches.forEach((p) => {
+      if (p.visitadoAt) {
+        p.visitado = (Date.now() - p.visitadoAt) < 24 * 60 * 60 * 1000;
+      }
       const primerDia = (p.dias && p.dias.length > 0) ? p.dias[0] : document.getElementById('daySelect').value;
       const turnoParaElDia = (p.agenda && p.agenda[primerDia]) ? p.agenda[primerDia] : (p.turno || 'MATUTINO_1');
       let shiftTag = 'Turno Matutino';
@@ -2864,7 +2880,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
       const card = document.createElement('div');
       // Hacer la tarjeta interactiva globalmente, excluyendo inputs
-      card.className = 'patient-card search-result-card' + (p.noAcudio ? ' no-acudio' : '') + (p.vigilanciaAcceso ? ' vigilancia-acceso' : '');
+      card.className = 'patient-card search-result-card' + (p.visitado ? ' saved' : '') + (p.noAcudio ? ' no-acudio' : '') + (p.vigilanciaAcceso ? ' vigilancia-acceso' : '');
       card.id = `card_${p.id}`;
       card.style.cursor = "pointer";
       card.style.border = "2px solid #93c5fd";
@@ -2885,6 +2901,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
               <input type="text" id="nombre_${p.id}" value="${p.nombre}" title="Clic para editar nombre" style="font-size: 14px; font-weight: 800; color: #1e3a8a; border: 1.5px solid transparent; border-radius: 6px; padding: 2px 4px; flex: 1; min-width: 200px; background: transparent; text-transform: uppercase; outline: none;" onblur="onNombreChanged('${p.id}', this.value)" onchange="onNombreChanged('${p.id}', this.value)">
               ${p.vigilanciaAcceso ? '<span class="badge-vigilancia">⚠️ VIGILANCIA</span>' : ''}
+              ${p.visitado ? '<span class="badge-visitado">✓ VISITADO</span>' : ''}
               <span style="font-size: 10px; background: #e2e8f0; color: #475569; padding: 3px 6px; border-radius: 10px;">📌 Clic en la tarjeta para abrir</span>
             </div>
             
