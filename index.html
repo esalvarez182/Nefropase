@@ -429,9 +429,10 @@
 
   <!-- Controls -->
   <div class="control-strip">
-    <div class="day-selector-group">
-      <label for="daySelect">🗓️ Día:</label>
+    <div class="day-selector-group" style="flex-wrap: wrap;">
+      <label for="daySelect" style="font-size: 12px; font-weight: 600;">🗓️ Día:</label>
       <select id="daySelect" onchange="onDayChanged()">
+        <option value="DOMINGO">Domingo</option>
         <option value="LUNES">Lunes</option>
         <option value="MARTES" selected>Martes</option>
         <option value="MIERCOLES">Miércoles</option>
@@ -440,7 +441,19 @@
         <option value="SABADO">Sábado</option>
       </select>
       <input type="date" id="sessionDate" onchange="onDateChanged()">
-      <span id="barSummary" style="font-size: 11.5px; font-weight: 700; color: #1e40af; background: #eff6ff; padding: 5px 9px; border-radius: 6px; border: 1px solid #bfdbfe;">0 pacientes</span>
+      
+      <label for="shiftSelect" style="font-size: 12px; font-weight: 600; margin-left: 4px;">⏰ Turno:</label>
+      <select id="shiftSelect" onchange="onShiftChanged()">
+        <option value="TODOS">Todos</option>
+        <option value="MATUTINO_1">1er Matutino</option>
+        <option value="MATUTINO_2">2do Matutino</option>
+        <option value="VESPERTINO_1">1er Vespertino</option>
+        <option value="VESPERTINO_2">2do Vespertino</option>
+        <option value="NOCTURNO_1">1er Nocturno</option>
+        <option value="NOCTURNO_2">2do Nocturno</option>
+      </select>
+      
+      <span id="barSummary" style="font-size: 11.5px; font-weight: 700; color: #1e40af; background: #eff6ff; padding: 5px 9px; border-radius: 6px; border: 1px solid #bfdbfe; margin-left: 4px;">0 pacientes</span>
     </div>
     <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; flex: 1; justify-content: flex-end;">
       <div style="position: relative; flex: 1; min-width: 170px; max-width: 280px;">
@@ -469,16 +482,7 @@
     </div>
   </div>
 
-  <!-- Shift Tabs -->
-  <div class="shift-tabs">
-    <button class="shift-btn active" onclick="setShiftFilter('TODOS', this)">Todos</button>
-    <button class="shift-btn" onclick="setShiftFilter('MATUTINO_1', this)">1er Turno</button>
-    <button class="shift-btn" onclick="setShiftFilter('MATUTINO_2', this)">2do Turno</button>
-    <button class="shift-btn" onclick="setShiftFilter('VESPERTINO_1', this)">Vesp. 1</button>
-    <button class="shift-btn" onclick="setShiftFilter('VESPERTINO_2', this)">Vesp. 2</button>
-    <button class="shift-btn" onclick="setShiftFilter('NOCTURNO_1', this)">Noc. 1</button>
-    <button class="shift-btn" onclick="setShiftFilter('NOCTURNO_2', this)">Noc. 2</button>
-  </div>
+
 
   <!-- Cards Container -->
   <div class="container" id="patientsContainer">
@@ -675,6 +679,7 @@
 
   let currentPatients = [];
   let currentShiftFilter = 'TODOS';
+  let isolatedPatientId = null;
   let activePatientForPiso = null;
   let activePreviewDocPatient = null;
 
@@ -687,9 +692,7 @@
     
     const days = ["DOMINGO", "LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
     const dayName = days[today.getDay()];
-    if (dayName !== "DOMINGO") {
-      document.getElementById('daySelect').value = dayName;
-    }
+    document.getElementById('daySelect').value = dayName;
     updatePasteDayLabel();
   }
   initDate();
@@ -822,19 +825,20 @@
       const days = ["DOMINGO", "LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
       const dayName = days[dateObj.getDay()];
       
-      if (dayName !== "DOMINGO") {
-        document.getElementById('daySelect').value = dayName;
-      } else {
-        showToast("⚠️ No hay turnos programados los domingos.");
-      }
+      document.getElementById('daySelect').value = dayName;
     }
     loadDayPatients();
   }
 
-  function setShiftFilter(shift, btn) {
-    currentShiftFilter = shift;
-    document.querySelectorAll('.shift-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+  function onShiftChanged() {
+    currentShiftFilter = document.getElementById('shiftSelect').value;
+    isolatedPatientId = null; // Clear isolated view if changing shift manually
+    renderCards();
+  }
+  
+  function clearIsolatedView() {
+    isolatedPatientId = null;
+    document.getElementById('patientSearchInput').value = '';
     renderCards();
   }
 
@@ -846,7 +850,9 @@
     const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
     let list = currentPatients;
-    if (query) {
+    if (isolatedPatientId) {
+      list = currentPatients.filter(p => p.id === isolatedPatientId);
+    } else if (query) {
       list = currentPatients.filter(p => (p.nombre || '').toLowerCase().includes(query) || (p.maquina || '').includes(query));
     } else if (currentShiftFilter !== 'TODOS') {
       const currentDay = document.getElementById('daySelect').value;
@@ -870,6 +876,12 @@
         <p style="font-size: 12.5px;">Copia tu tabla de Google Docs o Word y pégala en el recuadro superior azul para cargarlos al instante.</p>
       </div>`;
       return;
+    }
+
+    if (isolatedPatientId) {
+      const backBtn = document.createElement('div');
+      backBtn.innerHTML = `<button class="btn-light" style="margin-bottom: 12px; font-size: 14px; font-weight: 700; width: 100%; justify-content: center; background: #f1f5f9; border: 1.5px solid #cbd5e1; color: #1e293b; padding: 10px;" onclick="clearIsolatedView()">⬅️ Volver a todos los pacientes</button>`;
+      container.appendChild(backBtn);
     }
 
     list.forEach((p) => {
@@ -1587,7 +1599,9 @@
     const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
     let list = currentPatients;
-    if (query) {
+    if (isolatedPatientId) {
+      list = currentPatients.filter(p => p.id === isolatedPatientId);
+    } else if (query) {
       list = currentPatients.filter(p => (p.nombre || '').toLowerCase().includes(query) || (p.maquina || '').includes(query));
     } else if (currentShiftFilter !== 'TODOS') {
       const currentDay = document.getElementById('daySelect').value;
@@ -1701,7 +1715,9 @@ MÉDICOS RESPONSABLES: ${medico}`;
     const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
     let list = currentPatients;
-    if (query) {
+    if (isolatedPatientId) {
+      list = currentPatients.filter(p => p.id === isolatedPatientId);
+    } else if (query) {
       list = currentPatients.filter(p => (p.nombre || '').toLowerCase().includes(query) || (p.maquina || '').includes(query));
     } else if (currentShiftFilter !== 'TODOS') {
       const currentDay = document.getElementById('daySelect').value;
@@ -2661,7 +2677,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
     activeAgendaPatientId = id;
     document.getElementById('agendaPatientName').innerText = p.nombre;
     
-    const days = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
+    const days = ["DOMINGO", "LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
     const cont = document.getElementById('agendaDaysContainer');
     cont.innerHTML = '';
     
@@ -2675,19 +2691,21 @@ MÉDICOS RESPONSABLES: ${medico}`;
         const labelDay = d.charAt(0) + d.slice(1).toLowerCase();
         
         cont.innerHTML += `
-            <div style="display: flex; align-items: center; justify-content: space-between; background: ${isChecked ? '#f0f9ff' : '#f8fafc'}; padding: 8px 12px; border: 1px solid ${isChecked ? '#93c5fd' : '#e2e8f0'}; border-radius: 6px; transition: 0.2s;">
-                <label style="font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; width: 120px; color: ${isChecked ? '#1e40af' : '#475569'};">
-                    <input type="checkbox" id="chk_agenda_${d}" ${isChecked ? 'checked' : ''} onchange="toggleAgendaRow('${d}', this)">
-                    ${labelDay}
+            <div style="display: flex; align-items: center; justify-content: space-between; background: ${isChecked ? '#f0f9ff' : '#f8fafc'}; border: 1.5px solid ${isChecked ? '#93c5fd' : '#e2e8f0'}; border-radius: 8px; transition: 0.2s; overflow: hidden; min-height: 52px;">
+                <label for="chk_agenda_${d}" style="font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 12px; flex: 1; padding: 14px 12px; margin: 0; color: ${isChecked ? '#1e40af' : '#475569'}; user-select: none; -webkit-tap-highlight-color: transparent;">
+                    <input type="checkbox" id="chk_agenda_${d}" ${isChecked ? 'checked' : ''} onchange="toggleAgendaRow('${d}', this)" style="transform: scale(1.3); cursor: pointer; margin: 0;">
+                    <span style="font-size: 14.5px;">${labelDay}</span>
                 </label>
-                <select id="sel_agenda_${d}" style="padding: 6px; font-size: 12.5px; font-weight: 600; border-radius: 4px; border: 1px solid #cbd5e1; outline: none; flex: 1; background: #fff; ${isChecked ? '' : 'opacity: 0.4; pointer-events: none;'}">
-                    <option value="MATUTINO_1" ${shift === 'MATUTINO_1' ? 'selected' : ''}>Turno 1 - Matutino</option>
-                    <option value="MATUTINO_2" ${shift === 'MATUTINO_2' ? 'selected' : ''}>Turno 2 - Matutino</option>
-                    <option value="VESPERTINO_1" ${shift === 'VESPERTINO_1' ? 'selected' : ''}>Turno 1 - Vespertino</option>
-                    <option value="VESPERTINO_2" ${shift === 'VESPERTINO_2' ? 'selected' : ''}>Turno 2 - Vespertino</option>
-                    <option value="NOCTURNO_1" ${shift === 'NOCTURNO_1' ? 'selected' : ''}>Turno 1 - Nocturno</option>
-                    <option value="NOCTURNO_2" ${shift === 'NOCTURNO_2' ? 'selected' : ''}>Turno 2 - Nocturno</option>
-                </select>
+                <div style="padding-right: 12px;">
+                    <select id="sel_agenda_${d}" style="padding: 8px 6px; font-size: 12.5px; font-weight: 700; border-radius: 6px; border: 1px solid #cbd5e1; outline: none; width: 145px; background: #fff; color: #334155; ${isChecked ? '' : 'opacity: 0.4; pointer-events: none;'}">
+                        <option value="MATUTINO_1" ${shift === 'MATUTINO_1' ? 'selected' : ''}>Turno 1 - Matutino</option>
+                        <option value="MATUTINO_2" ${shift === 'MATUTINO_2' ? 'selected' : ''}>Turno 2 - Matutino</option>
+                        <option value="VESPERTINO_1" ${shift === 'VESPERTINO_1' ? 'selected' : ''}>Turno 1 - Vespertino</option>
+                        <option value="VESPERTINO_2" ${shift === 'VESPERTINO_2' ? 'selected' : ''}>Turno 2 - Vespertino</option>
+                        <option value="NOCTURNO_1" ${shift === 'NOCTURNO_1' ? 'selected' : ''}>Turno 1 - Nocturno</option>
+                        <option value="NOCTURNO_2" ${shift === 'NOCTURNO_2' ? 'selected' : ''}>Turno 2 - Nocturno</option>
+                    </select>
+                </div>
             </div>
         `;
     });
@@ -2722,7 +2740,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
     const p = currentPatients.find(item => item.id === activeAgendaPatientId) || todosLosPacientesDirectorio.find(item => item.id === activeAgendaPatientId);
     if (!p) return;
 
-    const days = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
+    const days = ["DOMINGO", "LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
     const newDias = [];
     const newAgenda = {};
 
@@ -2855,6 +2873,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
 
     async function onSearchInput(query) {
+    isolatedPatientId = null; // Quitar vista exclusiva si hace una nueva búsqueda
     const q = (query || '').trim().toLowerCase();
     if (!q) {
       renderCards();
@@ -3216,36 +3235,30 @@ function detectarYMostrarDuplicados() {
     closeDirectorioPacientesModal();
 
     const daySelect = document.getElementById('daySelect');
+    let dayChanged = false;
     if (daySelect.value !== dia) {
       daySelect.value = dia;
       updatePasteDayLabel();
-      await loadDayPatients();
+      dayChanged = true;
     }
 
-    // Poner filtro en TODOS para garantizar visibilidad
+    // Poner filtro en TODOS en el select y habilitar vista exclusiva
+    document.getElementById('shiftSelect').value = 'TODOS';
     currentShiftFilter = 'TODOS';
-    document.querySelectorAll('.shift-btn').forEach(b => b.classList.remove('active'));
-    const btnTodos = document.querySelector('.shift-btn');
-    if (btnTodos) btnTodos.classList.add('active');
+    isolatedPatientId = patientId;
     
     // Limpiar buscador
     const sInput = document.getElementById('patientSearchInput');
     if (sInput) sInput.value = '';
 
-    renderCards();
+    if (dayChanged) {
+      await loadDayPatients();
+    } else {
+      renderCards();
+    }
 
-    // Scroll y animación de destello
-    setTimeout(() => {
-      const cardEl = document.getElementById(`card_${patientId}`);
-      if (cardEl) {
-        cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        cardEl.classList.remove('card-highlight');
-        void cardEl.offsetWidth; // forzar reflow
-        cardEl.classList.add('card-highlight');
-      } else {
-        showToast(`Tarjeta de paciente abierta en ${dia}`);
-      }
-    }, 200);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showToast(`Mostrando expediente de paciente`);
   }
 
   // ==========================================
@@ -3445,6 +3458,7 @@ function detectarYMostrarDuplicados() {
       <div style="margin-bottom: 16px;">
         <label style="font-size: 11.5px; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Selecciona el día destino correcto:</label>
         <select id="moverDiaDestinoSelect" style="width: 100%; padding: 8px 10px; border: 1.5px solid #93c5fd; border-radius: 6px; font-size: 13.5px; font-weight: 700; color: #1e40af; background: #eff6ff; outline: none;">
+          <option value="DOMINGO">Domingo</option>
           <option value="LUNES">Lunes</option>
           <option value="MARTES">Martes</option>
           <option value="MIERCOLES">Miércoles</option>
@@ -3477,12 +3491,12 @@ function detectarYMostrarDuplicados() {
         <p style="font-size: 13px; font-weight: 700; margin-bottom: 10px; color: #1e293b;">
           ¿El paciente ha tenido hospitalizaciones en el último mes?
         </p>
-        <div style="display: flex; gap: 16px; margin-bottom: 14px;">
-          <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; cursor: pointer;">
-            <input type="radio" name="vigHospRadio" value="NO" checked onchange="toggleVigHospObs(false)"> No
+        <div style="display: flex; gap: 12px; margin-bottom: 14px;">
+          <label style="flex: 1; justify-content: center; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 12px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; user-select: none; -webkit-tap-highlight-color: transparent;">
+            <input type="radio" name="vigHospRadio" value="NO" checked onchange="toggleVigHospObs(false)" style="transform: scale(1.3); margin: 0;"> No
           </label>
-          <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; cursor: pointer;">
-            <input type="radio" name="vigHospRadio" value="SI" onchange="toggleVigHospObs(true)"> Sí
+          <label style="flex: 1; justify-content: center; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 12px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; user-select: none; -webkit-tap-highlight-color: transparent;">
+            <input type="radio" name="vigHospRadio" value="SI" onchange="toggleVigHospObs(true)" style="transform: scale(1.3); margin: 0;"> Sí
           </label>
         </div>
         <div id="vigHospObsContainer" style="display: none; margin-bottom: 14px;">
@@ -3512,8 +3526,8 @@ function detectarYMostrarDuplicados() {
               <span style="font-size: 11px; color: #64748b;">Cant:</span>
               <input type="number" id="vig_yd_cant" min="0" value="0" style="width: 48px; padding: 3px; font-size: 12px; text-align: center; border: 1px solid #cbd5e1; border-radius: 4px;">
             </div>
-            <label style="font-size: 11.5px; font-weight: 700; color: #1e40af; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-              <input type="radio" name="vigAccesoActual" value="Yugular Derecho" checked> Actual
+            <label style="font-size: 12px; font-weight: 700; color: #1e40af; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 4px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; user-select: none; -webkit-tap-highlight-color: transparent;">
+              <input type="radio" name="vigAccesoActual" value="Yugular Derecho" checked style="transform: scale(1.2); margin: 0;"> Actual
             </label>
           </div>
 
@@ -3523,8 +3537,8 @@ function detectarYMostrarDuplicados() {
               <span style="font-size: 11px; color: #64748b;">Cant:</span>
               <input type="number" id="vig_yi_cant" min="0" value="0" style="width: 48px; padding: 3px; font-size: 12px; text-align: center; border: 1px solid #cbd5e1; border-radius: 4px;">
             </div>
-            <label style="font-size: 11.5px; font-weight: 700; color: #1e40af; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-              <input type="radio" name="vigAccesoActual" value="Yugular Izquierdo"> Actual
+            <label style="font-size: 12px; font-weight: 700; color: #1e40af; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 4px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; user-select: none; -webkit-tap-highlight-color: transparent;">
+              <input type="radio" name="vigAccesoActual" value="Yugular Izquierdo" style="transform: scale(1.2); margin: 0;"> Actual
             </label>
           </div>
 
@@ -3534,8 +3548,8 @@ function detectarYMostrarDuplicados() {
               <span style="font-size: 11px; color: #64748b;">Cant:</span>
               <input type="number" id="vig_fd_cant" min="0" value="0" style="width: 48px; padding: 3px; font-size: 12px; text-align: center; border: 1px solid #cbd5e1; border-radius: 4px;">
             </div>
-            <label style="font-size: 11.5px; font-weight: 700; color: #1e40af; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-              <input type="radio" name="vigAccesoActual" value="Femoral Derecho"> Actual
+            <label style="font-size: 12px; font-weight: 700; color: #1e40af; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 4px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; user-select: none; -webkit-tap-highlight-color: transparent;">
+              <input type="radio" name="vigAccesoActual" value="Femoral Derecho" style="transform: scale(1.2); margin: 0;"> Actual
             </label>
           </div>
 
@@ -3545,8 +3559,8 @@ function detectarYMostrarDuplicados() {
               <span style="font-size: 11px; color: #64748b;">Cant:</span>
               <input type="number" id="vig_fi_cant" min="0" value="0" style="width: 48px; padding: 3px; font-size: 12px; text-align: center; border: 1px solid #cbd5e1; border-radius: 4px;">
             </div>
-            <label style="font-size: 11.5px; font-weight: 700; color: #1e40af; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-              <input type="radio" name="vigAccesoActual" value="Femoral Izquierdo"> Actual
+            <label style="font-size: 12px; font-weight: 700; color: #1e40af; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 4px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; user-select: none; -webkit-tap-highlight-color: transparent;">
+              <input type="radio" name="vigAccesoActual" value="Femoral Izquierdo" style="transform: scale(1.2); margin: 0;"> Actual
             </label>
           </div>
         </div>
@@ -3570,12 +3584,12 @@ function detectarYMostrarDuplicados() {
         <p style="font-size: 13px; font-weight: 700; margin-bottom: 10px; color: #1e293b;">
           ¿Tiene antecedente de Diálisis Peritoneal?
         </p>
-        <div style="display: flex; gap: 16px; margin-bottom: 14px;">
-          <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; cursor: pointer;">
-            <input type="radio" name="vigDpRadio" value="NO" checked onchange="toggleVigDpObs(false)"> No
+        <div style="display: flex; gap: 12px; margin-bottom: 14px;">
+          <label style="flex: 1; justify-content: center; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 12px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; user-select: none; -webkit-tap-highlight-color: transparent;">
+            <input type="radio" name="vigDpRadio" value="NO" checked onchange="toggleVigDpObs(false)" style="transform: scale(1.3); margin: 0;"> No
           </label>
-          <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; cursor: pointer;">
-            <input type="radio" name="vigDpRadio" value="SI" onchange="toggleVigDpObs(true)"> Sí
+          <label style="flex: 1; justify-content: center; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 12px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; user-select: none; -webkit-tap-highlight-color: transparent;">
+            <input type="radio" name="vigDpRadio" value="SI" onchange="toggleVigDpObs(true)" style="transform: scale(1.3); margin: 0;"> Sí
           </label>
         </div>
         <div id="vigDpObsContainer" style="margin-bottom: 14px;">
@@ -3656,13 +3670,14 @@ function detectarYMostrarDuplicados() {
 
         <div>
           <label style="font-size: 11.5px; font-weight: 700; color: #334155; display: block; margin-bottom: 3px;">Días de sesión:</label>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap; background: #f8fafc; padding: 7px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
-            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addVigDias" value="LUNES"> Lun</label>
-            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addVigDias" value="MARTES"> Mar</label>
-            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addVigDias" value="MIERCOLES"> Mié</label>
-            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addVigDias" value="JUEVES"> Jue</label>
-            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addVigDias" value="VIERNES"> Vie</label>
-            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addVigDias" value="SABADO"> Sáb</label>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;"><input type="checkbox" name="addVigDias" value="DOMINGO" style="transform: scale(1.2); margin: 0;"> Dom</label>
+            <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;"><input type="checkbox" name="addVigDias" value="LUNES" style="transform: scale(1.2); margin: 0;"> Lun</label>
+            <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;"><input type="checkbox" name="addVigDias" value="MARTES" style="transform: scale(1.2); margin: 0;"> Mar</label>
+            <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;"><input type="checkbox" name="addVigDias" value="MIERCOLES" style="transform: scale(1.2); margin: 0;"> Mié</label>
+            <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;"><input type="checkbox" name="addVigDias" value="JUEVES" style="transform: scale(1.2); margin: 0;"> Jue</label>
+            <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;"><input type="checkbox" name="addVigDias" value="VIERNES" style="transform: scale(1.2); margin: 0;"> Vie</label>
+            <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;"><input type="checkbox" name="addVigDias" value="SABADO" style="transform: scale(1.2); margin: 0;"> Sáb</label>
           </div>
         </div>
 
@@ -3787,13 +3802,14 @@ function detectarYMostrarDuplicados() {
 
         <div>
           <label style="font-size: 11.5px; font-weight: 700; color: #334155; display: block; margin-bottom: 3px;">Días que acude (Marcar solo hoy si es esporádico):</label>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap; background: #f8fafc; padding: 7px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
-            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addPatDias" value="LUNES"> Lun</label>
-            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addPatDias" value="MARTES"> Mar</label>
-            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addPatDias" value="MIERCOLES"> Mié</label>
-            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addPatDias" value="JUEVES"> Jue</label>
-            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addPatDias" value="VIERNES"> Vie</label>
-            <label style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px;"><input type="checkbox" name="addPatDias" value="SABADO"> Sáb</label>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;"><input type="checkbox" name="addPatDias" value="DOMINGO" style="transform: scale(1.2); margin: 0;"> Dom</label>
+            <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;"><input type="checkbox" name="addPatDias" value="LUNES" style="transform: scale(1.2); margin: 0;"> Lun</label>
+            <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;"><input type="checkbox" name="addPatDias" value="MARTES" style="transform: scale(1.2); margin: 0;"> Mar</label>
+            <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;"><input type="checkbox" name="addPatDias" value="MIERCOLES" style="transform: scale(1.2); margin: 0;"> Mié</label>
+            <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;"><input type="checkbox" name="addPatDias" value="JUEVES" style="transform: scale(1.2); margin: 0;"> Jue</label>
+            <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;"><input type="checkbox" name="addPatDias" value="VIERNES" style="transform: scale(1.2); margin: 0;"> Vie</label>
+            <label style="font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 8px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;"><input type="checkbox" name="addPatDias" value="SABADO" style="transform: scale(1.2); margin: 0;"> Sáb</label>
           </div>
         </div>
 
