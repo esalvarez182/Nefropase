@@ -188,6 +188,31 @@
       border-left: 6px solid #d97706 !important;
       box-shadow: 0 2px 6px rgba(217, 119, 6, 0.08);
     }
+    .patient-card.cultivo-alerta-roja {
+      background: #fef2f2 !important;
+      border: 2px solid #ef4444 !important;
+      border-left: 7px solid #dc2626 !important;
+      box-shadow: 0 3px 10px rgba(220, 38, 38, 0.22) !important;
+      animation: pulseRedAlert 2s infinite ease-in-out;
+    }
+    @keyframes pulseRedAlert {
+      0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+      70% { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+    }
+    .badge-cultivo-alerta {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fca5a5;
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 6px;
+      margin-left: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
     .badge-vigilancia {
       background: #fef3c7;
       color: #92400e;
@@ -429,8 +454,8 @@
 
   <!-- Controls -->
   <div class="control-strip">
-    <div class="day-selector-group" style="flex-wrap: wrap;">
-      <label for="daySelect" style="font-size: 12px; font-weight: 600;">🗓️ Día:</label>
+    <div class="day-selector-group">
+      <label for="daySelect">🗓️ Día:</label>
       <select id="daySelect" onchange="onDayChanged()">
         <option value="DOMINGO">Domingo</option>
         <option value="LUNES">Lunes</option>
@@ -441,19 +466,7 @@
         <option value="SABADO">Sábado</option>
       </select>
       <input type="date" id="sessionDate" onchange="onDateChanged()">
-      
-      <label for="shiftSelect" style="font-size: 12px; font-weight: 600; margin-left: 4px;">⏰ Turno:</label>
-      <select id="shiftSelect" onchange="onShiftChanged()">
-        <option value="TODOS">Todos</option>
-        <option value="MATUTINO_1">1er Matutino</option>
-        <option value="MATUTINO_2">2do Matutino</option>
-        <option value="VESPERTINO_1">1er Vespertino</option>
-        <option value="VESPERTINO_2">2do Vespertino</option>
-        <option value="NOCTURNO_1">1er Nocturno</option>
-        <option value="NOCTURNO_2">2do Nocturno</option>
-      </select>
-      
-      <span id="barSummary" style="font-size: 11.5px; font-weight: 700; color: #1e40af; background: #eff6ff; padding: 5px 9px; border-radius: 6px; border: 1px solid #bfdbfe; margin-left: 4px;">0 pacientes</span>
+      <span id="barSummary" style="font-size: 11.5px; font-weight: 700; color: #1e40af; background: #eff6ff; padding: 5px 9px; border-radius: 6px; border: 1px solid #bfdbfe;">0 pacientes</span>
     </div>
     <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; flex: 1; justify-content: flex-end;">
       <div style="position: relative; flex: 1; min-width: 170px; max-width: 280px;">
@@ -463,6 +476,16 @@
       <button class="btn-save" style="padding: 6px 11px; font-size: 12px; font-weight: 700;" onclick="openAddPatientModal()">➕ Agregar Paciente</button>
       <button class="btn-warn" style="padding: 6px 11px; font-size: 12px; font-weight: 700;" onclick="openReporteVigilanciaModal()">🛡️ Reporte Vigilancia</button>
       <button class="btn-light" style="padding: 6px 10px; font-size: 12px;" onclick="openMoverDiaModal()">🔄 Mover Censo</button>
+    </div>
+  </div>
+  <!-- Barra de Notificaciones y Alarmas Clínicas -->
+  <div id="alarmasBannerContainer" style="display: none; background: #fef2f2; border-bottom: 2px solid #f87171; padding: 10px 16px;">
+    <div style="max-width: 900px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+      <div style="display: flex; align-items: center; gap: 8px; color: #991b1b; font-size: 12.5px; font-weight: 700;">
+        <span style="font-size: 16px;">🚨</span>
+        <span id="alarmasText">Recordatorio: Pacientes que requieren hemocultivo de control hoy (14 días cumplidos).</span>
+      </div>
+      <button class="btn-danger" style="padding: 4px 10px; font-size: 11px; font-weight: 800;" onclick="filtrarPacientesConAlarma()">🔍 Ver Pacientes en Alerta</button>
     </div>
   </div>
   </div>
@@ -482,7 +505,16 @@
     </div>
   </div>
 
-
+  <!-- Shift Tabs -->
+  <div class="shift-tabs">
+    <button class="shift-btn active" onclick="setShiftFilter('TODOS', this)">Todos</button>
+    <button class="shift-btn" onclick="setShiftFilter('MATUTINO_1', this)">1er Turno</button>
+    <button class="shift-btn" onclick="setShiftFilter('MATUTINO_2', this)">2do Turno</button>
+    <button class="shift-btn" onclick="setShiftFilter('VESPERTINO_1', this)">Vesp. 1</button>
+    <button class="shift-btn" onclick="setShiftFilter('VESPERTINO_2', this)">Vesp. 2</button>
+    <button class="shift-btn" onclick="setShiftFilter('NOCTURNO_1', this)">Noc. 1</button>
+    <button class="shift-btn" onclick="setShiftFilter('NOCTURNO_2', this)">Noc. 2</button>
+  </div>
 
   <!-- Cards Container -->
   <div class="container" id="patientsContainer">
@@ -583,6 +615,24 @@
     const hospVal = v.hospUltimoMes === 'SI' ? (hospObs || 'Sí') : (hospObs || 'No');
     parts.push(`Hospitalizaciones: ${hospVal}`);
 
+    // 4. Cultivos tomados:
+    const cult = v.cultivos || {};
+    let cultList = [];
+    if (cult.central) cultList.push('Central');
+    if (cult.periferico) cultList.push('Periférico');
+    if (cult.sitio) cultList.push('Sitio de salida');
+    if (cultList.length > 0) {
+      const fechaC = cult.fecha ? ` el ${cult.fecha}` : '';
+      parts.push(`Cultivos tomados: ${cultList.join(', ')}${fechaC}`);
+    }
+
+    // 5. Tratamiento antibiótico:
+    const tx = v.tratamiento || {};
+    if (tx.inicia === 'SI' && tx.esquema) {
+      const fechaTx = tx.fechaInicio ? ` (${tx.fechaInicio})` : '';
+      parts.push(`Antibioticoterapia iniciada${fechaTx}: ${tx.esquema}`);
+    }
+
     return parts.join(', ');
   }
 
@@ -677,9 +727,63 @@
     { id: "hernandez_cruz", nombre: "HERNÁNDEZ CRUZ ELENA", maquina: "10", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "44", pp: "50.3", qs: "260", qd: "500", uf: "3.0 L", na: "136", bic: "3.1", temp: "35", filtro: "400", ta_in: "162/82", fc_in: "99", ta_out: "149/96", fc_out: "87", lastAnnotation: "Parece que subio de peso", vigilanciaAcceso: false }
   ];
 
+
+  function calcularDiasTranscurridos(fechaStr) {
+    if (!fechaStr) return -1;
+    const parts = fechaStr.split('-');
+    if (parts.length !== 3) return -1;
+    const fInicio = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const diffMs = hoy.getTime() - fInicio.getTime();
+    return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  }
+
+  function requiereControlHemocultivo(p) {
+    if (!p || !p.vigilanciaDatos || !p.vigilanciaDatos.tratamiento) return { alerta: false, dias: 0 };
+    const tx = p.vigilanciaDatos.tratamiento;
+    if (tx.inicia !== 'SI' || !tx.fechaInicio) return { alerta: false, dias: 0 };
+    const dias = calcularDiasTranscurridos(tx.fechaInicio);
+    return { alerta: (dias >= 14), dias: dias };
+  }
+
+  function actualizarBarraAlarmasHemocultivo() {
+    const banner = document.getElementById('alarmasBannerContainer');
+    const txt = document.getElementById('alarmasText');
+    if (!banner) return;
+
+    let alertasCount = 0;
+    let nombresAlerta = [];
+    (currentPatients || []).forEach(p => {
+      const res = requiereControlHemocultivo(p);
+      if (res.alerta && !p.noAcudio) {
+        alertasCount++;
+        nombresAlerta.push(`${p.nombre} (${res.dias} días de Tx)`);
+      }
+    });
+
+    if (alertasCount > 0) {
+      banner.style.display = 'block';
+      txt.innerHTML = `<strong>ALERTA DE HEMOCULTIVOS DE CONTROL (${alertasCount}):</strong> Han transcurrido &ge;14 días de antibiótico para: ${nombresAlerta.join(' &bull; ')}`;
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+
+  function filtrarPacientesConAlarma() {
+    const container = document.getElementById('patientsContainer');
+    const alertas = (currentPatients || []).filter(p => requiereControlHemocultivo(p).alerta);
+    if (alertas.length === 0) {
+      showToast("No hay pacientes con alarma pendiente en este turno.");
+      return;
+    }
+    isolatedPatientId = alertas[0].id;
+    renderCards();
+    showToast(`Mostrando paciente en alerta: ${alertas[0].nombre}`);
+  }
+
   let currentPatients = [];
   let currentShiftFilter = 'TODOS';
-  let isolatedPatientId = null;
   let activePatientForPiso = null;
   let activePreviewDocPatient = null;
 
@@ -830,15 +934,10 @@
     loadDayPatients();
   }
 
-  function onShiftChanged() {
-    currentShiftFilter = document.getElementById('shiftSelect').value;
-    isolatedPatientId = null; // Clear isolated view if changing shift manually
-    renderCards();
-  }
-  
-  function clearIsolatedView() {
-    isolatedPatientId = null;
-    document.getElementById('patientSearchInput').value = '';
+  function setShiftFilter(shift, btn) {
+    currentShiftFilter = shift;
+    document.querySelectorAll('.shift-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
     renderCards();
   }
 
@@ -850,9 +949,7 @@
     const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
     let list = currentPatients;
-    if (isolatedPatientId) {
-      list = currentPatients.filter(p => p.id === isolatedPatientId);
-    } else if (query) {
+    if (query) {
       list = currentPatients.filter(p => (p.nombre || '').toLowerCase().includes(query) || (p.maquina || '').includes(query));
     } else if (currentShiftFilter !== 'TODOS') {
       const currentDay = document.getElementById('daySelect').value;
@@ -878,12 +975,6 @@
       return;
     }
 
-    if (isolatedPatientId) {
-      const backBtn = document.createElement('div');
-      backBtn.innerHTML = `<button class="btn-light" style="margin-bottom: 12px; font-size: 14px; font-weight: 700; width: 100%; justify-content: center; background: #f1f5f9; border: 1.5px solid #cbd5e1; color: #1e293b; padding: 10px;" onclick="clearIsolatedView()">⬅️ Volver a todos los pacientes</button>`;
-      container.appendChild(backBtn);
-    }
-
     list.forEach((p) => {
       if (p.visitadoAt) {
         p.visitado = (Date.now() - p.visitadoAt) < 24 * 60 * 60 * 1000;
@@ -892,8 +983,18 @@
       if (p.turno && p.turno.includes('VESPERTINO')) shiftTag = 'Turno Vespertino';
       if (p.turno && p.turno.includes('NOCTURNO')) shiftTag = 'Turno Nocturno';
 
+      const infoAlerta = requiereControlHemocultivo(p);
       const card = document.createElement('div');
-      card.className = 'patient-card' + (p.visitado ? ' saved' : '') + (p.noAcudio ? ' no-acudio' : '') + (p.vigilanciaAcceso ? ' vigilancia-acceso' : '');
+      let cardClass = 'patient-card';
+      if (infoAlerta.alerta && !p.noAcudio) {
+        cardClass += ' cultivo-alerta-roja';
+      } else if (p.visitado) {
+        cardClass += ' saved';
+      }
+      if (p.noAcudio) cardClass += ' no-acudio';
+      if (p.vigilanciaAcceso && !infoAlerta.alerta) cardClass += ' vigilancia-acceso';
+
+      card.className = cardClass;
       card.id = `card_${p.id}`;
 
             card.innerHTML = `
@@ -901,7 +1002,7 @@
           <div style="flex: 1; padding-right: 10px;">
             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
               <input type="text" id="nombre_${p.id}" value="${p.nombre}" title="Clic para editar nombre" style="font-size: 14px; font-weight: 700; color: #0f172a; border: 1.5px solid transparent; border-radius: 6px; padding: 2px 4px; flex: 1; min-width: 200px; background: transparent; text-transform: uppercase; outline: none; ${p.noAcudio ? 'text-decoration: line-through; color: #94a3b8;' : ''}" onfocus="this.style.borderColor='#93c5fd'; this.style.background='#eff6ff';" onblur="this.style.borderColor='transparent'; this.style.background='transparent'; onNombreChanged('${p.id}', this.value)" onchange="onNombreChanged('${p.id}', this.value)">
-              ${p.noAcudio ? '<span class="badge-no-acudio">NO ACUDIÓ</span>' : ''}${p.vigilanciaAcceso ? '<span class="badge-vigilancia">⚠️ VIGILANCIA ACCESO</span>' : ''}${p.visitado ? '<span class="badge-visitado">✓ VISITADO</span>' : ''}
+              ${p.noAcudio ? '<span class="badge-no-acudio">NO ACUDIÓ</span>' : ''}${infoAlerta.alerta ? `<span class="badge-cultivo-alerta">🚨 REQUERIDO: HEMOCULTIVO CONTROL (${infoAlerta.dias} DÍAS TX)</span>` : ''}${p.vigilanciaAcceso && !infoAlerta.alerta ? '<span class="badge-vigilancia">⚠️ VIGILANCIA ACCESO</span>' : ''}${p.visitado ? '<span class="badge-visitado">✓ VISITADO</span>' : ''}
             </div>
             
             <!-- NSS Atenuado de 2 Casillas Debajo del Nombre -->
@@ -1037,6 +1138,7 @@
 
       container.appendChild(card);
     });
+    actualizarBarraAlarmasHemocultivo();
   }
 
   async function savePatientData(id, isSilent = false, markVisitado = false) {
@@ -1599,9 +1701,7 @@
     const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
     let list = currentPatients;
-    if (isolatedPatientId) {
-      list = currentPatients.filter(p => p.id === isolatedPatientId);
-    } else if (query) {
+    if (query) {
       list = currentPatients.filter(p => (p.nombre || '').toLowerCase().includes(query) || (p.maquina || '').includes(query));
     } else if (currentShiftFilter !== 'TODOS') {
       const currentDay = document.getElementById('daySelect').value;
@@ -1715,9 +1815,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
     const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
     let list = currentPatients;
-    if (isolatedPatientId) {
-      list = currentPatients.filter(p => p.id === isolatedPatientId);
-    } else if (query) {
+    if (query) {
       list = currentPatients.filter(p => (p.nombre || '').toLowerCase().includes(query) || (p.maquina || '').includes(query));
     } else if (currentShiftFilter !== 'TODOS') {
       const currentDay = document.getElementById('daySelect').value;
@@ -1996,6 +2094,19 @@ MÉDICOS RESPONSABLES: ${medico}`;
     }
     document.getElementById('vigDpObsText').value = v.dpObs || '';
 
+    // Paso 4: Cultivos y Tratamiento
+    const cult = v.cultivos || {};
+    document.getElementById('vigCultivoCentral').checked = (cult.central === true);
+    document.getElementById('vigCultivoPeriferico').checked = (cult.periferico === true);
+    document.getElementById('vigCultivoSitio').checked = (cult.sitio === true);
+    document.getElementById('vigFechaCultivo').value = cult.fecha || '';
+
+    const tx = v.tratamiento || {};
+    document.getElementById('vigIniciaTx').value = tx.inicia || 'NO';
+    document.getElementById('vigFechaTx').value = tx.fechaInicio || '';
+    document.getElementById('vigTxEsquema').value = tx.esquema || '';
+    toggleVigTxFields(tx.inicia === 'SI');
+
     // Show/hide button to withdraw
     document.getElementById('btnQuitarVigilancia').style.display = p.vigilanciaAcceso ? 'inline-flex' : 'none';
 
@@ -2013,18 +2124,33 @@ MÉDICOS RESPONSABLES: ${medico}`;
     document.getElementById('vigStep1').style.display = 'block';
     document.getElementById('vigStep2').style.display = 'none';
     document.getElementById('vigStep3').style.display = 'none';
+    document.getElementById('vigStep4').style.display = 'none';
   }
 
   function irVigPaso2() {
     document.getElementById('vigStep1').style.display = 'none';
     document.getElementById('vigStep2').style.display = 'block';
     document.getElementById('vigStep3').style.display = 'none';
+    document.getElementById('vigStep4').style.display = 'none';
   }
 
   function irVigPaso3() {
     document.getElementById('vigStep1').style.display = 'none';
     document.getElementById('vigStep2').style.display = 'none';
     document.getElementById('vigStep3').style.display = 'block';
+    document.getElementById('vigStep4').style.display = 'none';
+  }
+
+  function irVigPaso4() {
+    document.getElementById('vigStep1').style.display = 'none';
+    document.getElementById('vigStep2').style.display = 'none';
+    document.getElementById('vigStep3').style.display = 'none';
+    document.getElementById('vigStep4').style.display = 'block';
+  }
+
+  function toggleVigTxFields(show) {
+    const el = document.getElementById('vigTxDetailsContainer');
+    if (el) el.style.display = show ? 'flex' : 'none';
   }
 
   function toggleVigHospObs(show) {
@@ -2068,13 +2194,33 @@ MÉDICOS RESPONSABLES: ${medico}`;
     }
     const dpObs = document.getElementById('vigDpObsText').value.trim();
 
+    // Collect Step 4
+    const cultivos = {
+      central: document.getElementById('vigCultivoCentral').checked,
+      periferico: document.getElementById('vigCultivoPeriferico').checked,
+      sitio: document.getElementById('vigCultivoSitio').checked,
+      fecha: document.getElementById('vigFechaCultivo').value || ''
+    };
+
+    const iniciaTx = document.getElementById('vigIniciaTx').value;
+    const fechaTx = document.getElementById('vigFechaTx').value || '';
+    const esquemaTx = document.getElementById('vigTxEsquema').value.trim();
+
+    const tratamiento = {
+      inicia: iniciaTx,
+      fechaInicio: fechaTx,
+      esquema: esquemaTx
+    };
+
     p.vigilanciaAcceso = true;
     p.vigilanciaDatos = {
       hospUltimoMes: hospVal,
       hospObs: hospObs,
       accesos: accesos,
       dp: dpVal,
-      dpObs: dpObs
+      dpObs: dpObs,
+      cultivos: cultivos,
+      tratamiento: tratamiento
     };
 
     // Redactar resumen clínico estructurado
@@ -2873,7 +3019,6 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
 
     async function onSearchInput(query) {
-    isolatedPatientId = null; // Quitar vista exclusiva si hace una nueva búsqueda
     const q = (query || '').trim().toLowerCase();
     if (!q) {
       renderCards();
@@ -2977,6 +3122,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
       `;
       container.appendChild(card);
     });
+    actualizarBarraAlarmasHemocultivo();
   }
 
 
@@ -3235,30 +3381,36 @@ function detectarYMostrarDuplicados() {
     closeDirectorioPacientesModal();
 
     const daySelect = document.getElementById('daySelect');
-    let dayChanged = false;
     if (daySelect.value !== dia) {
       daySelect.value = dia;
       updatePasteDayLabel();
-      dayChanged = true;
+      await loadDayPatients();
     }
 
-    // Poner filtro en TODOS en el select y habilitar vista exclusiva
-    document.getElementById('shiftSelect').value = 'TODOS';
+    // Poner filtro en TODOS para garantizar visibilidad
     currentShiftFilter = 'TODOS';
-    isolatedPatientId = patientId;
+    document.querySelectorAll('.shift-btn').forEach(b => b.classList.remove('active'));
+    const btnTodos = document.querySelector('.shift-btn');
+    if (btnTodos) btnTodos.classList.add('active');
     
     // Limpiar buscador
     const sInput = document.getElementById('patientSearchInput');
     if (sInput) sInput.value = '';
 
-    if (dayChanged) {
-      await loadDayPatients();
-    } else {
-      renderCards();
-    }
+    renderCards();
 
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    showToast(`Mostrando expediente de paciente`);
+    // Scroll y animación de destello
+    setTimeout(() => {
+      const cardEl = document.getElementById(`card_${patientId}`);
+      if (cardEl) {
+        cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        cardEl.classList.remove('card-highlight');
+        void cardEl.offsetWidth; // forzar reflow
+        cardEl.classList.add('card-highlight');
+      } else {
+        showToast(`Tarjeta de paciente abierta en ${dia}`);
+      }
+    }, 200);
   }
 
   // ==========================================
@@ -3598,6 +3750,63 @@ function detectarYMostrarDuplicados() {
         </div>
         <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 18px;">
           <button class="btn-light" onclick="irVigPaso2()">⬅ Atrás</button>
+          <button class="btn-save" onclick="irVigPaso4()">Guardar y Siguiente ➔</button>
+        </div>
+      </div>
+
+      <!-- PASO 4: Hemocultivos, Tratamiento Antibiótico y Alarma a 14 Días -->
+      <div id="vigStep4" style="display: none;">
+        <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 6px; padding: 10px; margin-bottom: 14px;">
+          <strong style="color: #b45309; font-size: 13px;">Paso 4 de 4: Hemocultivos y Tratamiento Antibiótico</strong>
+        </div>
+
+        <p style="font-size: 12px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">
+          🩸 ¿Se tomaron cultivos del acceso vascular? (Selecciona los aplicables):
+        </p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+          <label style="font-size: 12.5px; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 7px 10px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 6px; cursor: pointer; user-select: none;">
+            <input type="checkbox" id="vigCultivoCentral" style="transform: scale(1.2); margin: 0;"> Hemocultivo Central
+          </label>
+          <label style="font-size: 12.5px; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 7px 10px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 6px; cursor: pointer; user-select: none;">
+            <input type="checkbox" id="vigCultivoPeriferico" style="transform: scale(1.2); margin: 0;"> Hemocultivo Periférico
+          </label>
+          <label style="font-size: 12.5px; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 7px 10px; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 6px; cursor: pointer; user-select: none;">
+            <input type="checkbox" id="vigCultivoSitio" style="transform: scale(1.2); margin: 0;"> Cultivo Sitio de Salida
+          </label>
+        </div>
+
+        <div style="margin-bottom: 14px;">
+          <label style="font-size: 11.5px; font-weight: 700; color: #475569; display: block; margin-bottom: 3px;">📅 Fecha de toma de cultivos:</label>
+          <input type="date" id="vigFechaCultivo" style="width: 100%; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; outline: none;">
+        </div>
+
+        <!-- Tratamiento Antibiótico -->
+        <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <label style="font-size: 12.5px; font-weight: 700; color: #1e3a8a;">💊 ¿Se inicia tratamiento antibiótico?</label>
+            <select id="vigIniciaTx" style="padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; font-weight: 700;" onchange="toggleVigTxFields(this.value === 'SI')">
+              <option value="NO">No</option>
+              <option value="SI">Sí</option>
+            </select>
+          </div>
+
+          <div id="vigTxDetailsContainer" style="display: none; flex-direction: column; gap: 8px;">
+            <div>
+              <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 2px;">📅 Fecha de inicio de antibiótico:</label>
+              <input type="date" id="vigFechaTx" style="width: 100%; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; outline: none;">
+            </div>
+            <div>
+              <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 2px;">Antibiótico(s) y esquema indicado:</label>
+              <textarea id="vigTxEsquema" placeholder="Ej. Vancomicina 1g IV cada 5 días post-HD + Ceftazidima 1g post-HD..." style="width: 100%; height: 50px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px; font-size: 12px; outline: none;"></textarea>
+            </div>
+            <div style="background: #fef2f2; border: 1px dashed #f87171; border-radius: 6px; padding: 7px 10px; font-size: 11.5px; color: #991b1b; line-height: 1.35;">
+              ⏰ <strong>Alarma automática:</strong> Se programará una alerta visual y la tarjeta cambiará a color rojo a los <strong>14 días exactos</strong> de haber iniciado el esquema para la toma mandatoria del hemocultivo de control.
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 18px;">
+          <button class="btn-light" onclick="irVigPaso3()">⬅ Atrás</button>
           <button class="btn-save" onclick="guardarYFinalizarVigilancia()">💾 Guardar y Finalizar Vigilancia</button>
         </div>
       </div>
