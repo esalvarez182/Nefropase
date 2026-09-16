@@ -621,9 +621,10 @@
     if (cult.central) cultList.push('Central');
     if (cult.periferico) cultList.push('Periférico');
     if (cult.sitio) cultList.push('Sitio de salida');
-    if (cultList.length > 0) {
+    if (cultList.length > 0 || cult.resultado) {
       const fechaC = cult.fecha ? ` el ${cult.fecha}` : '';
-      parts.push(`Cultivos tomados: ${cultList.join(', ')}${fechaC}`);
+      const resC = cult.resultado ? ` [Resultado: ${cult.resultado}]` : '';
+      parts.push(`Cultivos: ${cultList.length > 0 ? cultList.join(', ') : 'Registrado'}${fechaC}${resC}`);
     }
 
     // 5. Tratamiento antibiótico:
@@ -2100,6 +2101,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
     document.getElementById('vigCultivoPeriferico').checked = (cult.periferico === true);
     document.getElementById('vigCultivoSitio').checked = (cult.sitio === true);
     document.getElementById('vigFechaCultivo').value = cult.fecha || '';
+    document.getElementById('vigResultadoCultivo').value = cult.resultado || '';
 
     const tx = v.tratamiento || {};
     document.getElementById('vigIniciaTx').value = tx.inicia || 'NO';
@@ -2199,7 +2201,8 @@ MÉDICOS RESPONSABLES: ${medico}`;
       central: document.getElementById('vigCultivoCentral').checked,
       periferico: document.getElementById('vigCultivoPeriferico').checked,
       sitio: document.getElementById('vigCultivoSitio').checked,
-      fecha: document.getElementById('vigFechaCultivo').value || ''
+      fecha: document.getElementById('vigFechaCultivo').value || '',
+      resultado: document.getElementById('vigResultadoCultivo').value.trim() || ''
     };
 
     const iniciaTx = document.getElementById('vigIniciaTx').value;
@@ -2248,6 +2251,9 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
     closeVigWizard();
     renderCards();
+    if (document.getElementById('reporteVigilanciaModal').style.display === 'flex') {
+      openReporteVigilanciaModal();
+    }
     showToast(`⚠️ ${p.nombre} registrado en Vigilancia de Acceso`);
   }
 
@@ -2274,6 +2280,18 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
 
   // GENERACIÓN DE REPORTE DE VIGILANCIA DE ACCESO
+  function editarVigilanciaDesdeReporte(patientId) {
+    // Si el paciente no está en currentPatients por ser de otro día, buscarlo en reportePacientesData
+    let p = currentPatients.find(item => item.id === patientId);
+    if (!p) {
+      p = reportePacientesData.find(item => item.id === patientId);
+      if (p) {
+        currentPatients.push(p);
+      }
+    }
+    openVigilanciaWizard(patientId);
+  }
+
   let reportePacientesData = [];
 
   function formatTurnoNombre(code) {
@@ -2338,6 +2356,8 @@ MÉDICOS RESPONSABLES: ${medico}`;
             <th style="padding:6px; border:1px solid #cbd5e1;">Historial de Accesos</th>
             <th style="padding:6px; border:1px solid #cbd5e1;">Hospitalizaciones (Último Mes)</th>
             <th style="padding:6px; border:1px solid #cbd5e1;">Diálisis Peritoneal</th>
+            <th style="padding:6px; border:1px solid #cbd5e1; background: #fee2e2; color: #991b1b;">Cultivos y Tratamiento</th>
+            <th style="padding:6px; border:1px solid #cbd5e1; text-align: center;">Acción</th>
           </tr>
         </thead>
         <tbody>
@@ -2376,6 +2396,37 @@ MÉDICOS RESPONSABLES: ${medico}`;
         dpText += `<br><span style="font-size:11px; color:#475569;">${v.dpObs}</span>`;
       }
 
+      // Cultivos & Tratamiento
+      const cult = v.cultivos || {};
+      const tx = v.tratamiento || {};
+      let cultDetails = [];
+      if (cult.central) cultDetails.push('Central');
+      if (cult.periferico) cultDetails.push('Periférico');
+      if (cult.sitio) cultDetails.push('Sitio de salida');
+
+      let cultHtml = '';
+      if (cultDetails.length > 0 || cult.fecha || cult.resultado) {
+        cultHtml += `<strong>Cultivos:</strong> ${cultDetails.length > 0 ? cultDetails.join(', ') : 'Registrado'}`;
+        if (cult.fecha) cultHtml += `<br><small style="color:#475569;">Toma: ${cult.fecha}</small>`;
+        if (cult.resultado) cultHtml += `<br><strong style="color:#991b1b; font-size:11px;">Resultado: ${cult.resultado}</strong>`;
+      } else {
+        cultHtml += `<span style="color:#94a3b8;">Sin cultivos</span>`;
+      }
+
+      let txHtml = '';
+      if (tx.inicia === 'SI') {
+        const diasTx = calcularDiasTranscurridos(tx.fechaInicio);
+        txHtml += `<div style="margin-top: 5px; padding-top: 4px; border-top: 1px dashed #fca5a5;">`;
+        txHtml += `<strong style="color:#b91c1c;">Tx Antibiótico:</strong> ${tx.esquema || 'Iniciado'}`;
+        if (tx.fechaInicio) txHtml += `<br><small style="color:#475569;">Inicio: ${tx.fechaInicio} (${diasTx >= 0 ? diasTx + ' días' : '-'})</small>`;
+        if (diasTx >= 14) {
+          txHtml += `<br><span style="background:#fee2e2; color:#991b1b; font-size:10px; font-weight:800; padding:1px 5px; border-radius:4px; border:1px solid #f87171;">🚨 14 DÍAS CUMPLIDOS</span>`;
+        }
+        txHtml += `</div>`;
+      } else {
+        txHtml += `<br><small style="color:#94a3b8;">Sin antibiótico</small>`;
+      }
+
       tableHtml += `
         <tr style="vertical-align:top;">
           <td style="padding:6px; border:1px solid #cbd5e1; font-weight:700; color:#1e3a8a;">
@@ -2389,6 +2440,12 @@ MÉDICOS RESPONSABLES: ${medico}`;
           <td style="padding:6px; border:1px solid #cbd5e1;">${accesosText}</td>
           <td style="padding:6px; border:1px solid #cbd5e1;">${hospText}</td>
           <td style="padding:6px; border:1px solid #cbd5e1;">${dpText}</td>
+          <td style="padding:6px; border:1px solid #cbd5e1; background: #fff5f5;">${cultHtml}${txHtml}</td>
+          <td style="padding:6px; border:1px solid #cbd5e1; text-align: center; vertical-align: middle;">
+            <button class="btn-save" style="padding: 5px 9px; font-size: 11px; font-weight: 700; white-space: nowrap;" onclick="editarVigilanciaDesdeReporte('${p.id}')">
+              ✏️ Editar / Completar
+            </button>
+          </td>
         </tr>
       `;
     });
@@ -3775,9 +3832,15 @@ function detectarYMostrarDuplicados() {
           </label>
         </div>
 
-        <div style="margin-bottom: 14px;">
-          <label style="font-size: 11.5px; font-weight: 700; color: #475569; display: block; margin-bottom: 3px;">📅 Fecha de toma de cultivos:</label>
-          <input type="date" id="vigFechaCultivo" style="width: 100%; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; outline: none;">
+        <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 10px; margin-bottom: 14px;">
+          <div>
+            <label style="font-size: 11.5px; font-weight: 700; color: #475569; display: block; margin-bottom: 3px;">📅 Fecha de toma de cultivos:</label>
+            <input type="date" id="vigFechaCultivo" style="width: 100%; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; outline: none;">
+          </div>
+          <div>
+            <label style="font-size: 11.5px; font-weight: 700; color: #475569; display: block; margin-bottom: 3px;">🔬 Resultado / Aislamiento microbiano:</label>
+            <input type="text" id="vigResultadoCultivo" placeholder="Ej. S. aureus, E. cloacae, Negativo, Pendiente..." style="width: 100%; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; outline: none;">
+          </div>
         </div>
 
         <!-- Tratamiento Antibiótico -->
