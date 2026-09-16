@@ -664,6 +664,31 @@
     return String(nss).toUpperCase().replace(/[^A-Z0-9]/g, '');
   }
 
+
+  // Manejador inteligente de pegado para casillas de NSS
+  window.handleNssBaseInput = function(el, digInputId) {
+    let val = el.value.trim().toUpperCase();
+    const cleanAlphanum = val.replace(/[^A-Z0-9]/g, '');
+    // Si pegaron los 12 caracteres completos en la primera casilla
+    if (cleanAlphanum.length === 12) {
+      const digEl = document.getElementById(digInputId);
+      if (digEl && !digEl.value.trim()) {
+        digEl.value = cleanAlphanum.slice(-2);
+        // Dejar el formato original pegado en la casilla base sin los dos últimos dígitos
+        if (val.includes('-')) {
+          let parts = val.split('-');
+          if (parts.length > 2) {
+            el.value = parts.slice(0, -1).join('-');
+          } else {
+            el.value = cleanAlphanum.slice(0, 4) + '-' + cleanAlphanum.slice(4, 10);
+          }
+        } else {
+          el.value = cleanAlphanum.slice(0, 10);
+        }
+      }
+    }
+  };
+
   // Helper functions
   function clean(s) {
     if (!s) return '';
@@ -1009,7 +1034,7 @@
             <!-- NSS Atenuado de 2 Casillas Debajo del Nombre -->
             <div style="display: flex; align-items: center; gap: 4px; padding-left: 4px; margin-top: 4px;">
               <span style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 0.5px;">NSS:</span>
-              <input type="text" id="nss_base_${p.id}" value="${p.nss_base || ''}" placeholder="XXXX000000" maxlength="10" title="Número de Seguridad Social (4 letras + 6 números)" style="width: 102px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 5px; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); text-transform: uppercase; outline: none;" onfocus="this.style.borderStyle='solid'; this.style.borderColor='#93c5fd'; this.style.background='#fff';" onblur="this.style.borderStyle='dashed'; this.style.borderColor='#cbd5e1'; this.style.background='rgba(241, 245, 249, 0.6)';" onchange="actualizarNssPaciente('${p.id}')">
+              <input type="text" id="nss_base_${p.id}" value="${p.nss_base || ''}" placeholder="XXXX000000" maxlength="14" oninput="handleNssBaseInput(this, 'nss_dig_${p.id}')" title="Número de Seguridad Social (4 letras + 6 números)" style="width: 118px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 5px; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); text-transform: uppercase; outline: none;" onfocus="this.style.borderStyle='solid'; this.style.borderColor='#93c5fd'; this.style.background='#fff';" onblur="this.style.borderStyle='dashed'; this.style.borderColor='#cbd5e1'; this.style.background='rgba(241, 245, 249, 0.6)';" onchange="actualizarNssPaciente('${p.id}')">
               <span style="color: #94a3b8; font-weight: bold; font-size: 11px;">-</span>
               <input type="text" id="nss_dig_${p.id}" value="${p.nss_dig || ''}" placeholder="00" maxlength="2" title="2 dígitos agregados" style="width: 32px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 3px; text-align: center; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); outline: none;" onfocus="this.style.borderStyle='solid'; this.style.borderColor='#93c5fd'; this.style.background='#fff';" onblur="this.style.borderStyle='dashed'; this.style.borderColor='#cbd5e1'; this.style.background='rgba(241, 245, 249, 0.6)';" onchange="actualizarNssPaciente('${p.id}')">
             </div>
@@ -2698,11 +2723,18 @@ MÉDICOS RESPONSABLES: ${medico}`;
     const nssBase = baseInput ? baseInput.value.trim().toUpperCase() : '';
     const nssDig = digInput ? digInput.value.trim() : '';
 
-    const cleanBase = nssBase.replace(/[^A-Z0-9]/g, '');
-    const cleanDig = nssDig.replace(/[^0-9]/g, '');
+    // Si el usuario pegó el NSS completo (12 caracteres alfanuméricos) en la primera casilla
+    let rawCleanAll = (nssBase + nssDig).replace(/[^A-Z0-9]/g, '');
+    let cleanBase = nssBase.replace(/[^A-Z0-9]/g, '');
+    let cleanDig = nssDig.replace(/[^0-9]/g, '');
+
+    if (cleanBase.length === 12 && !cleanDig) {
+      cleanDig = cleanBase.slice(-2);
+      cleanBase = cleanBase.slice(0, 10);
+    }
 
     if (cleanBase.length !== 10 || cleanDig.length !== 2) {
-      alert("El Número de Seguridad Social (NSS) es obligatorio. Debe tener exactamente 10 caracteres base (4 letras + 6 números) en la primera casilla y 2 dígitos finales en la segunda.\n\nIgnoraremos los guiones, pero los caracteres deben estar completos.");
+      alert("El Número de Seguridad Social (NSS) es obligatorio. Debe contener los 10 caracteres base (4 letras + 6 números) y los 2 dígitos agregados.\n\nPuedes escribirlo o pegarlo con o sin guión, el sistema lo aceptará y no afectará la detección de duplicados.");
       if (baseInput) baseInput.focus();
       return;
     }
@@ -3161,7 +3193,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
             <!-- NSS Atenuado de 2 Casillas Debajo del Nombre -->
             <div style="display: flex; align-items: center; gap: 4px; padding-left: 4px; margin-top: 6px;">
               <span style="font-size: 10.5px; font-weight: 800; color: #64748b;">NSS:</span>
-              <input type="text" id="nss_base_${p.id}" value="${p.nss_base || ''}" placeholder="XXXX000000" maxlength="10" title="Número de Seguridad Social (4 letras + 6 números)" style="width: 102px; font-size: 11.5px; font-family: monospace; font-weight: 700; color: #1e293b; padding: 3px 5px; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(255, 255, 255, 0.9); text-transform: uppercase; outline: none;" onfocus="this.style.borderStyle='solid'; this.style.borderColor='#93c5fd';" onblur="this.style.borderStyle='dashed'; this.style.borderColor='#cbd5e1';" onchange="actualizarNssPaciente('${p.id}')">
+              <input type="text" id="nss_base_${p.id}" value="${p.nss_base || ''}" placeholder="XXXX000000" maxlength="14" oninput="handleNssBaseInput(this, 'nss_dig_${p.id}')" title="Número de Seguridad Social (4 letras + 6 números)" style="width: 118px; font-size: 11.5px; font-family: monospace; font-weight: 700; color: #1e293b; padding: 3px 5px; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(255, 255, 255, 0.9); text-transform: uppercase; outline: none;" onfocus="this.style.borderStyle='solid'; this.style.borderColor='#93c5fd';" onblur="this.style.borderStyle='dashed'; this.style.borderColor='#cbd5e1';" onchange="actualizarNssPaciente('${p.id}')">
               <span style="color: #94a3b8; font-weight: bold; font-size: 11px;">-</span>
               <input type="text" id="nss_dig_${p.id}" value="${p.nss_dig || ''}" placeholder="00" maxlength="2" title="2 dígitos agregados" style="width: 32px; font-size: 11.5px; font-family: monospace; font-weight: 700; color: #1e293b; padding: 3px 3px; text-align: center; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(255, 255, 255, 0.9); outline: none;" onfocus="this.style.borderStyle='solid'; this.style.borderColor='#93c5fd';" onblur="this.style.borderStyle='dashed'; this.style.borderColor='#cbd5e1';" onchange="actualizarNssPaciente('${p.id}')">
             </div>
@@ -3309,7 +3341,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
           <!-- NSS Atenuado de 2 Casillas en el Directorio -->
           <div style="display: flex; align-items: center; gap: 4px; margin-top: 4px;">
             <span style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 0.5px;">NSS:</span>
-            <input type="text" id="dir_nss_base_${p.id}" value="${p.nss_base || ''}" placeholder="XXXX000000" maxlength="10" title="Número de Seguridad Social (4 letras + 6 números)" style="width: 102px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 5px; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); text-transform: uppercase; outline: none;" onchange="actualizarNssDesdeDirectorio('${p.id}')">
+            <input type="text" id="dir_nss_base_${p.id}" value="${p.nss_base || ''}" placeholder="XXXX000000" maxlength="14" oninput="handleNssBaseInput(this, 'dir_nss_dig_${p.id}')" title="Número de Seguridad Social (4 letras + 6 números)" style="width: 118px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 5px; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); text-transform: uppercase; outline: none;" onchange="actualizarNssDesdeDirectorio('${p.id}')">
             <span style="color: #94a3b8; font-weight: bold; font-size: 11px;">-</span>
             <input type="text" id="dir_nss_dig_${p.id}" value="${p.nss_dig || ''}" placeholder="00" maxlength="2" title="2 dígitos agregados" style="width: 32px; font-size: 11px; font-family: monospace; font-weight: 700; color: #475569; padding: 2px 3px; text-align: center; border: 1px dashed #cbd5e1; border-radius: 4px; background: rgba(241, 245, 249, 0.6); outline: none;" onchange="actualizarNssDesdeDirectorio('${p.id}')">
           </div>
@@ -4042,7 +4074,7 @@ function detectarYMostrarDuplicados() {
             NÚMERO DE SEGURIDAD SOCIAL (NSS - Identificador Único):
           </label>
           <div style="display: flex; align-items: center; gap: 6px;">
-            <input type="text" id="addPatNssBase" placeholder="4 letras + 6 números (ej. ABCD123456)" maxlength="10" style="flex: 1; padding: 7px 10px; border: 1.5px solid #7dd3fc; border-radius: 6px; font-size: 12.5px; font-weight: 700; text-transform: uppercase; font-family: monospace; outline: none; background: #fff;">
+            <input type="text" id="addPatNssBase" placeholder="4 letras + 6 números (ej. ABCD-123456)" maxlength="14" oninput="handleNssBaseInput(this, 'addPatNssDig')" style="flex: 1; padding: 7px 10px; border: 1.5px solid #7dd3fc; border-radius: 6px; font-size: 12.5px; font-weight: 700; text-transform: uppercase; font-family: monospace; outline: none; background: #fff;">
             <span style="font-weight: 800; color: #0284c7; font-size: 14px;">-</span>
             <input type="text" id="addPatNssDig" placeholder="00" maxlength="2" style="width: 60px; padding: 7px 6px; border: 1.5px solid #7dd3fc; border-radius: 6px; font-size: 12.5px; font-weight: 700; text-align: center; font-family: monospace; outline: none; background: #fff;">
           </div>
