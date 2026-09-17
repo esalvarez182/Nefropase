@@ -2084,13 +2084,65 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
   function openVigilanciaWizard(id) {
     activeVigPatientId = id;
-    const p = currentPatients.find(item => item.id === id);
+    let p = currentPatients.find(item => item.id === id);
+    if (!p && typeof reportePacientesData !== 'undefined') {
+      p = reportePacientesData.find(item => item.id === id);
+      if (p) currentPatients.push(p);
+    }
     if (!p) return;
 
     document.getElementById('vigWizardTitle').innerText = `🛡️ Vigilancia: ${p.nombre}`;
-    
-    // Load existing data if already set
+
     const v = p.vigilanciaDatos || {};
+    const tieneDatosPrevios = p.vigilanciaAcceso && p.vigilanciaDatos;
+
+    let resetearCampos = false;
+
+    if (tieneDatosPrevios) {
+      const resp = confirm(`El paciente "${p.nombre}" ya cuenta con datos de vigilancia de catéter registrados.\n\n¿Deseas modificar/reiniciar todas las respuestas desde cero?\n\n• ACEPTAR: Se limpiarán los campos para llenarlos de nuevo.\n• CANCELAR: Se mantendrán las respuestas anteriores y avanzarás directamente a los datos que aún falten por completar.`);
+      if (resp) {
+        resetearCampos = true;
+      }
+    }
+
+    if (resetearCampos) {
+      // Limpiar y reiniciar todos los campos
+      for (let r of document.getElementsByName('vigHospRadio')) {
+        r.checked = (r.value === 'NO');
+      }
+      document.getElementById('vigHospObsText').value = '';
+      toggleVigHospObs(false);
+
+      document.getElementById('vig_yd_cant').value = 0;
+      document.getElementById('vig_yi_cant').value = 0;
+      document.getElementById('vig_fd_cant').value = 0;
+      document.getElementById('vig_fi_cant').value = 0;
+      document.getElementById('vigFechaColocacion').value = '';
+      for (let r of document.getElementsByName('vigAccesoActual')) {
+        r.checked = (r.value === 'Yugular Derecho');
+      }
+
+      for (let r of document.getElementsByName('vigDpRadio')) {
+        r.checked = (r.value === 'NO');
+      }
+      document.getElementById('vigDpObsText').value = '';
+
+      document.getElementById('vigCultivoCentral').checked = false;
+      document.getElementById('vigCultivoPeriferico').checked = false;
+      document.getElementById('vigCultivoSitio').checked = false;
+      document.getElementById('vigFechaCultivo').value = '';
+      document.getElementById('vigResultadoCultivo').value = '';
+
+      document.getElementById('vigIniciaTx').value = 'NO';
+      document.getElementById('vigFechaTx').value = '';
+      document.getElementById('vigTxEsquema').value = '';
+      toggleVigTxFields(false);
+
+      document.getElementById('btnQuitarVigilancia').style.display = p.vigilanciaAcceso ? 'inline-flex' : 'none';
+      irVigPaso1();
+      document.getElementById('vigilanciaWizardModal').style.display = 'flex';
+      return;
+    }
 
     // Paso 1
     const hospRadios = document.getElementsByName('vigHospRadio');
@@ -2137,8 +2189,33 @@ MÉDICOS RESPONSABLES: ${medico}`;
     // Show/hide button to withdraw
     document.getElementById('btnQuitarVigilancia').style.display = p.vigilanciaAcceso ? 'inline-flex' : 'none';
 
-    // Start at step 1
-    irVigPaso1();
+    // Si conserva datos anteriores, saltar al paso incompleto
+    if (tieneDatosPrevios) {
+      // Evaluar qué paso está pendiente:
+      // Paso 1: Hospitalizaciones
+      const paso1Completo = (v.hospUltimoMes === 'NO' || (v.hospUltimoMes === 'SI' && (v.hospObs || '').trim() !== ''));
+      // Paso 2: Accesos (debe tener fecha o acceso registrado)
+      const acc = v.accesos || {};
+      const paso2Completo = (acc.actual && acc.fechaColocacion);
+      // Paso 3: Diálisis Peritoneal
+      const paso3Completo = (v.dp === 'NO' || (v.dp === 'SI' && (v.dpObs || '').trim() !== ''));
+      // Paso 4: Cultivos / Tx
+      const cult = v.cultivos || {};
+      const tx = v.tratamiento || {};
+      const paso4Completo = (cult.fecha || cult.resultado || tx.fechaInicio || tx.esquema);
+
+      if (!paso1Completo) {
+        irVigPaso1();
+      } else if (!paso2Completo) {
+        irVigPaso2();
+      } else if (!paso3Completo) {
+        irVigPaso3();
+      } else {
+        irVigPaso4();
+      }
+    } else {
+      irVigPaso1();
+    }
     document.getElementById('vigilanciaWizardModal').style.display = 'flex';
   }
 
