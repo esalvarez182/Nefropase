@@ -200,6 +200,12 @@
       70% { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
       100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
     }
+    @keyframes pulseNotif {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+    .pulse-notif { animation: pulseNotif 2s infinite; }
     .badge-cultivo-alerta {
       background: #fee2e2;
       color: #991b1b;
@@ -446,9 +452,15 @@
   <!-- Header -->
   <header class="app-header">
     <h1>🩺 NefroPase Cloud</h1>
-    <div class="status-pill">
-      <span class="status-dot" id="cloudDot"></span>
-      <span id="cloudStatus">Conectando...</span>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <button id="btnNotif" style="background: rgba(255,255,255,0.2); border: none; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; position: relative;" onclick="abrirModalNotificaciones()">
+        <span id="iconNotif" style="font-size: 18px; filter: grayscale(100%);">⚡</span>
+        <span id="badgeNotif" style="display: none; position: absolute; top: -2px; right: -2px; background: #dc2626; color: white; font-size: 10px; font-weight: bold; border-radius: 50%; width: 16px; height: 16px; align-items: center; justify-content: center;">0</span>
+      </button>
+      <div class="status-pill">
+        <span class="status-dot" id="cloudDot"></span>
+        <span id="cloudStatus">Conectando...</span>
+      </div>
     </div>
   </header>
 
@@ -478,20 +490,10 @@
       <button class="btn-light" style="padding: 6px 10px; font-size: 12px;" onclick="openMoverDiaModal()">🔄 Mover Censo</button>
     </div>
   </div>
-  <!-- Barra de Notificaciones y Alarmas Clínicas -->
-  <div id="alarmasBannerContainer" style="display: none; background: #fef2f2; border-bottom: 2px solid #f87171; padding: 10px 16px;">
-    <div style="max-width: 900px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-      <div style="display: flex; align-items: center; gap: 8px; color: #991b1b; font-size: 12.5px; font-weight: 700;">
-        <span style="font-size: 16px;">🚨</span>
-        <span id="alarmasText">Recordatorio: Pacientes que requieren hemocultivo de control hoy (14 días cumplidos).</span>
-      </div>
-      <button class="btn-danger" style="padding: 4px 10px; font-size: 11px; font-weight: 800;" onclick="filtrarPacientesConAlarma()">🔍 Ver Pacientes en Alerta</button>
-    </div>
-  </div>
   </div>
 
   <!-- DIRECT PC PASTE PANEL -->
-  <div class="pc-paste-container" id="pcPasteContainer">
+  <div class="pc-paste-container" id="pcPasteContainer" style="display: none;">
     <div class="paste-card">
       <div class="paste-card-header">
         <h2>📋 Pegar Tabla de Control de Sala para <span id="pasteDayLabel" style="text-decoration: underline;">MARTES</span></h2>
@@ -505,16 +507,7 @@
     </div>
   </div>
 
-  <!-- Shift Tabs -->
-  <div class="shift-tabs">
-    <button class="shift-btn active" onclick="setShiftFilter('TODOS', this)">Todos</button>
-    <button class="shift-btn" onclick="setShiftFilter('MATUTINO_1', this)">1er Turno</button>
-    <button class="shift-btn" onclick="setShiftFilter('MATUTINO_2', this)">2do Turno</button>
-    <button class="shift-btn" onclick="setShiftFilter('VESPERTINO_1', this)">Vesp. 1</button>
-    <button class="shift-btn" onclick="setShiftFilter('VESPERTINO_2', this)">Vesp. 2</button>
-    <button class="shift-btn" onclick="setShiftFilter('NOCTURNO_1', this)">Noc. 1</button>
-    <button class="shift-btn" onclick="setShiftFilter('NOCTURNO_2', this)">Noc. 2</button>
-  </div>
+
 
   <!-- Cards Container -->
   <div class="container" id="patientsContainer">
@@ -774,27 +767,66 @@
   }
 
   function actualizarBarraAlarmasHemocultivo() {
-    const banner = document.getElementById('alarmasBannerContainer');
-    const txt = document.getElementById('alarmasText');
-    if (!banner) return;
+    const btn = document.getElementById('btnNotif');
+    const icon = document.getElementById('iconNotif');
+    const badge = document.getElementById('badgeNotif');
+    if (!btn) return;
 
     let alertasCount = 0;
-    let nombresAlerta = [];
     (currentPatients || []).forEach(p => {
       const res = requiereControlHemocultivo(p);
       if (res.alerta && !p.noAcudio) {
         alertasCount++;
-        nombresAlerta.push(`${p.nombre} (${res.dias} días de Tx)`);
       }
     });
 
     if (alertasCount > 0) {
-      banner.style.display = 'block';
-      txt.innerHTML = `<strong>ALERTA DE HEMOCULTIVOS DE CONTROL (${alertasCount}):</strong> Han transcurrido &ge;14 días de antibiótico para: ${nombresAlerta.join(' &bull; ')}`;
+      btn.style.background = '#ef4444';
+      icon.style.filter = 'none';
+      badge.style.display = 'flex';
+      badge.innerText = alertasCount;
+      btn.classList.add('pulse-notif');
     } else {
-      banner.style.display = 'none';
+      btn.style.background = 'rgba(255,255,255,0.2)';
+      icon.style.filter = 'grayscale(100%)';
+      badge.style.display = 'none';
+      btn.classList.remove('pulse-notif');
     }
   }
+  
+  function abrirModalNotificaciones() {
+    const alertas = (currentPatients || []).filter(p => requiereControlHemocultivo(p).alerta && !p.noAcudio);
+    const modal = document.getElementById('modalNotificaciones');
+    const list = document.getElementById('notifList');
+    
+    if (alertas.length === 0) {
+        list.innerHTML = '<p style="text-align: center; color: #64748b; padding: 20px;">No hay notificaciones ni alarmas pendientes para el día actual.</p>';
+    } else {
+        let html = '';
+        alertas.forEach(p => {
+            const res = requiereControlHemocultivo(p);
+            html += `<div style="background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
+                <div style="font-weight: 700; color: #991b1b; margin-bottom: 4px;">🚨 ${p.nombre}</div>
+                <div style="font-size: 12px; color: #7f1d1d;">Han transcurrido <strong>${res.dias} días</strong> de antibiótico. Se requiere hemocultivo de control.</div>
+                <button class="btn-danger" style="margin-top: 8px; padding: 4px 8px; font-size: 11px;" onclick="irAAlertaYCerarNotif('${p.id}')">Ver Paciente</button>
+            </div>`;
+        });
+        list.innerHTML = html;
+    }
+    modal.style.display = 'flex';
+  }
+  
+  function cerrarModalNotificaciones() {
+      document.getElementById('modalNotificaciones').style.display = 'none';
+  }
+  
+  function irAAlertaYCerarNotif(id) {
+      cerrarModalNotificaciones();
+      isolatedPatientId = id;
+      renderCards();
+      showToast('Mostrando paciente en alerta');
+  }
+  
 
   function filtrarPacientesConAlarma() {
     const container = document.getElementById('patientsContainer');
@@ -834,13 +866,10 @@
 
   function togglePastePanel() {
     const p = document.getElementById('pcPasteContainer');
-    const txt = document.getElementById('pastePanelToggleTxt');
-    if (p.style.display === 'none') {
+    if (p.style.display === 'none' || p.style.display === '') {
       p.style.display = 'block';
-      txt.innerText = 'Ocultar Panel de Pegado';
     } else {
       p.style.display = 'none';
-      txt.innerText = 'Pegar Tabla de Archivo';
     }
   }
 
@@ -1156,7 +1185,8 @@
           <button class="btn-light" onclick="openDocPreview('${p.id}')">👁️ Ver Nota</button>
           <button class="btn-action" onclick="openNotaPisoSingle('${p.id}')">📝 Nota Piso</button>
           <button class="btn-light" onclick="copySingleDocNote('${p.id}')">📋 Copiar Doc</button>
-          <button class="${p.vigilanciaAcceso ? 'btn-warn' : 'btn-light'}" onclick="openVigilanciaWizard('${p.id}')">${p.vigilanciaAcceso ? '⚠️ En Vigilancia' : '🛡️ Vigilar Acceso'}</button>
+          <button class="${p.vigilanciaAcceso ? 'btn-warn' : 'btn-light'}" onclick="openVigilanciaWizard('${p.id}')">${p.vigilanciaAcceso ? '⚠️ Editar Vig.' : '🛡️ Vigilar Acceso'}</button>
+          ${p.vigilanciaAcceso ? `<button class="btn-light" style="color: #b91c1c; border: 1px solid #fca5a5; background: #fef2f2;" onclick="quitarVigilanciaActualDesdeTarjeta('${p.id}')">❌ Retirar Vig.</button>` : ''}
           <button class="${p.noAcudio ? 'btn-save' : 'btn-warn'}" onclick="toggleNoAcudio('${p.id}')">${p.noAcudio ? '↩️ Reactivar' : '🚫 No Acudió'}</button>
           <button class="btn-danger" onclick="deletePatientConfirm('${p.id}')">🗑️ Eliminar</button>
         </div>
@@ -3735,6 +3765,27 @@ function detectarYMostrarDuplicados() {
     await confirmarFusion(pacienteOrigenParaFusion.id, idDestino);
   }
 
+
+  async function quitarVigilanciaActualDesdeTarjeta(id) {
+    const conf = confirm("¿Estás seguro que deseas retirar la bandera de vigilancia de acceso para este paciente?");
+    if (!conf) return;
+
+    const p = currentPatients.find(item => item.id === id);
+    if (!p) return;
+
+    p.vigilanciaAcceso = false;
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", p.id);
+        await window.fsUpdateDoc(pRef, { vigilanciaAcceso: false });
+      } catch (err) {
+        console.error("Error al retirar vigilancia en Firestore:", err);
+      }
+    }
+    renderCards();
+    showToast(`✓ ${p.nombre} retirado de vigilancia`);
+  }
+
 </script>
 
   
@@ -4312,6 +4363,24 @@ function detectarYMostrarDuplicados() {
       <div style="display: flex; justify-content: flex-end; gap: 8px;">
         <button class="btn-light" onclick="cerrarSelectorFusionManual()">Cancelar</button>
         <button class="btn-save" style="background: #b45309;" onclick="ejecutarFusionManual()">🔗 Confirmar y Fusionar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Notificaciones -->
+  <div id="modalNotificaciones" class="modal-overlay" style="z-index: 5000;">
+    <div class="modal-card" style="max-width: 440px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 2px solid #ef4444; padding-bottom: 8px;">
+        <h3 style="font-size: 16px; color: #991b1b; display: flex; align-items: center; gap: 6px;">
+          ⚡ Notificaciones
+        </h3>
+        <button onclick="cerrarModalNotificaciones()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #64748b;">&times;</button>
+      </div>
+      <div id="notifList" style="max-height: 50vh; overflow-y: auto;">
+        <!-- Inject JS -->
+      </div>
+      <div style="display: flex; justify-content: flex-end; margin-top: 12px;">
+        <button class="btn-light" onclick="cerrarModalNotificaciones()">Cerrar</button>
       </div>
     </div>
   </div>
