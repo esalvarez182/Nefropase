@@ -777,6 +777,18 @@
     return { alerta: (dias >= 14), dias: dias };
   }
 
+  function obtenerPendientesHoyOPasados(p) {
+    if (!p || !p.pendientes || !Array.isArray(p.pendientes)) return [];
+    const dateKey = document.getElementById('sessionDate').value; // YYYY-MM-DD
+    return p.pendientes.filter(item => !item.resuelto && item.fecha && item.fecha <= dateKey);
+  }
+
+  function obtenerBadgePendientesHoy(p) {
+    const pends = obtenerPendientesHoyOPasados(p);
+    if (pends.length === 0) return '';
+    return `<span style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-size: 10.5px; font-weight: 800; padding: 2px 7px; border-radius: 6px; margin-left: 6px; display: inline-flex; align-items: center; gap: 3px;">📌 ${pends.length} PENDIENTE${pends.length > 1 ? 'S' : ''} HOY</span>`;
+  }
+
   function actualizarBarraAlarmasHemocultivo() {
     const btn = document.getElementById('btnNotif');
     const icon = document.getElementById('iconNotif');
@@ -785,10 +797,11 @@
 
     let alertasCount = 0;
     (currentPatients || []).forEach(p => {
+      if (p.noAcudio) return;
       const res = requiereControlHemocultivo(p);
-      if (res.alerta && !p.noAcudio) {
-        alertasCount++;
-      }
+      if (res.alerta) alertasCount++;
+      const pends = obtenerPendientesHoyOPasados(p);
+      alertasCount += pends.length;
     });
 
     if (alertasCount > 0) {
@@ -806,22 +819,53 @@
   }
   
   function abrirModalNotificaciones() {
-    const alertas = (currentPatients || []).filter(p => requiereControlHemocultivo(p).alerta && !p.noAcudio);
     const modal = document.getElementById('modalNotificaciones');
     const list = document.getElementById('notifList');
+    let totalItems = 0;
+    let html = '';
+
+    (currentPatients || []).forEach(p => {
+      if (p.noAcudio) return;
+
+      // 1. Alerta de 14 días
+      const res = requiereControlHemocultivo(p);
+      if (res.alerta) {
+        totalItems++;
+        html += `<div style="background: #fef2f2; border: 1.5px solid #fca5a5; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <strong style="color: #991b1b; font-size: 13px;">🚨 ${p.nombre}</strong>
+              <span style="font-size: 10.5px; background: #fee2e2; color: #991b1b; font-weight: 800; padding: 2px 6px; border-radius: 4px;">HEMOCULTIVO</span>
+            </div>
+            <div style="font-size: 12px; color: #7f1d1d; margin-top: 3px;">Han transcurrido <strong>${res.dias} días</strong> de antibiótico. Se requiere hemocultivo de control.</div>
+            <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px;">
+              <button class="btn-danger" style="padding: 4px 10px; font-size: 11px;" onclick="irAAlertaYCerarNotif('${p.id}')">Ver Paciente</button>
+            </div>
+        </div>`;
+      }
+
+      // 2. Pendientes del día
+      const pends = obtenerPendientesHoyOPasados(p);
+      pends.forEach(item => {
+        totalItems++;
+        html += `<div style="background: #fffbeb; border: 1.5px solid #fcd34d; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <strong style="color: #92400e; font-size: 13px;">📌 ${p.nombre}</strong>
+              <span style="font-size: 10.5px; background: #fef3c7; color: #92400e; font-weight: 800; padding: 2px 6px; border-radius: 4px;">PARA HOY</span>
+            </div>
+            <div style="font-size: 12.5px; font-weight: 700; color: #1e293b; margin-top: 4px;">• ${item.texto}</div>
+            ${item.detalles ? `<div style="font-size: 11.5px; color: #475569; margin-top: 2px;">Nota: ${item.detalles}</div>` : ''}
+            <div style="font-size: 11px; color: #b45309; margin-top: 3px;">📅 Fecha programada: <strong>${item.fecha}</strong></div>
+            <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px;">
+              <button class="btn-save" style="padding: 4px 9px; font-size: 11px; background: #16a34a;" onclick="resolverPendienteDesdeNotif('${p.id}', '${item.id}')">✓ Marcar Realizado</button>
+              <button class="btn-light" style="padding: 4px 9px; font-size: 11px;" onclick="irAAlertaYCerarNotif('${p.id}')">Ver Ficha</button>
+            </div>
+        </div>`;
+      });
+    });
     
-    if (alertas.length === 0) {
-        list.innerHTML = '<p style="text-align: center; color: #64748b; padding: 20px;">No hay notificaciones ni alarmas pendientes para el día actual.</p>';
+    if (totalItems === 0) {
+        list.innerHTML = '<p style="text-align: center; color: #64748b; padding: 25px;">✓ No hay notificaciones, hemocultivos ni tareas pendientes programadas para los pacientes de hoy.</p>';
     } else {
-        let html = '';
-        alertas.forEach(p => {
-            const res = requiereControlHemocultivo(p);
-            html += `<div style="background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
-                <div style="font-weight: 700; color: #991b1b; margin-bottom: 4px;">🚨 ${p.nombre}</div>
-                <div style="font-size: 12px; color: #7f1d1d;">Han transcurrido <strong>${res.dias} días</strong> de antibiótico. Se requiere hemocultivo de control.</div>
-                <button class="btn-danger" style="margin-top: 8px; padding: 4px 8px; font-size: 11px;" onclick="irAAlertaYCerarNotif('${p.id}')">Ver Paciente</button>
-            </div>`;
-        });
         list.innerHTML = html;
     }
     modal.style.display = 'flex';
@@ -1084,7 +1128,7 @@
           <div style="flex: 1; padding-right: 10px;">
             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
               <input type="text" id="nombre_${p.id}" value="${p.nombre}" title="Clic para editar nombre" style="font-size: 14px; font-weight: 700; color: #0f172a; border: 1.5px solid transparent; border-radius: 6px; padding: 2px 4px; flex: 1; min-width: 200px; background: transparent; text-transform: uppercase; outline: none; ${p.noAcudio ? 'text-decoration: line-through; color: #94a3b8;' : ''}" onfocus="this.style.borderColor='#93c5fd'; this.style.background='#eff6ff';" onblur="this.style.borderColor='transparent'; this.style.background='transparent'; onNombreChanged('${p.id}', this.value)" onchange="onNombreChanged('${p.id}', this.value)">
-              ${p.noAcudio ? '<span class="badge-no-acudio">NO ACUDIÓ</span>' : ''}${infoAlerta.alerta ? `<span class="badge-cultivo-alerta">🚨 REQUERIDO: HEMOCULTIVO CONTROL (${infoAlerta.dias} DÍAS TX)</span>` : ''}${p.vigilanciaAcceso && !infoAlerta.alerta ? '<span class="badge-vigilancia">⚠️ VIGILANCIA ACCESO</span>' : ''}${p.visitado ? '<span class="badge-visitado">✓ VISITADO</span>' : ''}
+              ${p.noAcudio ? '<span class="badge-no-acudio">NO ACUDIÓ</span>' : ''}${infoAlerta.alerta ? `<span class="badge-cultivo-alerta">🚨 REQUERIDO: HEMOCULTIVO CONTROL (${infoAlerta.dias} DÍAS TX)</span>` : ''}${obtenerBadgePendientesHoy(p)}${p.vigilanciaAcceso && !infoAlerta.alerta ? '<span class="badge-vigilancia">⚠️ VIGILANCIA ACCESO</span>' : ''}${p.visitado ? '<span class="badge-visitado">✓ VISITADO</span>' : ''}
             </div>
             
             <!-- NSS Atenuado de 2 Casillas Debajo del Nombre -->
@@ -1212,6 +1256,7 @@
           <button class="btn-light" onclick="openDocPreview('${p.id}')">👁️ Ver Nota</button>
           <button class="btn-action" onclick="openNotaPisoSingle('${p.id}')">📝 Nota Piso</button>
           <button class="btn-light" onclick="copySingleDocNote('${p.id}')">📋 Copiar Doc</button>
+          <button class="btn-light" style="background: #fef9c3; color: #854d0e; border: 1.5px solid #facc15; font-weight: 700;" onclick="openPendientesModal('${p.id}')">📌 Pendientes ${(p.pendientes && p.pendientes.filter(x => !x.resuelto).length > 0) ? `(${p.pendientes.filter(x => !x.resuelto).length})` : ''}</button>
           <button class="${p.vigilanciaAcceso ? 'btn-warn' : 'btn-light'}" onclick="openVigilanciaWizard('${p.id}')">${p.vigilanciaAcceso ? '⚠️ Editar Vig.' : '🛡️ Vigilar Acceso'}</button>
           ${p.vigilanciaAcceso ? `<button class="btn-light" style="color: #b91c1c; border: 1px solid #fca5a5; background: #fef2f2;" onclick="quitarVigilanciaActualDesdeTarjeta('${p.id}')">❌ Retirar Vig.</button>` : ''}
           <button class="${p.noAcudio ? 'btn-save' : 'btn-warn'}" onclick="toggleNoAcudio('${p.id}')">${p.noAcudio ? '↩️ Reactivar' : '🚫 No Acudió'}</button>
@@ -3813,6 +3858,170 @@ function detectarYMostrarDuplicados() {
     showToast(`✓ ${p.nombre} retirado de vigilancia`);
   }
 
+
+  let activePendientePatientId = null;
+
+  function openPendientesModal(id) {
+    activePendientePatientId = id;
+    const p = currentPatients.find(item => item.id === id);
+    if (!p) return;
+
+    document.getElementById('pendientesPatientName').innerText = `${p.nombre} (Cama ${p.maquina || 'S/N'})`;
+    
+    // Set default date to current session date
+    document.getElementById('datePendRealizar').value = document.getElementById('sessionDate').value;
+    document.getElementById('chkPendHemocultivo').checked = false;
+    document.getElementById('chkPendSitio').checked = false;
+    document.getElementById('chkPendPesoSeco').checked = false;
+    document.getElementById('txtPendOtro').value = '';
+
+    renderListaPendientesPaciente(p);
+    document.getElementById('modalPendientes').style.display = 'flex';
+  }
+
+  function closePendientesModal() {
+    document.getElementById('modalPendientes').style.display = 'none';
+    activePendientePatientId = null;
+  }
+
+  function renderListaPendientesPaciente(p) {
+    const cont = document.getElementById('listaPendientesContainer');
+    if (!p || !p.pendientes || p.pendientes.length === 0) {
+      cont.innerHTML = '<p style="text-align: center; color: #94a3b8; font-size: 12px; padding: 12px;">Sin pendientes registrados para este paciente.</p>';
+      return;
+    }
+
+    let html = '';
+    p.pendientes.forEach((item, idx) => {
+      html += `
+        <div style="display: flex; justify-content: space-between; align-items: center; background: ${item.resuelto ? '#f1f5f9' : '#fff'}; border: 1px solid ${item.resuelto ? '#e2e8f0' : '#cbd5e1'}; padding: 8px 10px; border-radius: 6px; opacity: ${item.resuelto ? '0.7' : '1'};">
+          <div style="flex: 1; padding-right: 8px;">
+            <div style="font-size: 12.5px; font-weight: 700; color: ${item.resuelto ? '#64748b' : '#0f172a'}; text-decoration: ${item.resuelto ? 'line-through' : 'none'};">
+              ${item.texto}
+            </div>
+            ${item.detalles ? `<div style="font-size: 11px; color: #64748b;">${item.detalles}</div>` : ''}
+            <div style="font-size: 11px; color: #ca8a04; margin-top: 2px;">📅 Programado: <strong>${item.fecha}</strong></div>
+          </div>
+          <div style="display: flex; gap: 4px; align-items: center;">
+            <button class="btn-light" style="padding: 4px 8px; font-size: 11px; ${item.resuelto ? 'color: #15803d;' : 'color: #334155;'}" onclick="toggleEstadoPendiente('${p.id}', '${item.id}')">
+              ${item.resuelto ? '✓ Realizado' : 'Marcar Listo'}
+            </button>
+            <button class="btn-light" style="padding: 4px 6px; font-size: 11px; color: #dc2626;" onclick="eliminarPendiente('${p.id}', '${item.id}')">
+              🗑️
+            </button>
+          </div>
+        </div>
+      `;
+    });
+    cont.innerHTML = html;
+  }
+
+  async function guardarPendienteParaPaciente() {
+    if (!activePendientePatientId) return;
+    const p = currentPatients.find(item => item.id === activePendientePatientId);
+    if (!p) return;
+
+    const fecha = document.getElementById('datePendRealizar').value;
+    if (!fecha) {
+      alert("Por favor selecciona una fecha para realizar el pendiente.");
+      return;
+    }
+
+    const itemsToAdd = [];
+    if (document.getElementById('chkPendHemocultivo').checked) itemsToAdd.push("Tomar Hemocultivo");
+    if (document.getElementById('chkPendSitio').checked) itemsToAdd.push("Cultivo de Sitio de Salida");
+    if (document.getElementById('chkPendPesoSeco').checked) itemsToAdd.push("Ajuste de Peso Seco");
+    
+    const otroTxt = document.getElementById('txtPendOtro').value.trim();
+    if (otroTxt) itemsToAdd.push(otroTxt);
+
+    if (itemsToAdd.length === 0) {
+      alert("Selecciona al menos una casilla o escribe un pendiente en el campo de texto.");
+      return;
+    }
+
+    if (!p.pendientes) p.pendientes = [];
+
+    itemsToAdd.forEach(texto => {
+      p.pendientes.push({
+        id: 'pend_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+        texto: texto,
+        detalles: otroTxt && itemsToAdd.length > 1 && texto !== otroTxt ? otroTxt : '',
+        fecha: fecha,
+        resuelto: false,
+        creadoAt: Date.now()
+      });
+    });
+
+    // Guardar en Firestore
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", p.id);
+        await window.fsUpdateDoc(pRef, { pendientes: p.pendientes });
+      } catch (err) {
+        console.error("Error al guardar pendiente en Firestore:", err);
+      }
+    }
+
+    // Limpiar inputs
+    document.getElementById('chkPendHemocultivo').checked = false;
+    document.getElementById('chkPendSitio').checked = false;
+    document.getElementById('chkPendPesoSeco').checked = false;
+    document.getElementById('txtPendOtro').value = '';
+
+    renderListaPendientesPaciente(p);
+    renderCards();
+    showToast(`✓ ${itemsToAdd.length} pendiente(s) guardado(s) para ${p.nombre}`);
+  }
+
+  async function toggleEstadoPendiente(patientId, pendienteId) {
+    const p = currentPatients.find(item => item.id === patientId);
+    if (!p || !p.pendientes) return;
+
+    const item = p.pendientes.find(x => x.id === pendienteId);
+    if (!item) return;
+
+    item.resuelto = !item.resuelto;
+
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", p.id);
+        await window.fsUpdateDoc(pRef, { pendientes: p.pendientes });
+      } catch (err) {
+        console.error("Error al actualizar estado del pendiente:", err);
+      }
+    }
+
+    renderListaPendientesPaciente(p);
+    renderCards();
+    showToast(item.resuelto ? "✓ Pendiente marcado como realizado" : "Pendiente marcado como activo");
+  }
+
+  async function resolverPendienteDesdeNotif(patientId, pendienteId) {
+    await toggleEstadoPendiente(patientId, pendienteId);
+    abrirModalNotificaciones(); // Re-render notification modal
+  }
+
+  async function eliminarPendiente(patientId, pendienteId) {
+    const p = currentPatients.find(item => item.id === patientId);
+    if (!p || !p.pendientes) return;
+
+    p.pendientes = p.pendientes.filter(x => x.id !== pendienteId);
+
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", p.id);
+        await window.fsUpdateDoc(pRef, { pendientes: p.pendientes });
+      } catch (err) {
+        console.error("Error al eliminar pendiente:", err);
+      }
+    }
+
+    renderListaPendientesPaciente(p);
+    renderCards();
+    showToast("Pendiente eliminado");
+  }
+
 </script>
 
   
@@ -4408,6 +4617,62 @@ function detectarYMostrarDuplicados() {
       </div>
       <div style="display: flex; justify-content: flex-end; margin-top: 12px;">
         <button class="btn-light" onclick="cerrarModalNotificaciones()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GESTIÓN DE PENDIENTES CLÍNICOS -->
+  <div id="modalPendientes" class="modal-overlay" style="z-index: 4500;">
+    <div class="modal-card" style="max-width: 520px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 2px solid #facc15; padding-bottom: 8px;">
+        <h3 style="font-size: 16px; color: #854d0e; display: flex; align-items: center; gap: 6px;">
+          📌 Pendientes y Tareas Clínicas
+        </h3>
+        <button onclick="closePendientesModal()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #64748b;">&times;</button>
+      </div>
+
+      <p id="pendientesPatientName" style="font-size: 13.5px; font-weight: 800; color: #1e40af; background: #eff6ff; padding: 6px 10px; border-radius: 6px; border: 1px solid #bfdbfe; margin-bottom: 14px; text-transform: uppercase;"></p>
+
+      <!-- Formulario para Agregar Nuevo Pendiente -->
+      <div style="background: #fffbeb; border: 1.5px solid #fef08a; border-radius: 8px; padding: 12px; margin-bottom: 14px;">
+        <strong style="font-size: 12.5px; color: #854d0e; display: block; margin-bottom: 8px;">➕ Agregar Nuevo Pendiente para la Sesión:</strong>
+        
+        <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px;">
+          <label style="font-size: 12.5px; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px 8px; background: #fff; border: 1px solid #cbd5e1; border-radius: 6px;">
+            <input type="checkbox" id="chkPendHemocultivo" style="transform: scale(1.2); margin: 0;"> 🩸 Tomar Hemocultivo
+          </label>
+          <label style="font-size: 12.5px; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px 8px; background: #fff; border: 1px solid #cbd5e1; border-radius: 6px;">
+            <input type="checkbox" id="chkPendSitio" style="transform: scale(1.2); margin: 0;"> 🔬 Cultivo de Sitio de Salida
+          </label>
+          <label style="font-size: 12.5px; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px 8px; background: #fff; border: 1px solid #cbd5e1; border-radius: 6px;">
+            <input type="checkbox" id="chkPendPesoSeco" style="transform: scale(1.2); margin: 0;"> ⚖️ Ajuste de Peso Seco
+          </label>
+        </div>
+
+        <div style="margin-bottom: 10px;">
+          <label style="font-size: 11.5px; font-weight: 700; color: #475569; display: block; margin-bottom: 3px;">✏️ Otro pendiente o detalle adicional:</label>
+          <input type="text" id="txtPendOtro" placeholder="Ej. Laboratorios mensuales, cita con cirugía vascular, etc..." style="width: 100%; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; outline: none;">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 140px; gap: 10px; align-items: flex-end;">
+          <div>
+            <label style="font-size: 11.5px; font-weight: 700; color: #475569; display: block; margin-bottom: 3px;">📅 Fecha en que debe realizarse:</label>
+            <input type="date" id="datePendRealizar" style="width: 100%; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; outline: none; font-weight: 600;">
+          </div>
+          <button class="btn-save" style="padding: 7px 12px; font-size: 12px; height: 34px; justify-content: center; background: #ca8a04;" onclick="guardarPendienteParaPaciente()">➕ Agregar</button>
+        </div>
+      </div>
+
+      <!-- Lista de Pendientes Existentes -->
+      <div>
+        <strong style="font-size: 12px; color: #475569; display: block; margin-bottom: 6px;">📋 Pendientes Activos e Historial:</strong>
+        <div id="listaPendientesContainer" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
+          <!-- Inject JS -->
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
+        <button class="btn-light" onclick="closePendientesModal()">Cerrar</button>
       </div>
     </div>
   </div>
