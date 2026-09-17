@@ -466,7 +466,7 @@
 
   <!-- Controls -->
   <div class="control-strip">
-    <div class="day-selector-group">
+    <div class="day-selector-group" style="flex-wrap: wrap;">
       <label for="daySelect">🗓️ Día:</label>
       <select id="daySelect" onchange="onDayChanged()">
         <option value="DOMINGO">Domingo</option>
@@ -478,12 +478,23 @@
         <option value="SABADO">Sábado</option>
       </select>
       <input type="date" id="sessionDate" onchange="onDateChanged()">
+      <label for="shiftSelect" style="font-size: 12px; font-weight: 600; margin-left: 6px;">⏰ Turno:</label>
+      <select id="shiftSelect" onchange="onShiftChanged()" style="padding: 6px 10px; border: 1px solid #94a3b8; border-radius: 6px; font-size: 13px; font-weight: 600; outline: none; background: #f8fafc;">
+        <option value="TODOS">Todos</option>
+        <option value="MATUTINO_1">1er Matutino</option>
+        <option value="MATUTINO_2">2do Matutino</option>
+        <option value="VESPERTINO_1">1er Vespertino</option>
+        <option value="VESPERTINO_2">2do Vespertino</option>
+        <option value="NOCTURNO_1">1er Nocturno</option>
+        <option value="NOCTURNO_2">2do Nocturno</option>
+      </select>
       <span id="barSummary" style="font-size: 11.5px; font-weight: 700; color: #1e40af; background: #eff6ff; padding: 5px 9px; border-radius: 6px; border: 1px solid #bfdbfe;">0 pacientes</span>
     </div>
     <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; flex: 1; justify-content: flex-end;">
       <div style="position: relative; flex: 1; min-width: 170px; max-width: 280px;">
         <input type="text" id="patientSearchInput" placeholder="🔍 Buscar paciente por nombre..." oninput="onSearchInput(this.value)" style="width: 100%; padding: 6px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; outline: none; background: #fff;">
       </div>
+      <button class="btn-light" style="padding: 6px 10px; font-size: 12px; font-weight: 700; color: #0f172a; border: 1px solid #cbd5e1;" onclick="togglePastePanel()">📥 Importar</button>
       <button class="btn-action" style="padding: 6px 13px; font-size: 12px; font-weight: 700;" onclick="openDirectorioPacientesModal()">👥 Pacientes</button>
       <button class="btn-save" style="padding: 6px 11px; font-size: 12px; font-weight: 700;" onclick="openAddPatientModal()">➕ Agregar Paciente</button>
       <button class="btn-warn" style="padding: 6px 11px; font-size: 12px; font-weight: 700;" onclick="openReporteVigilanciaModal()">🛡️ Reporte Vigilancia</button>
@@ -823,6 +834,8 @@
   function irAAlertaYCerarNotif(id) {
       cerrarModalNotificaciones();
       isolatedPatientId = id;
+      document.getElementById('shiftSelect').value = 'TODOS';
+      currentShiftFilter = 'TODOS';
       renderCards();
       showToast('Mostrando paciente en alerta');
   }
@@ -842,6 +855,7 @@
 
   let currentPatients = [];
   let currentShiftFilter = 'TODOS';
+  let isolatedPatientId = null;
   let activePatientForPiso = null;
   let activePreviewDocPatient = null;
 
@@ -989,10 +1003,15 @@
     loadDayPatients();
   }
 
-  function setShiftFilter(shift, btn) {
-    currentShiftFilter = shift;
-    document.querySelectorAll('.shift-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+  function onShiftChanged() {
+    currentShiftFilter = document.getElementById('shiftSelect').value;
+    isolatedPatientId = null;
+    renderCards();
+  }
+  
+  function clearIsolatedView() {
+    isolatedPatientId = null;
+    document.getElementById('patientSearchInput').value = '';
     renderCards();
   }
 
@@ -1004,7 +1023,9 @@
     const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
     let list = currentPatients;
-    if (query) {
+    if (isolatedPatientId) {
+      list = currentPatients.filter(p => p.id === isolatedPatientId);
+    } else if (query) {
       list = currentPatients.filter(p => (p.nombre || '').toLowerCase().includes(query) || (p.maquina || '').includes(query));
     } else if (currentShiftFilter !== 'TODOS') {
       const currentDay = document.getElementById('daySelect').value;
@@ -1028,6 +1049,12 @@
         <p style="font-size: 12.5px;">Copia tu tabla de Google Docs o Word y pégala en el recuadro superior azul para cargarlos al instante.</p>
       </div>`;
       return;
+    }
+
+    if (isolatedPatientId) {
+      const backBtn = document.createElement('div');
+      backBtn.innerHTML = `<button class="btn-light" style="margin-bottom: 12px; font-size: 14px; font-weight: 700; width: 100%; justify-content: center; background: #f1f5f9; border: 1.5px solid #cbd5e1; color: #1e293b; padding: 10px;" onclick="clearIsolatedView()">⬅️ Volver a todos los pacientes</button>`;
+      container.appendChild(backBtn);
     }
 
     list.forEach((p) => {
@@ -1757,7 +1784,9 @@
     const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
     let list = currentPatients;
-    if (query) {
+    if (isolatedPatientId) {
+      list = currentPatients.filter(p => p.id === isolatedPatientId);
+    } else if (query) {
       list = currentPatients.filter(p => (p.nombre || '').toLowerCase().includes(query) || (p.maquina || '').includes(query));
     } else if (currentShiftFilter !== 'TODOS') {
       const currentDay = document.getElementById('daySelect').value;
@@ -1871,7 +1900,9 @@ MÉDICOS RESPONSABLES: ${medico}`;
     const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
     let list = currentPatients;
-    if (query) {
+    if (isolatedPatientId) {
+      list = currentPatients.filter(p => p.id === isolatedPatientId);
+    } else if (query) {
       list = currentPatients.filter(p => (p.nombre || '').toLowerCase().includes(query) || (p.maquina || '').includes(query));
     } else if (currentShiftFilter !== 'TODOS') {
       const currentDay = document.getElementById('daySelect').value;
@@ -3215,6 +3246,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
 
     async function onSearchInput(query) {
+    isolatedPatientId = null;
     const q = (query || '').trim().toLowerCase();
     if (!q) {
       renderCards();
@@ -3577,36 +3609,31 @@ function detectarYMostrarDuplicados() {
     closeDirectorioPacientesModal();
 
     const daySelect = document.getElementById('daySelect');
+    let dayChanged = false;
     if (daySelect.value !== dia) {
       daySelect.value = dia;
       updatePasteDayLabel();
-      await loadDayPatients();
+      dayChanged = true;
     }
 
-    // Poner filtro en TODOS para garantizar visibilidad
+    // Poner filtro en TODOS en el select y habilitar vista exclusiva
+    const shiftSel = document.getElementById('shiftSelect');
+    if(shiftSel) shiftSel.value = 'TODOS';
     currentShiftFilter = 'TODOS';
-    document.querySelectorAll('.shift-btn').forEach(b => b.classList.remove('active'));
-    const btnTodos = document.querySelector('.shift-btn');
-    if (btnTodos) btnTodos.classList.add('active');
+    isolatedPatientId = patientId;
     
     // Limpiar buscador
     const sInput = document.getElementById('patientSearchInput');
     if (sInput) sInput.value = '';
 
-    renderCards();
+    if (dayChanged) {
+      await loadDayPatients();
+    } else {
+      renderCards();
+    }
 
-    // Scroll y animación de destello
-    setTimeout(() => {
-      const cardEl = document.getElementById(`card_${patientId}`);
-      if (cardEl) {
-        cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        cardEl.classList.remove('card-highlight');
-        void cardEl.offsetWidth; // forzar reflow
-        cardEl.classList.add('card-highlight');
-      } else {
-        showToast(`Tarjeta de paciente abierta en ${dia}`);
-      }
-    }, 200);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showToast(`Mostrando expediente de paciente`);
   }
 
   // ==========================================
