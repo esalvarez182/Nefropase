@@ -1375,7 +1375,6 @@
       }
     }
 
-    const dateKey = document.getElementById('sessionDate').value;
 
     // Guardar copia de respaldo en almacenamiento local de inmediato
     try {
@@ -2351,13 +2350,10 @@ MÉDICOS RESPONSABLES: ${medico}`;
       // Paso 1: Hospitalizaciones
       const paso1Completo = (v.hospUltimoMes === 'NO' || (v.hospUltimoMes === 'SI' && (v.hospObs || '').trim() !== ''));
       // Paso 2: Accesos (debe tener fecha o acceso registrado)
-      const acc = v.accesos || {};
       const paso2Completo = (acc.actual && acc.fechaColocacion);
       // Paso 3: Diálisis Peritoneal
       const paso3Completo = (v.dp === 'NO' || (v.dp === 'SI' && (v.dpObs || '').trim() !== ''));
       // Paso 4: Cultivos / Tx
-      const cult = v.cultivos || {};
-      const tx = v.tratamiento || {};
       const paso4Completo = (cult.fecha || cult.resultado || tx.fechaInicio || tx.esquema);
 
       if (!paso1Completo) {
