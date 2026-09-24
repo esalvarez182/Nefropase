@@ -825,23 +825,33 @@
     const badge = document.getElementById('badgeNotif');
     if (!btn) return;
 
-    let alertasCount = 0;
-    (currentPatients || []).forEach(p => {
-      if (p.noAcudio) return;
+    let pool = (todosLosPacientesDirectorio && todosLosPacientesDirectorio.length > 0) ? todosLosPacientesDirectorio : currentPatients;
+    let count = 0;
+
+    let today = new Date();
+    today.setHours(0,0,0,0);
+    let todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+    // Buscar hasta fin de semana (sábado/domingo próximo)
+    let endOfWeek = new Date(today);
+    endOfWeek.setDate(endOfWeek.getDate() + 7);
+    let endOfWeekStr = `${endOfWeek.getFullYear()}-${String(endOfWeek.getMonth()+1).padStart(2,'0')}-${String(endOfWeek.getDate()).padStart(2,'0')}`;
+
+    (pool || []).forEach(p => {
+      if (p.noAcudio || p.eliminado || p.fusionadoEn) return;
       const res = requiereControlHemocultivo(p);
-      if (res.alerta) alertasCount++;
-      const pends = obtenerPendientesHoyOPasados(p);
-      alertasCount += pends.length;
-      if (p.vigilanciaAcceso && p.vigilanciaDatos && p.vigilanciaDatos.datosIncompletos) {
-        alertasCount++;
+      if (res.alerta) count++;
+      if (p.vigilanciaAcceso && p.vigilanciaDatos && p.vigilanciaDatos.datosIncompletos) count++;
+      if (p.pendientes && Array.isArray(p.pendientes)) {
+        count += p.pendientes.filter(x => !x.resuelto && x.fecha && x.fecha <= endOfWeekStr).length;
       }
     });
 
-    if (alertasCount > 0) {
+    if (count > 0) {
       btn.style.background = '#ef4444';
       icon.style.filter = 'none';
       badge.style.display = 'flex';
-      badge.innerText = alertasCount;
+      badge.innerText = count;
       btn.classList.add('pulse-notif');
     } else {
       btn.style.background = 'rgba(255,255,255,0.2)';
@@ -850,108 +860,368 @@
       btn.classList.remove('pulse-notif');
     }
   }
-  
-  function abrirModalNotificaciones() {
-    const modal = document.getElementById('modalNotificaciones');
-    const list = document.getElementById('notifList');
-    let totalItems = 0;
-    let html = '';
 
-    (currentPatients || []).forEach(p => {
-      if (p.noAcudio) return;
+  function formatTurnoNombreCorto(t) {
+    if (!t) return 'Turno No Esp.';
+    if (t === 'MATUTINO_1') return '1er Matutino (M1)';
+    if (t === 'MATUTINO_2') return '2do Matutino (M2)';
+    if (t === 'VESPERTINO_1') return '1er Vespertino (V1)';
+    if (t === 'VESPERTINO_2') return '2do Vespertino (V2)';
+    if (t === 'NOCTURNO_1') return '1er Nocturno (N1)';
+    if (t === 'NOCTURNO_2') return '2do Nocturno (N2)';
+    return t;
+  }
 
-      // 1. Alerta de 14 días
+  function calcularProximaSesion(p, targetDateStr) {
+    const daysMap = ["DOMINGO", "LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
+    let hoy = new Date();
+    hoy.setHours(0,0,0,0);
+
+    let parts = (targetDateStr || '').split('-');
+    let fTarget = parts.length === 3 ? new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)) : new Date(hoy);
+    fTarget.setHours(0,0,0,0);
+
+    // Buscar a partir del máximo entre hoy y la fecha objetivo
+    let inicio = new Date(Math.max(hoy.getTime(), fTarget.getTime()));
+    let diasArr = p.dias || [];
+
+    for (let offset = 0; offset <= 14; offset++) {
+      let d = new Date(inicio);
+      d.setDate(d.getDate() + offset);
+      let nomDia = daysMap[d.getDay()];
+      if (diasArr.includes(nomDia)) {
+        let t = (p.agenda && p.agenda[nomDia]) ? p.agenda[nomDia] : (p.turno || 'MATUTINO_1');
+        let dd = String(d.getDate()).padStart(2, '0');
+        let mm = String(d.getMonth() + 1).padStart(2, '0');
+        return {
+          fechaObj: d,
+          diaNombre: nomDia,
+          fechaFmt: `${dd}/${mm}/${d.getFullYear()}`,
+          turno: t,
+          turnoFmt: formatTurnoNombreCorto(t),
+          textoCompleto: `${nomDia} ${dd}/${mm} - ${formatTurnoNombreCorto(t)}`
+        };
+      }
+    }
+
+    return {
+      fechaObj: fTarget,
+      diaNombre: 'No asignado',
+      fechaFmt: targetDateStr || '',
+      turno: p.turno || '',
+      turnoFmt: formatTurnoNombreCorto(p.turno),
+      textoCompleto: `${targetDateStr || 'Sin fecha'} (${formatTurnoNombreCorto(p.turno)})`
+    };
+  }
+
+  async function obtenerTodasNotificacionesSemana() {
+    let pool = (todosLosPacientesDirectorio && todosLosPacientesDirectorio.length > 0) ? todosLosPacientesDirectorio : [];
+
+    if (pool.length === 0 && window.db) {
+      try {
+        const snap = await window.fsGetDocs(window.fsCollection(window.db, "pacientes"));
+        let all = [];
+        snap.forEach(docSnap => {
+          const d = { id: docSnap.id, ...docSnap.data() };
+          if (!d.eliminado && !d.fusionadoEn && d.dias && d.dias.length > 0) {
+            all.push(d);
+          }
+        });
+        todosLosPacientesDirectorio = all;
+        pool = all;
+      } catch(e) {
+        console.warn("Aviso al consultar todos los pacientes para notificaciones:", e);
+      }
+    }
+
+    if (pool.length === 0) pool = currentPatients.filter(p => !p.eliminado && !p.fusionadoEn);
+
+    let hoy = new Date();
+    hoy.setHours(0,0,0,0);
+    let hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
+
+    // Ventana de la semana completa (próximos 7 días)
+    let finSemana = new Date(hoy);
+    finSemana.setDate(finSemana.getDate() + 7);
+    let finSemanaStr = `${finSemana.getFullYear()}-${String(finSemana.getMonth()+1).padStart(2,'0')}-${String(finSemana.getDate()).padStart(2,'0')}`;
+
+    let listaNotifs = [];
+
+    pool.forEach(p => {
+      if (p.noAcudio || p.eliminado || p.fusionadoEn) return;
+
+      // 1. Alerta de Hemocultivo de 14 días
       const res = requiereControlHemocultivo(p);
       if (res.alerta) {
-        totalItems++;
+        let fTarget = hoyStr;
         if (res.tipo === 'toma') {
-          html += `<div style="background: #fef2f2; border: 1.5px solid #fca5a5; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <strong style="color: #991b1b; font-size: 13px;">🚨 ${p.nombre}</strong>
-                <span style="font-size: 10.5px; background: #fee2e2; color: #991b1b; font-weight: 800; padding: 2px 6px; border-radius: 4px;">TOMA CULTIVO</span>
-              </div>
-              <div style="font-size: 12px; color: #7f1d1d; margin-top: 3px;">Han transcurrido <strong>${res.dias} días</strong> de antibiótico. Se requiere hemocultivo de control.</div>
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; gap: 8px; flex-wrap: wrap;">
-                <input type="date" id="toma_ctrl_${p.id}" value="${document.getElementById('sessionDate').value}" style="padding: 4px 6px; border: 1px solid #fca5a5; border-radius: 4px; font-size: 11.5px; outline: none; max-width: 120px;">
-                <div style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end;">
-                  <button class="btn-save" style="padding: 4px 8px; font-size: 11px; background: #b91c1c;" onclick="marcarControlHemocultivoTomado('${p.id}')">✓ Tomado</button>
-                  <button class="btn-light" style="padding: 4px 8px; font-size: 11px; background: #fff; border: 1px solid #cbd5e1;" onclick="reprogramarControlHemocultivo('${p.id}')">📅 Reprogramar</button>
-                  <button class="btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="cancelarControlHemocultivo('${p.id}')">❌ Quitar</button>
-                  <button class="btn-light" style="padding: 4px 8px; font-size: 11px;" onclick="irAAlertaYCerarNotif('${p.id}')">Ver Ficha</button>
-                </div>
-              </div>
-          </div>`;
+          if (p.vigilanciaDatos && p.vigilanciaDatos.tratamiento && p.vigilanciaDatos.tratamiento.fechaInicio) {
+            let d = new Date(p.vigilanciaDatos.tratamiento.fechaInicio);
+            d.setDate(d.getDate() + 14);
+            fTarget = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          }
         } else if (res.tipo === 'resultado') {
-          html += `<div style="background: #f5f3ff; border: 1.5px solid #c4b5fd; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <strong style="color: #5b21b6; font-size: 13px;">🔬 ${p.nombre}</strong>
-                <span style="font-size: 10.5px; background: #ede9fe; color: #6d28d9; font-weight: 800; padding: 2px 6px; border-radius: 4px;">RESULTADO PENDIENTE</span>
-              </div>
-              <div style="font-size: 12px; color: #4c1d95; margin-top: 3px;">Hemocultivo de control tomado el <strong>${res.fechaToma}</strong>. Faltan resultados de laboratorio.</div>
-              <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;">
-                <input type="text" id="res_ctrl_${p.id}" placeholder="Escribe el resultado (Ej. Negativo a 5 días...)" style="padding: 5px 8px; border: 1px solid #c4b5fd; border-radius: 4px; font-size: 11.5px; outline: none; width: 100%;">
-                <div style="display: flex; justify-content: flex-end; gap: 4px; flex-wrap: wrap;">
-                  <button class="btn-save" style="padding: 4px 8px; font-size: 11px; background: #6d28d9;" onclick="guardarResultadoControlHemocultivo('${p.id}')">💾 Guardar Resultado</button>
-                  <button class="btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="cancelarControlHemocultivo('${p.id}')">❌ Quitar</button>
-                  <button class="btn-light" style="padding: 4px 8px; font-size: 11px;" onclick="irAAlertaYCerarNotif('${p.id}')">Ver Ficha</button>
-                </div>
-              </div>
-          </div>`;
+          fTarget = res.fechaToma || hoyStr;
         }
+
+        const prox = calcularProximaSesion(p, fTarget);
+        listaNotifs.push({
+          id: `hc_${p.id}_${res.tipo}`,
+          paciente: p,
+          tipo: res.tipo === 'toma' ? 'TOMA CULTIVO' : 'RESULTADO CULTIVO',
+          prioridad: 1,
+          fechaTarget: fTarget,
+          proximaSesion: prox,
+          titulo: res.tipo === 'toma' ? '🚨 TOMA MANDATORIA DE HEMOCULTIVO' : '🔬 RESULTADO DE HEMOCULTIVO PENDIENTE',
+          detalle: res.tipo === 'toma' ? `Han transcurrido ${res.dias} días de tratamiento antibiótico. Se requiere hemocultivo de control.` : `Hemocultivo de control tomado el ${res.fechaToma}. Faltan resultados de laboratorio.`,
+          res: res
+        });
       }
 
-      // 2. Vigilancia con datos diferidos / incompletos
+      // 2. Datos diferidos de vigilancia
       if (p.vigilanciaAcceso && p.vigilanciaDatos && p.vigilanciaDatos.datosIncompletos) {
-        totalItems++;
+        const fTarget = p.vigilanciaDatos.fechaDiferido || hoyStr;
+        const prox = calcularProximaSesion(p, fTarget);
         const nombresMap = { 1: 'Hospitalizaciones', 2: 'Historial de Accesos', 3: 'Diálisis Peritoneal', 4: 'Cultivos / Tratamiento' };
         const difArr = (p.vigilanciaDatos.pasosDiferidos && p.vigilanciaDatos.pasosDiferidos.length > 0) ? p.vigilanciaDatos.pasosDiferidos : [1];
         const nombresPendientes = difArr.map(n => nombresMap[n] || `Paso ${n}`).join(', ');
+
+        listaNotifs.push({
+          id: `dif_${p.id}`,
+          paciente: p,
+          tipo: 'DATOS DIFERIDOS',
+          prioridad: 2,
+          fechaTarget: fTarget,
+          proximaSesion: prox,
+          titulo: '⚠️ DATOS DE VIGILANCIA DIFERIDOS',
+          detalle: `Faltan campos por completar en: ${nombresPendientes}.`
+        });
+      }
+
+      // 3. Pendientes clínicos de la semana
+      if (p.pendientes && Array.isArray(p.pendientes)) {
+        p.pendientes.filter(x => !x.resuelto && x.fecha && x.fecha <= finSemanaStr).forEach(item => {
+          const prox = calcularProximaSesion(p, item.fecha);
+          listaNotifs.push({
+            id: `pend_${p.id}_${item.id}`,
+            paciente: p,
+            tipo: 'PENDIENTE CLINICO',
+            prioridad: 3,
+            fechaTarget: item.fecha,
+            proximaSesion: prox,
+            item: item,
+            titulo: `📌 PENDIENTE: ${item.texto}`,
+            detalle: item.detalles ? `Detalle: ${item.detalles}` : `Programado para: ${item.fecha}`
+          });
+        });
+      }
+    });
+
+    // Ordenar cronológicamente del más próximo al más lejano por fecha de la próxima sesión
+    listaNotifs.sort((a, b) => a.proximaSesion.fechaObj.getTime() - b.proximaSesion.fechaObj.getTime());
+
+    return listaNotifs;
+  }
+
+  let notificacionesSemanalesCache = [];
+
+  async function abrirModalNotificaciones() {
+    const modal = document.getElementById('modalNotificaciones');
+    const list = document.getElementById('notifList');
+    const countEl = document.getElementById('notifListCount');
+
+    list.innerHTML = '<p style="text-align: center; color: #64748b; padding: 25px;">Consultando programación de pendientes de la semana en la nube...</p>';
+    if (countEl) countEl.innerText = '';
+    modal.style.display = 'flex';
+
+    const notifs = await obtenerTodasNotificacionesSemana();
+    notificacionesSemanalesCache = notifs;
+
+    if (countEl) countEl.innerText = `${notifs.length} pendiente(s) programado(s) esta semana`;
+
+    if (notifs.length === 0) {
+      list.innerHTML = '<p style="text-align: center; color: #15803d; padding: 30px; font-weight: 600;">✓ ¡Excelente! No hay hemocultivos ni tareas pendientes programadas para esta semana.</p>';
+      return;
+    }
+
+    let html = '';
+    notifs.forEach(n => {
+      const p = n.paciente;
+      const prox = n.proximaSesion;
+
+      if (n.tipo === 'TOMA CULTIVO') {
+        html += `<div style="background: #fef2f2; border: 1.5px solid #fca5a5; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+              <div>
+                <strong style="color: #991b1b; font-size: 13.5px;">🚨 ${p.nombre}</strong>
+                <div style="font-size: 11px; font-weight: 700; color: #b91c1c; margin-top: 2px;">
+                  🗓️ Próxima sesión: <span style="background: #fee2e2; padding: 2px 6px; border-radius: 4px; border: 1px solid #f87171;">${prox.textoCompleto}</span>
+                </div>
+              </div>
+              <span style="font-size: 10px; background: #fee2e2; color: #991b1b; font-weight: 800; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">TOMA CULTIVO</span>
+            </div>
+            <div style="font-size: 12px; color: #7f1d1d; margin-top: 4px;">${n.detalle}</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; gap: 6px; flex-wrap: wrap;">
+              <input type="date" id="toma_ctrl_${p.id}" value="${document.getElementById('sessionDate').value}" style="padding: 4px 6px; border: 1px solid #fca5a5; border-radius: 4px; font-size: 11.5px; outline: none; max-width: 120px;">
+              <div style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end;">
+                <button class="btn-save" style="padding: 4px 8px; font-size: 11px; background: #b91c1c;" onclick="marcarControlHemocultivoTomado('${p.id}')">✓ Tomado</button>
+                <button class="btn-light" style="padding: 4px 8px; font-size: 11px; background: #fff; border: 1px solid #cbd5e1;" onclick="reprogramarControlHemocultivo('${p.id}')">📅 Reprogramar</button>
+                <button class="btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="cancelarControlHemocultivo('${p.id}')">❌ Quitar</button>
+                <button class="btn-light" style="padding: 4px 8px; font-size: 11px;" onclick="irAAlertaYCerarNotif('${p.id}')">Ver Ficha</button>
+              </div>
+            </div>
+        </div>`;
+      } else if (n.tipo === 'RESULTADO CULTIVO') {
+        html += `<div style="background: #f5f3ff; border: 1.5px solid #c4b5fd; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+              <div>
+                <strong style="color: #5b21b6; font-size: 13.5px;">🔬 ${p.nombre}</strong>
+                <div style="font-size: 11px; font-weight: 700; color: #6d28d9; margin-top: 2px;">
+                  🗓️ Próxima sesión: <span style="background: #ede9fe; padding: 2px 6px; border-radius: 4px; border: 1px solid #c4b5fd;">${prox.textoCompleto}</span>
+                </div>
+              </div>
+              <span style="font-size: 10px; background: #ede9fe; color: #6d28d9; font-weight: 800; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">RESULTADO PENDIENTE</span>
+            </div>
+            <div style="font-size: 12px; color: #4c1d95; margin-top: 4px;">${n.detalle}</div>
+            <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;">
+              <input type="text" id="res_ctrl_${p.id}" placeholder="Escribe el resultado (Ej. Negativo a 5 días...)" style="padding: 5px 8px; border: 1px solid #c4b5fd; border-radius: 4px; font-size: 11.5px; outline: none; width: 100%;">
+              <div style="display: flex; justify-content: flex-end; gap: 4px; flex-wrap: wrap;">
+                <button class="btn-save" style="padding: 4px 8px; font-size: 11px; background: #6d28d9;" onclick="guardarResultadoControlHemocultivo('${p.id}')">💾 Guardar Resultado</button>
+                <button class="btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="cancelarControlHemocultivo('${p.id}')">❌ Quitar</button>
+                <button class="btn-light" style="padding: 4px 8px; font-size: 11px;" onclick="irAAlertaYCerarNotif('${p.id}')">Ver Ficha</button>
+              </div>
+            </div>
+        </div>`;
+      } else if (n.tipo === 'DATOS DIFERIDOS') {
         html += `<div style="background: #fffbeb; border: 1.5px solid #f59e0b; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <strong style="color: #b45309; font-size: 13px;">⚠️ ${p.nombre}</strong>
-              <span style="font-size: 10.5px; background: #fef3c7; color: #92400e; font-weight: 800; padding: 2px 6px; border-radius: 4px;">DATOS DIFERIDOS</span>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+              <div>
+                <strong style="color: #b45309; font-size: 13.5px;">⚠️ ${p.nombre}</strong>
+                <div style="font-size: 11px; font-weight: 700; color: #b45309; margin-top: 2px;">
+                  🗓️ Próxima sesión: <span style="background: #fef3c7; padding: 2px 6px; border-radius: 4px; border: 1px solid #fcd34d;">${prox.textoCompleto}</span>
+                </div>
+              </div>
+              <span style="font-size: 10px; background: #fef3c7; color: #92400e; font-weight: 800; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">DATOS DIFERIDOS</span>
             </div>
-            <div style="font-size: 12px; color: #78350f; margin-top: 3px;">
-              Vigilancia de catéter con datos pendientes en: <strong>${nombresPendientes}</strong>.
-            </div>
+            <div style="font-size: 12px; color: #78350f; margin-top: 4px;">${n.detalle}</div>
             <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px;">
               <button class="btn-warn" style="padding: 4px 10px; font-size: 11px; background: #d97706;" onclick="completarVigilanciaDesdeNotif('${p.id}')">✏️ Completar Ahora</button>
               <button class="btn-light" style="padding: 4px 8px; font-size: 11px;" onclick="irAAlertaYCerarNotif('${p.id}')">Ver Ficha</button>
             </div>
         </div>`;
-      }
-
-      // 3. Pendientes del día
-      const pends = obtenerPendientesHoyOPasados(p);
-      pends.forEach(item => {
-        totalItems++;
+      } else if (n.tipo === 'PENDIENTE CLINICO') {
         html += `<div style="background: #fffbeb; border: 1.5px solid #fcd34d; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <strong style="color: #92400e; font-size: 13px;">📌 ${p.nombre}</strong>
-              <span style="font-size: 10.5px; background: #fef3c7; color: #92400e; font-weight: 800; padding: 2px 6px; border-radius: 4px;">PARA HOY</span>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+              <div>
+                <strong style="color: #92400e; font-size: 13.5px;">📌 ${p.nombre}</strong>
+                <div style="font-size: 11px; font-weight: 700; color: #92400e; margin-top: 2px;">
+                  🗓️ Próxima sesión: <span style="background: #fef3c7; padding: 2px 6px; border-radius: 4px; border: 1px solid #fcd34d;">${prox.textoCompleto}</span>
+                </div>
+              </div>
+              <span style="font-size: 10px; background: #fef3c7; color: #92400e; font-weight: 800; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">PENDIENTE</span>
             </div>
-            <div style="font-size: 12.5px; font-weight: 700; color: #1e293b; margin-top: 4px;">• ${item.texto}</div>
-            ${item.detalles ? `<div style="font-size: 11.5px; color: #475569; margin-top: 2px;">Nota: ${item.detalles}</div>` : ''}
-            <div style="font-size: 11px; color: #b45309; margin-top: 3px;">📅 Fecha programada: <strong>${item.fecha}</strong></div>
+            <div style="font-size: 12.5px; font-weight: 700; color: #1e293b; margin-top: 4px;">• ${n.item.texto}</div>
+            ${n.item.detalles ? `<div style="font-size: 11.5px; color: #475569; margin-top: 2px;">Nota: ${n.item.detalles}</div>` : ''}
             <div style="display: flex; justify-content: flex-end; gap: 4px; flex-wrap: wrap; margin-top: 6px;">
-              <button class="btn-save" style="padding: 4px 8px; font-size: 11px; background: #16a34a;" onclick="resolverPendienteDesdeNotif('${p.id}', '${item.id}')">✓ Realizado</button>
-              <button class="btn-light" style="padding: 4px 8px; font-size: 11px; background: #fff; border: 1px solid #cbd5e1;" onclick="reprogramarPendienteDesdeNotif('${p.id}', '${item.id}')">📅 Reprogramar</button>
-              <button class="btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="eliminarPendienteDesdeNotif('${p.id}', '${item.id}')">❌ Quitar</button>
+              <button class="btn-save" style="padding: 4px 8px; font-size: 11px; background: #16a34a;" onclick="resolverPendienteDesdeNotif('${p.id}', '${n.item.id}')">✓ Realizado</button>
+              <button class="btn-light" style="padding: 4px 8px; font-size: 11px; background: #fff; border: 1px solid #cbd5e1;" onclick="reprogramarPendienteDesdeNotif('${p.id}', '${n.item.id}')">📅 Reprogramar</button>
+              <button class="btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="eliminarPendienteDesdeNotif('${p.id}', '${n.item.id}')">❌ Quitar</button>
               <button class="btn-light" style="padding: 4px 8px; font-size: 11px;" onclick="irAAlertaYCerarNotif('${p.id}')">Ver Ficha</button>
             </div>
         </div>`;
-      });
+      }
     });
-    
-    if (totalItems === 0) {
-        list.innerHTML = '<p style="text-align: center; color: #64748b; padding: 25px;">✓ No hay notificaciones, hemocultivos ni tareas pendientes programadas para los pacientes de hoy.</p>';
-    } else {
-        list.innerHTML = html;
-    }
-    modal.style.display = 'flex';
+
+    list.innerHTML = html;
   }
-  
-  function cerrarModalNotificaciones() {
+
+  function imprimirPendientesSemana() {
+    if (!notificacionesSemanalesCache || notificacionesSemanalesCache.length === 0) {
+      alert("No hay pendientes en la lista para imprimir.");
+      return;
+    }
+
+    let rowsHtml = '';
+    notificacionesSemanalesCache.forEach((n, idx) => {
+      const p = n.paciente;
+      const prox = n.proximaSesion;
+      let pendienteTxt = '';
+
+      if (n.tipo === 'TOMA CULTIVO') {
+        pendienteTxt = `<strong>[HEMOCULTIVO]</strong> Toma de hemocultivo de control (14 días tx antibiótico)`;
+      } else if (n.tipo === 'RESULTADO CULTIVO') {
+        pendienteTxt = `<strong>[RESULTADO]</strong> Pendiente resultado de laboratorio (Tomado: ${n.res.fechaToma || '-'})`;
+      } else if (n.tipo === 'DATOS DIFERIDOS') {
+        pendienteTxt = `<strong>[VIGILANCIA]</strong> Completar datos clínicos diferidos`;
+      } else {
+        pendienteTxt = `<strong>${n.item.texto}</strong>${n.item.detalles ? ' - ' + n.item.detalles : ''}`;
+      }
+
+      rowsHtml += `
+        <tr style="border-bottom: 1px solid #cbd5e1;">
+          <td style="padding: 6px 8px; text-align: center; font-weight: bold; width: 30px;">${idx + 1}</td>
+          <td style="padding: 6px 8px; font-weight: bold; color: #1e3a8a;">${p.nombre}<br><small style="color:#64748b; font-weight: normal;">Cama/Máq: ${p.maquina || '-'}</small></td>
+          <td style="padding: 6px 8px; font-weight: 600; color: #0f172a;">${prox.diaNombre} ${prox.fechaFmt}</td>
+          <td style="padding: 6px 8px; color: #334155; font-weight: 600;">${prox.turnoFmt}</td>
+          <td style="padding: 6px 8px; color: #0f172a;">${pendienteTxt}</td>
+          <td style="padding: 6px 8px; text-align: center; border: 1px dashed #94a3b8; width: 70px;"></td>
+        </tr>
+      `;
+    });
+
+    const printWin = window.open('', '_blank');
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Programación Semanal de Pendientes - Hemodiálisis</title>
+        <style>
+          @page { size: portrait; margin: 12mm; }
+          body { font-family: Arial, sans-serif; font-size: 11px; color: #0f172a; margin: 0; padding: 10px; }
+          h2 { font-size: 15px; margin: 0 0 4px; color: #1e3a8a; text-transform: uppercase; }
+          .sub { font-size: 11px; color: #64748b; margin-bottom: 12px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 10.5px; }
+          th { background: #f1f5f9; color: #1e3a8a; padding: 6px 8px; text-align: left; border: 1px solid #cbd5e1; font-weight: bold; font-size: 10px; text-transform: uppercase; }
+          td { border: 1px solid #e2e8f0; vertical-align: middle; }
+          .footer { margin-top: 18px; font-size: 10px; color: #64748b; display: flex; justify-content: space-between; }
+        </style>
+      </head>
+      <body>
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1e3a8a; padding-bottom: 6px; margin-bottom: 8px;">
+          <div>
+            <h2>🩺 PROGRAMACIÓN SEMANAL DE PENDIENTES CLÍNICOS</h2>
+            <div class="sub">Unidad de Hemodiálisis &bull; Generado el ${getSelectedDateFormatted()} &bull; Total de tareas: ${notificacionesSemanalesCache.length}</div>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>N°</th>
+              <th>Paciente</th>
+              <th>Próxima Sesión</th>
+              <th>Turno</th>
+              <th>Pendiente a Realizar</th>
+              <th>Firma / Realizado</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+        <div class="footer">
+          <span>* Ordenado cronológicamente por día y turno de llegada.</span>
+          <span>NefroPase Cloud</span>
+        </div>
+        <script>
+          window.onload = function() { window.print(); }
+        </script>
+      </body>
+      </html>
+    `);
+    printWin.document.close();
+  }
+
+function cerrarModalNotificaciones() {
       document.getElementById('modalNotificaciones').style.display = 'none';
   }
   
@@ -5075,17 +5345,21 @@ function detectarYMostrarDuplicados() {
 
   <!-- Modal Notificaciones -->
   <div id="modalNotificaciones" class="modal-overlay" style="z-index: 5000;">
-    <div class="modal-card" style="max-width: 440px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 2px solid #ef4444; padding-bottom: 8px;">
+    <div class="modal-card" style="max-width: 540px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 2px solid #ef4444; padding-bottom: 8px; flex-wrap: wrap; gap: 8px;">
         <h3 style="font-size: 16px; color: #991b1b; display: flex; align-items: center; gap: 6px;">
-          ⚡ Notificaciones
+          ⚡ Pendientes de la Semana
         </h3>
-        <button onclick="cerrarModalNotificaciones()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #64748b;">&times;</button>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button class="btn-save" style="padding: 5px 10px; font-size: 11.5px; background: #0284c7;" onclick="imprimirPendientesSemana()">🖨️ Imprimir Programación</button>
+          <button onclick="cerrarModalNotificaciones()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #64748b;">&times;</button>
+        </div>
       </div>
-      <div id="notifList" style="max-height: 50vh; overflow-y: auto;">
+      <div id="notifList" style="max-height: 60vh; overflow-y: auto; padding-right: 4px;">
         <!-- Inject JS -->
       </div>
-      <div style="display: flex; justify-content: flex-end; margin-top: 12px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
+        <span id="notifListCount" style="font-size: 11px; color: #64748b; font-weight: 600;"></span>
         <button class="btn-light" onclick="cerrarModalNotificaciones()">Cerrar</button>
       </div>
     </div>
