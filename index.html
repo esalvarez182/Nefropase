@@ -694,6 +694,17 @@
   };
 
   
+
+  function normalizeSearchText(str) {
+    if (!str) return '';
+    return String(str)
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\./g, "")
+      .trim();
+  }
+
   function obtenerNotaParaFecha(p, dateKey) {
     if (p.anotaciones !== undefined && p.anotaciones !== null) return p.anotaciones;
     if (!p.historialNotas) return p.lastAnnotation || '';
@@ -1129,11 +1140,17 @@
     const searchInput = document.getElementById('patientSearchInput');
     const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
-    let list = currentPatients;
+    let list = currentPatients.filter(p => !p.eliminado && !p.fusionadoEn);
     if (isolatedPatientId) {
-      list = currentPatients.filter(p => p.id === isolatedPatientId);
+      list = list.filter(p => p.id === isolatedPatientId);
     } else if (query) {
-      list = currentPatients.filter(p => (p.nombre || '').toLowerCase().includes(query) || (p.maquina || '').includes(query));
+      const qClean = normalizeSearchText(query);
+      list = list.filter(p => {
+        const nom = normalizeSearchText(p.nombre);
+        const maq = normalizeSearchText(p.maquina);
+        const nss = normalizeSearchText(p.nss || p.nss_base);
+        return nom.includes(qClean) || maq.includes(qClean) || nss.includes(qClean);
+      });
     } else if (currentShiftFilter !== 'TODOS') {
       const currentDay = document.getElementById('daySelect').value;
       list = currentPatients.filter(p => {
@@ -1900,11 +1917,17 @@
     const searchInput = document.getElementById('patientSearchInput');
     const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
-    let list = currentPatients;
+    let list = currentPatients.filter(p => !p.eliminado && !p.fusionadoEn);
     if (isolatedPatientId) {
-      list = currentPatients.filter(p => p.id === isolatedPatientId);
+      list = list.filter(p => p.id === isolatedPatientId);
     } else if (query) {
-      list = currentPatients.filter(p => (p.nombre || '').toLowerCase().includes(query) || (p.maquina || '').includes(query));
+      const qClean = normalizeSearchText(query);
+      list = list.filter(p => {
+        const nom = normalizeSearchText(p.nombre);
+        const maq = normalizeSearchText(p.maquina);
+        const nss = normalizeSearchText(p.nss || p.nss_base);
+        return nom.includes(qClean) || maq.includes(qClean) || nss.includes(qClean);
+      });
     } else if (currentShiftFilter !== 'TODOS') {
       const currentDay = document.getElementById('daySelect').value;
       list = currentPatients.filter(p => {
@@ -2016,11 +2039,17 @@ MÉDICOS RESPONSABLES: ${medico}`;
     const searchInput = document.getElementById('patientSearchInput');
     const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
-    let list = currentPatients;
+    let list = currentPatients.filter(p => !p.eliminado && !p.fusionadoEn);
     if (isolatedPatientId) {
-      list = currentPatients.filter(p => p.id === isolatedPatientId);
+      list = list.filter(p => p.id === isolatedPatientId);
     } else if (query) {
-      list = currentPatients.filter(p => (p.nombre || '').toLowerCase().includes(query) || (p.maquina || '').includes(query));
+      const qClean = normalizeSearchText(query);
+      list = list.filter(p => {
+        const nom = normalizeSearchText(p.nombre);
+        const maq = normalizeSearchText(p.maquina);
+        const nss = normalizeSearchText(p.nss || p.nss_base);
+        return nom.includes(qClean) || maq.includes(qClean) || nss.includes(qClean);
+      });
     } else if (currentShiftFilter !== 'TODOS') {
       const currentDay = document.getElementById('daySelect').value;
       list = currentPatients.filter(p => {
@@ -2111,24 +2140,45 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
 
   async function deletePatientConfirm(id) {
-    const p = currentPatients.find(item => item.id === id);
-    if (!p) return;
+    const p = currentPatients.find(item => item.id === id) || (todosLosPacientesDirectorio || []).find(item => item.id === id);
+    const nombre = p ? p.nombre : "este paciente";
 
-    const conf = confirm(`¿Estás seguro de eliminar permanentemente a "${p.nombre}" del sistema?`);
+    const conf = confirm(`¿Estás seguro de eliminar permanentemente a "${nombre}" del sistema?`);
     if (!conf) return;
 
     currentPatients = currentPatients.filter(item => item.id !== id);
+    todosLosPacientesDirectorio = (todosLosPacientesDirectorio || []).filter(item => item.id !== id);
+
+    // Limpiar de localStorage si existía
+    try {
+      const dateKey = document.getElementById('sessionDate').value;
+      const localKey = `nefro_local_session_${dateKey}`;
+      let localSession = JSON.parse(localStorage.getItem(localKey) || '{}');
+      if (localSession[id]) {
+        delete localSession[id];
+        localStorage.setItem(localKey, JSON.stringify(localSession));
+      }
+    } catch(e) {}
 
     if (window.db) {
       try {
         const pRef = window.fsDoc(window.db, "pacientes", id);
         await window.fsSetDoc(pRef, { eliminado: true, dias: [] }, { merge: true });
+        if (window.fsDeleteDoc) {
+          try { await window.fsDeleteDoc(pRef); } catch(eDel) {}
+        }
       } catch (err) {
         console.error("Error al eliminar paciente en Firestore:", err);
       }
     }
-    renderCards();
-    showToast(`✓ Paciente ${p.nombre} eliminado permanentemente`);
+
+    const sInput = document.getElementById('patientSearchInput');
+    if (sInput && sInput.value.trim()) {
+      onSearchInput(sInput.value);
+    } else {
+      renderCards();
+    }
+    showToast(`✓ Paciente ${nombre} eliminado permanentemente`);
   }
 
 
@@ -3323,7 +3373,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
           if (duplicadoDoc) {
             showToast(`🔗 NSS idéntico detectado: Unificando automáticamente con "${duplicadoDoc.nombre}"...`);
-            await confirmarFusion(patientId, duplicadoDoc.id);
+            await confirmarFusion(patientId, duplicadoDoc.id, true);
             return;
           }
         }
@@ -3365,31 +3415,38 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
     async function onSearchInput(query) {
     isolatedPatientId = null;
-    const q = (query || '').trim().toLowerCase();
-    if (!q) {
+    const rawQ = (query || '').trim();
+    if (!rawQ) {
       renderCards();
       return;
     }
+    const qClean = normalizeSearchText(rawQ);
 
-    if (todosLosPacientesDirectorio.length === 0 && window.db) {
+    // Siempre asegurar que el censo completo esté cargado sin eliminados
+    if (window.db) {
       try {
         const snap = await window.fsGetDocs(window.fsCollection(window.db, "pacientes"));
         let all = [];
         snap.forEach(docSnap => {
           const d = { id: docSnap.id, ...docSnap.data() };
-          if (!d.eliminado && !d.fusionadoEn) all.push(d);
+          if (!d.eliminado && !d.fusionadoEn && d.dias && d.dias.length > 0) {
+            all.push(d);
+          }
         });
         todosLosPacientesDirectorio = all;
       } catch (e) {}
     }
 
-    const pool = todosLosPacientesDirectorio.length > 0 ? todosLosPacientesDirectorio : currentPatients;
-    const matches = pool.filter(p => 
-      (p.nombre || '').toLowerCase().includes(q) ||
-      (p.nss || '').toLowerCase().includes(q) ||
-      (p.nss_base || '').toLowerCase().includes(q) ||
-      (p.maquina || '').includes(q)
-    );
+    const pool = (todosLosPacientesDirectorio.length > 0 ? todosLosPacientesDirectorio : currentPatients)
+      .filter(p => !p.eliminado && !p.fusionadoEn && p.dias && p.dias.length > 0);
+
+    const matches = pool.filter(p => {
+      const nom = normalizeSearchText(p.nombre);
+      const nss = normalizeSearchText(p.nss);
+      const nssBase = normalizeSearchText(p.nss_base);
+      const maq = normalizeSearchText(p.maquina);
+      return nom.includes(qClean) || nss.includes(qClean) || nssBase.includes(qClean) || maq.includes(qClean);
+    });
 
     const container = document.getElementById('patientsContainer');
     container.innerHTML = '';
@@ -3522,16 +3579,20 @@ MÉDICOS RESPONSABLES: ${medico}`;
   }
 
   function filtrarEnDirectorio(query) {
-    const q = (query || '').trim().toLowerCase();
-    if (!q) {
-      renderDirectorioPacientes(todosLosPacientesDirectorio);
+    const rawQ = (query || '').trim();
+    if (!rawQ) {
+      renderDirectorioPacientes(todosLosPacientesDirectorio.filter(p => !p.eliminado && !p.fusionadoEn));
       return;
     }
-    const filtrados = todosLosPacientesDirectorio.filter(p => 
-      (p.nombre || '').toLowerCase().includes(q) ||
-      (p.maquina || '').includes(q) ||
-      (p.dias || []).some(d => d.toLowerCase().includes(q))
-    );
+    const qClean = normalizeSearchText(rawQ);
+    const filtrados = todosLosPacientesDirectorio.filter(p => {
+      if (p.eliminado || p.fusionadoEn) return false;
+      const nom = normalizeSearchText(p.nombre);
+      const maq = normalizeSearchText(p.maquina);
+      const nss = normalizeSearchText(p.nss || p.nss_base);
+      const diasMatch = (p.dias || []).some(d => normalizeSearchText(d).includes(qClean));
+      return nom.includes(qClean) || maq.includes(qClean) || nss.includes(qClean) || diasMatch;
+    });
     renderDirectorioPacientes(filtrados);
   }
 
@@ -3630,25 +3691,28 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
 
   async function eliminarPacienteDesdeDirectorio(id) {
-    const p = todosLosPacientesDirectorio.find(item => item.id === id);
+    const p = (todosLosPacientesDirectorio || []).find(item => item.id === id) || currentPatients.find(item => item.id === id);
     const nombre = p ? p.nombre : "este paciente";
     const conf = confirm(`¿Estás seguro de eliminar permanentemente a "${nombre}" del sistema?`);
     if (!conf) return;
 
-    todosLosPacientesDirectorio = todosLosPacientesDirectorio.filter(item => item.id !== id);
+    todosLosPacientesDirectorio = (todosLosPacientesDirectorio || []).filter(item => item.id !== id);
     currentPatients = currentPatients.filter(item => item.id !== id);
 
     if (window.db) {
       try {
         const pRef = window.fsDoc(window.db, "pacientes", id);
         await window.fsSetDoc(pRef, { eliminado: true, dias: [] }, { merge: true });
+        if (window.fsDeleteDoc) {
+          try { await window.fsDeleteDoc(pRef); } catch(eDel) {}
+        }
       } catch (err) {
         console.error("Error al eliminar paciente:", err);
       }
     }
     renderCards();
     openDirectorioPacientesModal();
-    showToast(`✓ Paciente eliminado permanentemente`);
+    showToast(`✓ Paciente ${nombre} eliminado permanentemente`);
   }
 
 
@@ -3691,7 +3755,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
           if (duplicadoDoc) {
             showToast(`🔗 NSS idéntico detectado: Unificando automáticamente...`);
-            await confirmarFusion(patientId, duplicadoDoc.id);
+            await confirmarFusion(patientId, duplicadoDoc.id, true);
             return;
           }
         }
@@ -3758,19 +3822,35 @@ function detectarYMostrarDuplicados() {
   // FUSIÓN DE EXPEDIENTES REPETIDOS
   // ==========================================
 
-  async function confirmarFusion(id1, id2) {
-    const p1 = todosLosPacientesDirectorio.find(p => p.id === id1);
-    const p2 = todosLosPacientesDirectorio.find(p => p.id === id2);
+  async function confirmarFusion(id1, id2, isAutoNSS = false) {
+    // Buscar en todas las fuentes disponibles
+    let p1 = (todosLosPacientesDirectorio || []).find(p => p.id === id1) || currentPatients.find(p => p.id === id1);
+    let p2 = (todosLosPacientesDirectorio || []).find(p => p.id === id2) || currentPatients.find(p => p.id === id2);
+
+    if ((!p1 || !p2) && window.db) {
+      try {
+        if (!p1) {
+          const s1 = await window.fsGetDoc(window.fsDoc(window.db, "pacientes", id1));
+          if (s1.exists()) p1 = { id: s1.id, ...s1.data() };
+        }
+        if (!p2) {
+          const s2 = await window.fsGetDoc(window.fsDoc(window.db, "pacientes", id2));
+          if (s2.exists()) p2 = { id: s2.id, ...s2.data() };
+        }
+      } catch(e) {}
+    }
 
     if (!p1 || !p2) {
       alert("No se pudieron localizar ambos expedientes para fusionar.");
       return;
     }
 
-    const conf = confirm(`¿Deseas fusionar las tarjetas de "${p1.nombre}"?\n\n- Se conservarán los datos de la tarjeta más reciente.\n- Se juntarán las observaciones y notas de ambos expedientes.\n- Se combinarán los días de sesión de ambos turnos.`);
-    if (!conf) return;
+    if (!isAutoNSS) {
+      const conf = confirm(`¿Deseas fusionar las tarjetas de "${p1.nombre}" y "${p2.nombre}"?\n\n- Se conservarán los datos clínicos más recientes.\n- Se juntarán las observaciones y notas de ambos expedientes.\n- Se combinarán los días y turnos de sesión.`);
+      if (!conf) return;
+    }
 
-    showToast("Fusionando expedientes...");
+    showToast(isAutoNSS ? `🔗 Unificando automáticamente por NSS idéntico...` : "Fusionando expedientes...");
 
     // 1. Combinar días
     const combinedDias = Array.from(new Set([...(p1.dias || []), ...(p2.dias || [])]));
