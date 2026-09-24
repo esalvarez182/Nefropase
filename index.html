@@ -790,7 +790,7 @@
   }
 
   function requiereControlHemocultivo(p) {
-    if (!p || !p.vigilanciaDatos || !p.vigilanciaDatos.tratamiento) return { alerta: false, dias: 0, estado: 'ninguno' };
+    if (!p || !p.vigilanciaAcceso || !p.vigilanciaDatos || !p.vigilanciaDatos.tratamiento) return { alerta: false, dias: 0, estado: 'ninguno' };
     const tx = p.vigilanciaDatos.tratamiento;
     if (tx.inicia !== 'SI' || !tx.fechaInicio) return { alerta: false, dias: 0, estado: 'ninguno' };
     
@@ -798,8 +798,8 @@
     if (dias < 14) return { alerta: false, dias: dias, estado: 'en_curso' };
     
     const ctrl = p.vigilanciaDatos.controlHemocultivo || {};
-    if (ctrl.estado === 'completado') {
-      return { alerta: false, dias: dias, estado: 'completado' };
+    if (ctrl.estado === 'completado' || ctrl.estado === 'cancelado' || ctrl.estado === 'reprogramado') {
+      return { alerta: false, dias: dias, estado: ctrl.estado };
     } else if (ctrl.estado === 'pendiente_resultado') {
       return { alerta: true, tipo: 'resultado', dias: dias, fechaToma: ctrl.fechaToma || '', estado: 'pendiente_resultado' };
     } else {
@@ -873,8 +873,10 @@
               <div style="font-size: 12px; color: #7f1d1d; margin-top: 3px;">Han transcurrido <strong>${res.dias} días</strong> de antibiótico. Se requiere hemocultivo de control.</div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; gap: 8px; flex-wrap: wrap;">
                 <input type="date" id="toma_ctrl_${p.id}" value="${document.getElementById('sessionDate').value}" style="padding: 4px 6px; border: 1px solid #fca5a5; border-radius: 4px; font-size: 11.5px; outline: none; max-width: 120px;">
-                <div style="display: flex; gap: 6px;">
-                  <button class="btn-save" style="padding: 4px 10px; font-size: 11px; background: #b91c1c;" onclick="marcarControlHemocultivoTomado('${p.id}')">✓ Marcar Realizado</button>
+                <div style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end;">
+                  <button class="btn-save" style="padding: 4px 8px; font-size: 11px; background: #b91c1c;" onclick="marcarControlHemocultivoTomado('${p.id}')">✓ Tomado</button>
+                  <button class="btn-light" style="padding: 4px 8px; font-size: 11px; background: #fff; border: 1px solid #cbd5e1;" onclick="reprogramarControlHemocultivo('${p.id}')">📅 Reprogramar</button>
+                  <button class="btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="cancelarControlHemocultivo('${p.id}')">❌ Quitar</button>
                   <button class="btn-light" style="padding: 4px 8px; font-size: 11px;" onclick="irAAlertaYCerarNotif('${p.id}')">Ver Ficha</button>
                 </div>
               </div>
@@ -888,8 +890,9 @@
               <div style="font-size: 12px; color: #4c1d95; margin-top: 3px;">Hemocultivo de control tomado el <strong>${res.fechaToma}</strong>. Faltan resultados de laboratorio.</div>
               <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;">
                 <input type="text" id="res_ctrl_${p.id}" placeholder="Escribe el resultado (Ej. Negativo a 5 días...)" style="padding: 5px 8px; border: 1px solid #c4b5fd; border-radius: 4px; font-size: 11.5px; outline: none; width: 100%;">
-                <div style="display: flex; justify-content: flex-end; gap: 6px;">
-                  <button class="btn-save" style="padding: 4px 10px; font-size: 11px; background: #6d28d9;" onclick="guardarResultadoControlHemocultivo('${p.id}')">💾 Guardar Resultado</button>
+                <div style="display: flex; justify-content: flex-end; gap: 4px; flex-wrap: wrap;">
+                  <button class="btn-save" style="padding: 4px 8px; font-size: 11px; background: #6d28d9;" onclick="guardarResultadoControlHemocultivo('${p.id}')">💾 Guardar Resultado</button>
+                  <button class="btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="cancelarControlHemocultivo('${p.id}')">❌ Quitar</button>
                   <button class="btn-light" style="padding: 4px 8px; font-size: 11px;" onclick="irAAlertaYCerarNotif('${p.id}')">Ver Ficha</button>
                 </div>
               </div>
@@ -930,9 +933,11 @@
             <div style="font-size: 12.5px; font-weight: 700; color: #1e293b; margin-top: 4px;">• ${item.texto}</div>
             ${item.detalles ? `<div style="font-size: 11.5px; color: #475569; margin-top: 2px;">Nota: ${item.detalles}</div>` : ''}
             <div style="font-size: 11px; color: #b45309; margin-top: 3px;">📅 Fecha programada: <strong>${item.fecha}</strong></div>
-            <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px;">
-              <button class="btn-save" style="padding: 4px 9px; font-size: 11px; background: #16a34a;" onclick="resolverPendienteDesdeNotif('${p.id}', '${item.id}')">✓ Marcar Realizado</button>
-              <button class="btn-light" style="padding: 4px 9px; font-size: 11px;" onclick="irAAlertaYCerarNotif('${p.id}')">Ver Ficha</button>
+            <div style="display: flex; justify-content: flex-end; gap: 4px; flex-wrap: wrap; margin-top: 6px;">
+              <button class="btn-save" style="padding: 4px 8px; font-size: 11px; background: #16a34a;" onclick="resolverPendienteDesdeNotif('${p.id}', '${item.id}')">✓ Realizado</button>
+              <button class="btn-light" style="padding: 4px 8px; font-size: 11px; background: #fff; border: 1px solid #cbd5e1;" onclick="reprogramarPendienteDesdeNotif('${p.id}', '${item.id}')">📅 Reprogramar</button>
+              <button class="btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="eliminarPendienteDesdeNotif('${p.id}', '${item.id}')">❌ Quitar</button>
+              <button class="btn-light" style="padding: 4px 8px; font-size: 11px;" onclick="irAAlertaYCerarNotif('${p.id}')">Ver Ficha</button>
             </div>
         </div>`;
       });
@@ -2602,11 +2607,20 @@ MÉDICOS RESPONSABLES: ${medico}`;
     if (!p) return;
 
     p.vigilanciaAcceso = false;
+    if (p.vigilanciaDatos) {
+      p.vigilanciaDatos.datosIncompletos = false;
+      if (p.vigilanciaDatos.controlHemocultivo) {
+        p.vigilanciaDatos.controlHemocultivo.estado = 'cancelado';
+      }
+    }
 
     if (window.db) {
       try {
         const pRef = window.fsDoc(window.db, "pacientes", p.id);
-        await window.fsUpdateDoc(pRef, { vigilanciaAcceso: false });
+        await window.fsUpdateDoc(pRef, { 
+          vigilanciaAcceso: false,
+          vigilanciaDatos: p.vigilanciaDatos || null
+        });
       } catch (err) {
         console.error("Error al retirar vigilancia en Firestore:", err);
       }
@@ -4008,10 +4022,20 @@ function detectarYMostrarDuplicados() {
     if (!p) return;
 
     p.vigilanciaAcceso = false;
+    if (p.vigilanciaDatos) {
+      p.vigilanciaDatos.datosIncompletos = false;
+      if (p.vigilanciaDatos.controlHemocultivo) {
+        p.vigilanciaDatos.controlHemocultivo.estado = 'cancelado';
+      }
+    }
+
     if (window.db) {
       try {
         const pRef = window.fsDoc(window.db, "pacientes", p.id);
-        await window.fsUpdateDoc(pRef, { vigilanciaAcceso: false });
+        await window.fsUpdateDoc(pRef, { 
+          vigilanciaAcceso: false,
+          vigilanciaDatos: p.vigilanciaDatos || null
+        });
       } catch (err) {
         console.error("Error al retirar vigilancia en Firestore:", err);
       }
@@ -4355,6 +4379,105 @@ function detectarYMostrarDuplicados() {
   function completarVigilanciaDesdeNotif(patientId) {
     cerrarModalNotificaciones();
     openVigilanciaWizard(patientId);
+  }
+
+
+  async function cancelarControlHemocultivo(id) {
+    const conf = confirm("¿Deseas quitar esta notificación de hemocultivo de control para este paciente?");
+    if (!conf) return;
+
+    const p = currentPatients.find(item => item.id === id);
+    if (!p) return;
+
+    if (!p.vigilanciaDatos) p.vigilanciaDatos = {};
+    if (!p.vigilanciaDatos.controlHemocultivo) p.vigilanciaDatos.controlHemocultivo = {};
+    p.vigilanciaDatos.controlHemocultivo.estado = 'cancelado';
+
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", p.id);
+        await window.fsUpdateDoc(pRef, { vigilanciaDatos: p.vigilanciaDatos });
+      } catch (err) {
+        console.error("Error al cancelar control de hemocultivo:", err);
+      }
+    }
+
+    renderCards();
+    abrirModalNotificaciones();
+    showToast("✓ Notificación de hemocultivo removida");
+  }
+
+  async function reprogramarControlHemocultivo(id) {
+    const p = currentPatients.find(item => item.id === id);
+    if (!p) return;
+
+    const fechaActual = document.getElementById('sessionDate').value;
+    const nuevaFecha = prompt("Ingresa la nueva fecha para realizar el hemocultivo (AAAA-MM-DD):", fechaActual);
+    if (!nuevaFecha) return;
+
+    if (!p.vigilanciaDatos) p.vigilanciaDatos = {};
+    if (!p.vigilanciaDatos.controlHemocultivo) p.vigilanciaDatos.controlHemocultivo = {};
+    p.vigilanciaDatos.controlHemocultivo.estado = 'reprogramado';
+    p.vigilanciaDatos.controlHemocultivo.fechaReprogramada = nuevaFecha;
+
+    if (!p.pendientes) p.pendientes = [];
+    p.pendientes.push({
+      id: 'pend_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      texto: "Tomar Hemocultivo (Reprogramado)",
+      detalles: "Control de hemocultivo reprogramado desde la alerta de 14 días",
+      fecha: nuevaFecha,
+      resuelto: false,
+      creadoAt: Date.now()
+    });
+
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", p.id);
+        await window.fsUpdateDoc(pRef, { 
+          vigilanciaDatos: p.vigilanciaDatos,
+          pendientes: p.pendientes
+        });
+      } catch (err) {
+        console.error("Error al reprogramar control de hemocultivo:", err);
+      }
+    }
+
+    renderCards();
+    abrirModalNotificaciones();
+    showToast(`✓ Hemocultivo reprogramado para el ${nuevaFecha}`);
+  }
+
+  async function reprogramarPendienteDesdeNotif(patientId, pendienteId) {
+    const p = currentPatients.find(item => item.id === patientId);
+    if (!p || !p.pendientes) return;
+
+    const item = p.pendientes.find(x => x.id === pendienteId);
+    if (!item) return;
+
+    const nuevaFecha = prompt(`Ingresa la nueva fecha para "${item.texto}" (AAAA-MM-DD):`, item.fecha || document.getElementById('sessionDate').value);
+    if (!nuevaFecha) return;
+
+    item.fecha = nuevaFecha;
+
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", p.id);
+        await window.fsUpdateDoc(pRef, { pendientes: p.pendientes });
+      } catch (err) {
+        console.error("Error al reprogramar pendiente:", err);
+      }
+    }
+
+    renderCards();
+    abrirModalNotificaciones();
+    showToast(`✓ Pendiente reprogramado para el ${nuevaFecha}`);
+  }
+
+  async function eliminarPendienteDesdeNotif(patientId, pendienteId) {
+    const conf = confirm("¿Deseas quitar este pendiente?");
+    if (!conf) return;
+    await eliminarPendiente(patientId, pendienteId);
+    abrirModalNotificaciones();
   }
 
 </script>
