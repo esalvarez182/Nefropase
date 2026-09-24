@@ -900,15 +900,16 @@
       // 2. Vigilancia con datos diferidos / incompletos
       if (p.vigilanciaAcceso && p.vigilanciaDatos && p.vigilanciaDatos.datosIncompletos) {
         totalItems++;
-        const pPaso = p.vigilanciaDatos.diferidoPaso || 1;
-        const nombrePaso = pPaso === 1 ? 'Hospitalizaciones' : pPaso === 2 ? 'Historial de Accesos' : pPaso === 3 ? 'Diálisis Peritoneal' : 'Hemocultivos / Tx';
+        const nombresMap = { 1: 'Hospitalizaciones', 2: 'Historial de Accesos', 3: 'Diálisis Peritoneal', 4: 'Cultivos / Tratamiento' };
+        const difArr = (p.vigilanciaDatos.pasosDiferidos && p.vigilanciaDatos.pasosDiferidos.length > 0) ? p.vigilanciaDatos.pasosDiferidos : [1];
+        const nombresPendientes = difArr.map(n => nombresMap[n] || `Paso ${n}`).join(', ');
         html += `<div style="background: #fffbeb; border: 1.5px solid #f59e0b; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <strong style="color: #b45309; font-size: 13px;">⚠️ ${p.nombre}</strong>
               <span style="font-size: 10.5px; background: #fef3c7; color: #92400e; font-weight: 800; padding: 2px 6px; border-radius: 4px;">DATOS DIFERIDOS</span>
             </div>
             <div style="font-size: 12px; color: #78350f; margin-top: 3px;">
-              Vigilancia de catéter con llenado pendiente desde el <strong>Paso ${pPaso} (${nombrePaso})</strong>.
+              Vigilancia de catéter con datos pendientes en: <strong>${nombresPendientes}</strong>.
             </div>
             <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px;">
               <button class="btn-warn" style="padding: 4px 10px; font-size: 11px; background: #d97706;" onclick="completarVigilanciaDesdeNotif('${p.id}')">✏️ Completar Ahora</button>
@@ -2490,7 +2491,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
     // Both states can show textarea, or focus when true
   }
 
-  async function guardarYFinalizarVigilancia() {
+  async function guardarYFinalizarVigilancia(fuePaso4Diferido = false) {
     if (!activeVigPatientId) return;
     const p = currentPatients.find(item => item.id === activeVigPatientId);
     if (!p) return;
@@ -2543,6 +2544,14 @@ MÉDICOS RESPONSABLES: ${medico}`;
     };
 
     p.vigilanciaAcceso = true;
+    if (!p.vigilanciaDatos) p.vigilanciaDatos = {};
+
+    let pasosDif = (p.vigilanciaDatos.pasosDiferidos || []).filter(num => num !== 4);
+    if (fuePaso4Diferido === true) {
+      if (!pasosDif.includes(4)) pasosDif.push(4);
+    }
+    pasosDif.sort();
+
     p.vigilanciaDatos = {
       ...(p.vigilanciaDatos || {}),
       hospUltimoMes: hospVal,
@@ -2552,8 +2561,8 @@ MÉDICOS RESPONSABLES: ${medico}`;
       dpObs: dpObs,
       cultivos: cultivos,
       tratamiento: tratamiento,
-      datosIncompletos: false,
-      diferidoPaso: null
+      pasosDiferidos: pasosDif,
+      datosIncompletos: (pasosDif.length > 0)
     };
 
     // Redactar resumen clínico estructurado
@@ -4247,15 +4256,10 @@ function detectarYMostrarDuplicados() {
   }
 
 
-  async function diferirLlenadoVigilancia(pasoActual) {
-    if (!activeVigPatientId) return;
-    const p = currentPatients.find(item => item.id === activeVigPatientId);
+  function recolectarDatosParcialesVigilancia(p) {
     if (!p) return;
-
-    p.vigilanciaAcceso = true;
     if (!p.vigilanciaDatos) p.vigilanciaDatos = {};
 
-    // Recolectar datos parciales ingresados hasta el momento
     let hospVal = 'NO';
     for (let r of document.getElementsByName('vigHospRadio')) {
       if (r.checked) hospVal = r.value;
@@ -4295,6 +4299,7 @@ function detectarYMostrarDuplicados() {
       esquema: document.getElementById('vigTxEsquema').value.trim()
     };
 
+    p.vigilanciaAcceso = true;
     p.vigilanciaDatos = {
       ...(p.vigilanciaDatos || {}),
       hospUltimoMes: hospVal,
@@ -4303,36 +4308,48 @@ function detectarYMostrarDuplicados() {
       dp: dpVal,
       dpObs: dpObs,
       cultivos: cultivos,
-      tratamiento: tratamiento,
-      datosIncompletos: true,
-      diferidoPaso: pasoActual || 1,
-      fechaDiferido: document.getElementById('sessionDate').value
+      tratamiento: tratamiento
     };
+  }
 
-    // Actualizar anotaciones
-    const summaryNote = formatRedaccionVigilancia(p.vigilanciaDatos);
-    p.anotaciones = p.anotaciones || summaryNote || 'Vigilancia de catéter iniciada (datos clínicos diferidos)';
-    p.lastAnnotation = p.anotaciones;
+  async function diferirLlenadoVigilancia(pasoActual) {
+    if (!activeVigPatientId) return;
+    const p = currentPatients.find(item => item.id === activeVigPatientId);
+    if (!p) return;
 
-    if (window.db) {
-      try {
-        const pRef = window.fsDoc(window.db, "pacientes", p.id);
-        await window.fsUpdateDoc(pRef, {
-          vigilanciaAcceso: true,
-          vigilanciaDatos: p.vigilanciaDatos,
-          lastAnnotation: p.lastAnnotation
-        });
-      } catch (err) {
-        console.error("Error guardando datos diferidos en Firestore:", err);
-      }
+    recolectarDatosParcialesVigilancia(p);
+
+    if (!p.vigilanciaDatos.pasosDiferidos) p.vigilanciaDatos.pasosDiferidos = [];
+    if (!p.vigilanciaDatos.pasosDiferidos.includes(pasoActual)) {
+      p.vigilanciaDatos.pasosDiferidos.push(pasoActual);
+    }
+    p.vigilanciaDatos.pasosDiferidos.sort();
+    p.vigilanciaDatos.datosIncompletos = (p.vigilanciaDatos.pasosDiferidos.length > 0);
+
+    if (pasoActual === 1) {
+      showToast("⏳ Hospitalizaciones diferido. Pasando a Historial de Accesos...");
+      irVigPaso2();
+    } else if (pasoActual === 2) {
+      showToast("⏳ Historial de Accesos diferido. Pasando a Diálisis Peritoneal...");
+      irVigPaso3();
+    } else if (pasoActual === 3) {
+      showToast("⏳ Diálisis Peritoneal diferido. Pasando a Cultivos y Tratamiento...");
+      irVigPaso4();
+    } else if (pasoActual === 4) {
+      await guardarYFinalizarVigilancia(true);
+    }
+  }
+
+  function avanzarPasoCompletado(pasoActual) {
+    if (!activeVigPatientId) return;
+    const p = currentPatients.find(item => item.id === activeVigPatientId);
+    if (p && p.vigilanciaDatos && p.vigilanciaDatos.pasosDiferidos) {
+      p.vigilanciaDatos.pasosDiferidos = p.vigilanciaDatos.pasosDiferidos.filter(num => num !== pasoActual);
     }
 
-    closeVigWizard();
-    renderCards();
-    if (document.getElementById('reporteVigilanciaModal').style.display === 'flex') {
-      openReporteVigilanciaModal();
-    }
-    showToast(`⏳ Vigilancia activada pero diferida. La app te recordará completarla.`);
+    if (pasoActual === 1) irVigPaso2();
+    else if (pasoActual === 2) irVigPaso3();
+    else if (pasoActual === 3) irVigPaso4();
   }
 
   function completarVigilanciaDesdeNotif(patientId) {
@@ -4433,7 +4450,7 @@ function detectarYMostrarDuplicados() {
           </div>
           <div style="display: flex; gap: 8px;">
             <button class="btn-light" onclick="closeVigWizard()">Cancelar</button>
-            <button class="btn-save" onclick="irVigPaso2()">Guardar y Siguiente ➔</button>
+            <button class="btn-save" onclick="avanzarPasoCompletado(1)">Guardar y Siguiente ➔</button>
           </div>
         </div>
       </div>
@@ -4501,7 +4518,7 @@ function detectarYMostrarDuplicados() {
             <button class="btn-light" onclick="irVigPaso1()">⬅ Atrás</button>
             <button type="button" class="btn-light" style="padding: 6px 10px; font-size: 11.5px; background: #fffbeb; color: #b45309; border: 1.5px dashed #f59e0b; font-weight: 700;" onclick="diferirLlenadoVigilancia(2)">⏳ Completar después</button>
           </div>
-          <button class="btn-save" onclick="irVigPaso3()">Guardar y Siguiente ➔</button>
+          <button class="btn-save" onclick="avanzarPasoCompletado(2)">Guardar y Siguiente ➔</button>
         </div>
       </div>
 
@@ -4527,10 +4544,10 @@ function detectarYMostrarDuplicados() {
         </div>
         <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 18px; flex-wrap: wrap;">
           <div style="display: flex; gap: 6px;">
-            <button class="btn-light" onclick="irVigPaso2()">⬅ Atrás</button>
+            <button class="btn-light" onclick="avanzarPasoCompletado(1)">⬅ Atrás</button>
             <button type="button" class="btn-light" style="padding: 6px 10px; font-size: 11.5px; background: #fffbeb; color: #b45309; border: 1.5px dashed #f59e0b; font-weight: 700;" onclick="diferirLlenadoVigilancia(3)">⏳ Completar después</button>
           </div>
-          <button class="btn-save" onclick="irVigPaso4()">Guardar y Siguiente ➔</button>
+          <button class="btn-save" onclick="avanzarPasoCompletado(3)">Guardar y Siguiente ➔</button>
         </div>
       </div>
 
@@ -4593,7 +4610,7 @@ function detectarYMostrarDuplicados() {
 
         <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 18px; flex-wrap: wrap;">
           <div style="display: flex; gap: 6px;">
-            <button class="btn-light" onclick="irVigPaso3()">⬅ Atrás</button>
+            <button class="btn-light" onclick="avanzarPasoCompletado(2)">⬅ Atrás</button>
             <button type="button" class="btn-light" style="padding: 6px 10px; font-size: 11.5px; background: #fffbeb; color: #b45309; border: 1.5px dashed #f59e0b; font-weight: 700;" onclick="diferirLlenadoVigilancia(4)">⏳ Completar después</button>
           </div>
           <button class="btn-save" onclick="guardarYFinalizarVigilancia()">💾 Guardar y Finalizar Vigilancia</button>
