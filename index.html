@@ -821,6 +821,9 @@
       if (res.alerta) alertasCount++;
       const pends = obtenerPendientesHoyOPasados(p);
       alertasCount += pends.length;
+      if (p.vigilanciaAcceso && p.vigilanciaDatos && p.vigilanciaDatos.datosIncompletos) {
+        alertasCount++;
+      }
     });
 
     if (alertasCount > 0) {
@@ -883,7 +886,27 @@
         }
       }
 
-      // 2. Pendientes del día
+      // 2. Vigilancia con datos diferidos / incompletos
+      if (p.vigilanciaAcceso && p.vigilanciaDatos && p.vigilanciaDatos.datosIncompletos) {
+        totalItems++;
+        const pPaso = p.vigilanciaDatos.diferidoPaso || 1;
+        const nombrePaso = pPaso === 1 ? 'Hospitalizaciones' : pPaso === 2 ? 'Historial de Accesos' : pPaso === 3 ? 'Diálisis Peritoneal' : 'Hemocultivos / Tx';
+        html += `<div style="background: #fffbeb; border: 1.5px solid #f59e0b; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <strong style="color: #b45309; font-size: 13px;">⚠️ ${p.nombre}</strong>
+              <span style="font-size: 10.5px; background: #fef3c7; color: #92400e; font-weight: 800; padding: 2px 6px; border-radius: 4px;">DATOS DIFERIDOS</span>
+            </div>
+            <div style="font-size: 12px; color: #78350f; margin-top: 3px;">
+              Vigilancia de catéter con llenado pendiente desde el <strong>Paso ${pPaso} (${nombrePaso})</strong>.
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px;">
+              <button class="btn-warn" style="padding: 4px 10px; font-size: 11px; background: #d97706;" onclick="completarVigilanciaDesdeNotif('${p.id}')">✏️ Completar Ahora</button>
+              <button class="btn-light" style="padding: 4px 8px; font-size: 11px;" onclick="irAAlertaYCerarNotif('${p.id}')">Ver Ficha</button>
+            </div>
+        </div>`;
+      }
+
+      // 3. Pendientes del día
       const pends = obtenerPendientesHoyOPasados(p);
       pends.forEach(item => {
         totalItems++;
@@ -1168,7 +1191,7 @@
           <div style="flex: 1; padding-right: 10px;">
             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
               <input type="text" id="nombre_${p.id}" value="${p.nombre}" title="Clic para editar nombre" style="font-size: 14px; font-weight: 700; color: #0f172a; border: 1.5px solid transparent; border-radius: 6px; padding: 2px 4px; flex: 1; min-width: 200px; background: transparent; text-transform: uppercase; outline: none; ${p.noAcudio ? 'text-decoration: line-through; color: #94a3b8;' : ''}" onfocus="this.style.borderColor='#93c5fd'; this.style.background='#eff6ff';" onblur="this.style.borderColor='transparent'; this.style.background='transparent'; onNombreChanged('${p.id}', this.value)" onchange="onNombreChanged('${p.id}', this.value)">
-              ${p.noAcudio ? '<span class="badge-no-acudio">NO ACUDIÓ</span>' : ''}${infoAlerta.alerta && infoAlerta.tipo === 'toma' ? `<span class="badge-cultivo-alerta">🚨 REQUERIDO: HEMOCULTIVO CONTROL (${infoAlerta.dias} DÍAS TX)</span>` : ''}${infoAlerta.alerta && infoAlerta.tipo === 'resultado' ? `<span style="background:#f5f3ff; color:#6d28d9; border:1px solid #c4b5fd; font-size:10.5px; font-weight:800; padding:2px 7px; border-radius:6px; margin-left:6px; display:inline-flex; align-items:center; gap:3px;">🔬 PENDIENTE RESULTADO CULTIVO (${infoAlerta.fechaToma})</span>` : ''}${obtenerBadgePendientesHoy(p)}${p.vigilanciaAcceso && !infoAlerta.alerta ? '<span class="badge-vigilancia">⚠️ VIGILANCIA ACCESO</span>' : ''}${p.visitado ? '<span class="badge-visitado">✓ VISITADO</span>' : ''}
+              ${p.noAcudio ? '<span class="badge-no-acudio">NO ACUDIÓ</span>' : ''}${infoAlerta.alerta && infoAlerta.tipo === 'toma' ? `<span class="badge-cultivo-alerta">🚨 REQUERIDO: HEMOCULTIVO CONTROL (${infoAlerta.dias} DÍAS TX)</span>` : ''}${infoAlerta.alerta && infoAlerta.tipo === 'resultado' ? `<span style="background:#f5f3ff; color:#6d28d9; border:1px solid #c4b5fd; font-size:10.5px; font-weight:800; padding:2px 7px; border-radius:6px; margin-left:6px; display:inline-flex; align-items:center; gap:3px;">🔬 PENDIENTE RESULTADO CULTIVO (${infoAlerta.fechaToma})</span>` : ''}${obtenerBadgePendientesHoy(p)}${p.vigilanciaAcceso && !infoAlerta.alerta ? ((p.vigilanciaDatos && p.vigilanciaDatos.datosIncompletos) ? '<span class="badge-vigilancia" style="background:#fee2e2; color:#b91c1c; border-color:#fca5a5;">⚠️ VIGILANCIA INCOMPLETA</span>' : '<span class="badge-vigilancia">⚠️ VIGILANCIA ACCESO</span>') : ''}${p.visitado ? '<span class="badge-visitado">✓ VISITADO</span>' : ''}
             </div>
             
             <!-- NSS Atenuado de 2 Casillas Debajo del Nombre -->
@@ -2471,13 +2494,16 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
     p.vigilanciaAcceso = true;
     p.vigilanciaDatos = {
+      ...(p.vigilanciaDatos || {}),
       hospUltimoMes: hospVal,
       hospObs: hospObs,
       accesos: accesos,
       dp: dpVal,
       dpObs: dpObs,
       cultivos: cultivos,
-      tratamiento: tratamiento
+      tratamiento: tratamiento,
+      datosIncompletos: false,
+      diferidoPaso: null
     };
 
     // Redactar resumen clínico estructurado
@@ -2685,6 +2711,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
         <tr style="vertical-align:top;">
           <td style="padding:6px; border:1px solid #cbd5e1; font-weight:700; color:#1e3a8a;">
             ${p.nombre}
+            ${(v.datosIncompletos) ? '<br><span style="background:#fee2e2; color:#b91c1c; font-size:9.5px; font-weight:800; padding:1px 5px; border-radius:3px;">⚠️ DATOS DIFERIDOS</span>' : ''}
             <br><small style="font-weight:normal; color:#64748b;">Máq/Cama: ${p.maquina || '-'}</small>
           </td>
           <td style="padding:6px; border:1px solid #cbd5e1;">
@@ -4139,6 +4166,100 @@ function detectarYMostrarDuplicados() {
     showToast(`✓ Resultado registrado exitosamente.`);
   }
 
+
+  async function diferirLlenadoVigilancia(pasoActual) {
+    if (!activeVigPatientId) return;
+    const p = currentPatients.find(item => item.id === activeVigPatientId);
+    if (!p) return;
+
+    p.vigilanciaAcceso = true;
+    if (!p.vigilanciaDatos) p.vigilanciaDatos = {};
+
+    // Recolectar datos parciales ingresados hasta el momento
+    let hospVal = 'NO';
+    for (let r of document.getElementsByName('vigHospRadio')) {
+      if (r.checked) hospVal = r.value;
+    }
+    const hospObs = document.getElementById('vigHospObsText').value.trim();
+
+    let actualAcceso = 'Yugular Derecho';
+    for (let r of document.getElementsByName('vigAccesoActual')) {
+      if (r.checked) actualAcceso = r.value;
+    }
+    const accesos = {
+      yd_cant: parseInt(document.getElementById('vig_yd_cant').value, 10) || 0,
+      yi_cant: parseInt(document.getElementById('vig_yi_cant').value, 10) || 0,
+      fd_cant: parseInt(document.getElementById('vig_fd_cant').value, 10) || 0,
+      fi_cant: parseInt(document.getElementById('vig_fi_cant').value, 10) || 0,
+      actual: actualAcceso,
+      fechaColocacion: document.getElementById('vigFechaColocacion').value || ''
+    };
+
+    let dpVal = 'NO';
+    for (let r of document.getElementsByName('vigDpRadio')) {
+      if (r.checked) dpVal = r.value;
+    }
+    const dpObs = document.getElementById('vigDpObsText').value.trim();
+
+    const cultivos = {
+      central: document.getElementById('vigCultivoCentral').checked,
+      periferico: document.getElementById('vigCultivoPeriferico').checked,
+      sitio: document.getElementById('vigCultivoSitio').checked,
+      fecha: document.getElementById('vigFechaCultivo').value || '',
+      resultado: document.getElementById('vigResultadoCultivo').value.trim() || ''
+    };
+
+    const tratamiento = {
+      inicia: document.getElementById('vigIniciaTx').value,
+      fechaInicio: document.getElementById('vigFechaTx').value || '',
+      esquema: document.getElementById('vigTxEsquema').value.trim()
+    };
+
+    p.vigilanciaDatos = {
+      ...(p.vigilanciaDatos || {}),
+      hospUltimoMes: hospVal,
+      hospObs: hospObs,
+      accesos: accesos,
+      dp: dpVal,
+      dpObs: dpObs,
+      cultivos: cultivos,
+      tratamiento: tratamiento,
+      datosIncompletos: true,
+      diferidoPaso: pasoActual || 1,
+      fechaDiferido: document.getElementById('sessionDate').value
+    };
+
+    // Actualizar anotaciones
+    const summaryNote = formatRedaccionVigilancia(p.vigilanciaDatos);
+    p.anotaciones = p.anotaciones || summaryNote || 'Vigilancia de catéter iniciada (datos clínicos diferidos)';
+    p.lastAnnotation = p.anotaciones;
+
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", p.id);
+        await window.fsUpdateDoc(pRef, {
+          vigilanciaAcceso: true,
+          vigilanciaDatos: p.vigilanciaDatos,
+          lastAnnotation: p.lastAnnotation
+        });
+      } catch (err) {
+        console.error("Error guardando datos diferidos en Firestore:", err);
+      }
+    }
+
+    closeVigWizard();
+    renderCards();
+    if (document.getElementById('reporteVigilanciaModal').style.display === 'flex') {
+      openReporteVigilanciaModal();
+    }
+    showToast(`⏳ Vigilancia activada pero diferida. La app te recordará completarla.`);
+  }
+
+  function completarVigilanciaDesdeNotif(patientId) {
+    cerrarModalNotificaciones();
+    openVigilanciaWizard(patientId);
+  }
+
 </script>
 
   
@@ -4225,8 +4346,11 @@ function detectarYMostrarDuplicados() {
           <label style="font-size: 11.5px; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Observaciones / Causa de hospitalización:</label>
           <textarea id="vigHospObsText" placeholder="Especifique motivo, días de estancia, antibióticos..." style="width: 100%; height: 60px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px; font-size: 12px; outline: none;"></textarea>
         </div>
-        <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 18px;">
-          <button class="btn-warn" id="btnQuitarVigilancia" style="padding: 6px 12px; font-size: 12px;" onclick="quitarVigilanciaActual()">Retirar de Vigilancia</button>
+        <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 18px; flex-wrap: wrap;">
+          <div style="display: flex; gap: 6px;">
+            <button class="btn-warn" id="btnQuitarVigilancia" style="padding: 6px 12px; font-size: 12px;" onclick="quitarVigilanciaActual()">Retirar de Vigilancia</button>
+            <button type="button" class="btn-light" style="padding: 6px 10px; font-size: 11.5px; background: #fffbeb; color: #b45309; border: 1.5px dashed #f59e0b; font-weight: 700;" onclick="diferirLlenadoVigilancia(1)">⏳ Completar después</button>
+          </div>
           <div style="display: flex; gap: 8px;">
             <button class="btn-light" onclick="closeVigWizard()">Cancelar</button>
             <button class="btn-save" onclick="irVigPaso2()">Guardar y Siguiente ➔</button>
@@ -4292,8 +4416,11 @@ function detectarYMostrarDuplicados() {
           <input type="date" id="vigFechaColocacion" style="width: 100%; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; outline: none;">
         </div>
 
-        <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 18px;">
-          <button class="btn-light" onclick="irVigPaso1()">⬅ Atrás</button>
+        <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 18px; flex-wrap: wrap;">
+          <div style="display: flex; gap: 6px;">
+            <button class="btn-light" onclick="irVigPaso1()">⬅ Atrás</button>
+            <button type="button" class="btn-light" style="padding: 6px 10px; font-size: 11.5px; background: #fffbeb; color: #b45309; border: 1.5px dashed #f59e0b; font-weight: 700;" onclick="diferirLlenadoVigilancia(2)">⏳ Completar después</button>
+          </div>
           <button class="btn-save" onclick="irVigPaso3()">Guardar y Siguiente ➔</button>
         </div>
       </div>
@@ -4318,8 +4445,11 @@ function detectarYMostrarDuplicados() {
           <label style="font-size: 11.5px; font-weight: 700; color: #475569; display: block; margin-bottom: 4px;">Observaciones / Motivo de cambio a hemodiálisis:</label>
           <textarea id="vigDpObsText" placeholder="Especifique peritonitis previa, disfunción de catéter, tiempo en DP..." style="width: 100%; height: 65px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px; font-size: 12px; outline: none;"></textarea>
         </div>
-        <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 18px;">
-          <button class="btn-light" onclick="irVigPaso2()">⬅ Atrás</button>
+        <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 18px; flex-wrap: wrap;">
+          <div style="display: flex; gap: 6px;">
+            <button class="btn-light" onclick="irVigPaso2()">⬅ Atrás</button>
+            <button type="button" class="btn-light" style="padding: 6px 10px; font-size: 11.5px; background: #fffbeb; color: #b45309; border: 1.5px dashed #f59e0b; font-weight: 700;" onclick="diferirLlenadoVigilancia(3)">⏳ Completar después</button>
+          </div>
           <button class="btn-save" onclick="irVigPaso4()">Guardar y Siguiente ➔</button>
         </div>
       </div>
@@ -4381,8 +4511,11 @@ function detectarYMostrarDuplicados() {
           </div>
         </div>
 
-        <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 18px;">
-          <button class="btn-light" onclick="irVigPaso3()">⬅ Atrás</button>
+        <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 18px; flex-wrap: wrap;">
+          <div style="display: flex; gap: 6px;">
+            <button class="btn-light" onclick="irVigPaso3()">⬅ Atrás</button>
+            <button type="button" class="btn-light" style="padding: 6px 10px; font-size: 11.5px; background: #fffbeb; color: #b45309; border: 1.5px dashed #f59e0b; font-weight: 700;" onclick="diferirLlenadoVigilancia(4)">⏳ Completar después</button>
+          </div>
           <button class="btn-save" onclick="guardarYFinalizarVigilancia()">💾 Guardar y Finalizar Vigilancia</button>
         </div>
       </div>
