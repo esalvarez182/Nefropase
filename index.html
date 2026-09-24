@@ -1212,13 +1212,12 @@
           <span>* Ordenado cronológicamente por día y turno de llegada.</span>
           <span>NefroPase Cloud</span>
         </div>
-        <script>
-          window.onload = function() { window.print(); }
-        </script>
       </body>
       </html>
     `);
     printWin.document.close();
+    printWin.focus();
+    setTimeout(() => { printWin.print(); }, 500);
   }
 
 function cerrarModalNotificaciones() {
