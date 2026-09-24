@@ -607,17 +607,17 @@
     }
 
     const angioText = accList.join(', ');
-    parts.push(`Historial de angioaccesos: ${angioText || 'No registrado'}`);
+    parts.push(`Historial de angioaccesos: ${angioText || 'No registrado'}.`);
 
     // 2. Historial de dialisis:
     const dpObs = (v.dpObs || '').trim();
     const dpVal = v.dp === 'SI' ? (dpObs || 'Sí') : (dpObs || 'No');
-    parts.push(`Historial de dialisis: ${dpVal}`);
+    parts.push(`Historial de diálisis: ${dpVal}.`);
 
     // 3. Hospitalizaciones:
     const hospObs = (v.hospObs || '').trim();
     const hospVal = v.hospUltimoMes === 'SI' ? (hospObs || 'Sí') : (hospObs || 'No');
-    parts.push(`Hospitalizaciones: ${hospVal}`);
+    parts.push(`Hospitalizaciones: ${hospVal}.`);
 
     // 4. Cultivos tomados:
     const cult = v.cultivos || {};
@@ -628,17 +628,17 @@
     if (cultList.length > 0 || cult.resultado) {
       const fechaC = cult.fecha ? ` el ${cult.fecha}` : '';
       const resC = cult.resultado ? ` [Resultado: ${cult.resultado}]` : '';
-      parts.push(`Cultivos: ${cultList.length > 0 ? cultList.join(', ') : 'Registrado'}${fechaC}${resC}`);
+      parts.push(`Cultivos: ${cultList.length > 0 ? cultList.join(', ') : 'Registrado'}${fechaC}${resC}.`);
     }
 
     // 5. Tratamiento antibiótico:
     const tx = v.tratamiento || {};
     if (tx.inicia === 'SI' && tx.esquema) {
       const fechaTx = tx.fechaInicio ? ` (${tx.fechaInicio})` : '';
-      parts.push(`Antibioticoterapia iniciada${fechaTx}: ${tx.esquema}`);
+      parts.push(`Antibioticoterapia iniciada${fechaTx}: ${tx.esquema}.`);
     }
 
-    return parts.join(', ');
+    return parts.join('\n');
   }
 
   function getTextoObservaciones(p) {
@@ -654,7 +654,7 @@
     if (p.vigilanciaAcceso && p.vigilanciaDatos) {
       const vigTexto = formatRedaccionVigilancia(p.vigilanciaDatos);
       if (baseObs) {
-        return `${baseObs}. ${vigTexto}`;
+        return `${baseObs}\n\n${vigTexto}`;
       }
       return vigTexto;
     }
@@ -692,6 +692,15 @@
       }
     }
   };
+
+  
+  function obtenerNotaParaFecha(p, dateKey) {
+    if (p.anotaciones !== undefined && p.anotaciones !== null) return p.anotaciones;
+    if (!p.historialNotas) return p.lastAnnotation || '';
+    const dates = Object.keys(p.historialNotas).filter(d => d <= dateKey).sort();
+    if (dates.length > 0) return p.historialNotas[dates[dates.length - 1]];
+    return p.lastAnnotation || '';
+  }
 
   // Helper functions
   function clean(s) {
@@ -770,11 +779,21 @@
   }
 
   function requiereControlHemocultivo(p) {
-    if (!p || !p.vigilanciaDatos || !p.vigilanciaDatos.tratamiento) return { alerta: false, dias: 0 };
+    if (!p || !p.vigilanciaDatos || !p.vigilanciaDatos.tratamiento) return { alerta: false, dias: 0, estado: 'ninguno' };
     const tx = p.vigilanciaDatos.tratamiento;
-    if (tx.inicia !== 'SI' || !tx.fechaInicio) return { alerta: false, dias: 0 };
+    if (tx.inicia !== 'SI' || !tx.fechaInicio) return { alerta: false, dias: 0, estado: 'ninguno' };
+    
     const dias = calcularDiasTranscurridos(tx.fechaInicio);
-    return { alerta: (dias >= 14), dias: dias };
+    if (dias < 14) return { alerta: false, dias: dias, estado: 'en_curso' };
+    
+    const ctrl = p.vigilanciaDatos.controlHemocultivo || {};
+    if (ctrl.estado === 'completado') {
+      return { alerta: false, dias: dias, estado: 'completado' };
+    } else if (ctrl.estado === 'pendiente_resultado') {
+      return { alerta: true, tipo: 'resultado', dias: dias, fechaToma: ctrl.fechaToma || '', estado: 'pendiente_resultado' };
+    } else {
+      return { alerta: true, tipo: 'toma', dias: dias, estado: 'pendiente_toma' };
+    }
   }
 
   function obtenerPendientesHoyOPasados(p) {
@@ -831,16 +850,37 @@
       const res = requiereControlHemocultivo(p);
       if (res.alerta) {
         totalItems++;
-        html += `<div style="background: #fef2f2; border: 1.5px solid #fca5a5; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <strong style="color: #991b1b; font-size: 13px;">🚨 ${p.nombre}</strong>
-              <span style="font-size: 10.5px; background: #fee2e2; color: #991b1b; font-weight: 800; padding: 2px 6px; border-radius: 4px;">HEMOCULTIVO</span>
-            </div>
-            <div style="font-size: 12px; color: #7f1d1d; margin-top: 3px;">Han transcurrido <strong>${res.dias} días</strong> de antibiótico. Se requiere hemocultivo de control.</div>
-            <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px;">
-              <button class="btn-danger" style="padding: 4px 10px; font-size: 11px;" onclick="irAAlertaYCerarNotif('${p.id}')">Ver Paciente</button>
-            </div>
-        </div>`;
+        if (res.tipo === 'toma') {
+          html += `<div style="background: #fef2f2; border: 1.5px solid #fca5a5; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <strong style="color: #991b1b; font-size: 13px;">🚨 ${p.nombre}</strong>
+                <span style="font-size: 10.5px; background: #fee2e2; color: #991b1b; font-weight: 800; padding: 2px 6px; border-radius: 4px;">TOMA CULTIVO</span>
+              </div>
+              <div style="font-size: 12px; color: #7f1d1d; margin-top: 3px;">Han transcurrido <strong>${res.dias} días</strong> de antibiótico. Se requiere hemocultivo de control.</div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; gap: 8px; flex-wrap: wrap;">
+                <input type="date" id="toma_ctrl_${p.id}" value="${document.getElementById('sessionDate').value}" style="padding: 4px 6px; border: 1px solid #fca5a5; border-radius: 4px; font-size: 11.5px; outline: none; max-width: 120px;">
+                <div style="display: flex; gap: 6px;">
+                  <button class="btn-save" style="padding: 4px 10px; font-size: 11px; background: #b91c1c;" onclick="marcarControlHemocultivoTomado('${p.id}')">✓ Marcar Realizado</button>
+                  <button class="btn-light" style="padding: 4px 8px; font-size: 11px;" onclick="irAAlertaYCerarNotif('${p.id}')">Ver Ficha</button>
+                </div>
+              </div>
+          </div>`;
+        } else if (res.tipo === 'resultado') {
+          html += `<div style="background: #f5f3ff; border: 1.5px solid #c4b5fd; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <strong style="color: #5b21b6; font-size: 13px;">🔬 ${p.nombre}</strong>
+                <span style="font-size: 10.5px; background: #ede9fe; color: #6d28d9; font-weight: 800; padding: 2px 6px; border-radius: 4px;">RESULTADO PENDIENTE</span>
+              </div>
+              <div style="font-size: 12px; color: #4c1d95; margin-top: 3px;">Hemocultivo de control tomado el <strong>${res.fechaToma}</strong>. Faltan resultados de laboratorio.</div>
+              <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;">
+                <input type="text" id="res_ctrl_${p.id}" placeholder="Escribe el resultado (Ej. Negativo a 5 días...)" style="padding: 5px 8px; border: 1px solid #c4b5fd; border-radius: 4px; font-size: 11.5px; outline: none; width: 100%;">
+                <div style="display: flex; justify-content: flex-end; gap: 6px;">
+                  <button class="btn-save" style="padding: 4px 10px; font-size: 11px; background: #6d28d9;" onclick="guardarResultadoControlHemocultivo('${p.id}')">💾 Guardar Resultado</button>
+                  <button class="btn-light" style="padding: 4px 8px; font-size: 11px;" onclick="irAAlertaYCerarNotif('${p.id}')">Ver Ficha</button>
+                </div>
+              </div>
+          </div>`;
+        }
       }
 
       // 2. Pendientes del día
@@ -1112,7 +1152,7 @@
       const infoAlerta = requiereControlHemocultivo(p);
       const card = document.createElement('div');
       let cardClass = 'patient-card';
-      if (infoAlerta.alerta && !p.noAcudio) {
+      if (infoAlerta.alerta && infoAlerta.tipo === 'toma' && !p.noAcudio) {
         cardClass += ' cultivo-alerta-roja';
       } else if (p.visitado) {
         cardClass += ' saved';
@@ -1128,7 +1168,7 @@
           <div style="flex: 1; padding-right: 10px;">
             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
               <input type="text" id="nombre_${p.id}" value="${p.nombre}" title="Clic para editar nombre" style="font-size: 14px; font-weight: 700; color: #0f172a; border: 1.5px solid transparent; border-radius: 6px; padding: 2px 4px; flex: 1; min-width: 200px; background: transparent; text-transform: uppercase; outline: none; ${p.noAcudio ? 'text-decoration: line-through; color: #94a3b8;' : ''}" onfocus="this.style.borderColor='#93c5fd'; this.style.background='#eff6ff';" onblur="this.style.borderColor='transparent'; this.style.background='transparent'; onNombreChanged('${p.id}', this.value)" onchange="onNombreChanged('${p.id}', this.value)">
-              ${p.noAcudio ? '<span class="badge-no-acudio">NO ACUDIÓ</span>' : ''}${infoAlerta.alerta ? `<span class="badge-cultivo-alerta">🚨 REQUERIDO: HEMOCULTIVO CONTROL (${infoAlerta.dias} DÍAS TX)</span>` : ''}${obtenerBadgePendientesHoy(p)}${p.vigilanciaAcceso && !infoAlerta.alerta ? '<span class="badge-vigilancia">⚠️ VIGILANCIA ACCESO</span>' : ''}${p.visitado ? '<span class="badge-visitado">✓ VISITADO</span>' : ''}
+              ${p.noAcudio ? '<span class="badge-no-acudio">NO ACUDIÓ</span>' : ''}${infoAlerta.alerta && infoAlerta.tipo === 'toma' ? `<span class="badge-cultivo-alerta">🚨 REQUERIDO: HEMOCULTIVO CONTROL (${infoAlerta.dias} DÍAS TX)</span>` : ''}${infoAlerta.alerta && infoAlerta.tipo === 'resultado' ? `<span style="background:#f5f3ff; color:#6d28d9; border:1px solid #c4b5fd; font-size:10.5px; font-weight:800; padding:2px 7px; border-radius:6px; margin-left:6px; display:inline-flex; align-items:center; gap:3px;">🔬 PENDIENTE RESULTADO CULTIVO (${infoAlerta.fechaToma})</span>` : ''}${obtenerBadgePendientesHoy(p)}${p.vigilanciaAcceso && !infoAlerta.alerta ? '<span class="badge-vigilancia">⚠️ VIGILANCIA ACCESO</span>' : ''}${p.visitado ? '<span class="badge-visitado">✓ VISITADO</span>' : ''}
             </div>
             
             <!-- NSS Atenuado de 2 Casillas Debajo del Nombre -->
@@ -1248,7 +1288,7 @@
           <div class="obs-box-header">
             <span>📌 Anotación Acumulativa (Se guarda para las próximas sesiones):</span>
           </div>
-          <textarea id="obs_${p.id}" placeholder="Escribe aquí observaciones clínicas, cultivos, medicamentos..." onchange="autoSavePatient('${p.id}')">${p.lastAnnotation || p.anotaciones || ''}</textarea>
+          <textarea id="obs_${p.id}" placeholder="Escribe aquí observaciones clínicas, cultivos, medicamentos..." onchange="autoSavePatient('${p.id}')">${obtenerNotaParaFecha(p, document.getElementById('sessionDate').value)}</textarea>
         </div>
 
         <div class="card-actions">
@@ -1302,9 +1342,18 @@
     p.fc_out = document.getElementById(`fcout_${id}`).value.trim();
     p.temp = document.getElementById(`temp_${id}`).value.trim();
 
+    const dateKey = document.getElementById('sessionDate').value;
     const newAnnotation = document.getElementById(`obs_${id}`).value.trim();
-    p.lastAnnotation = newAnnotation;
     p.anotaciones = newAnnotation;
+    
+    if (!p.historialNotas) p.historialNotas = {};
+    p.historialNotas[dateKey] = newAnnotation;
+
+    // Solo actualizar lastAnnotation global si la fecha guardada es de hoy o futura respecto al historial
+    const allDates = Object.keys(p.historialNotas).sort();
+    if (dateKey === allDates[allDates.length - 1]) {
+      p.lastAnnotation = newAnnotation;
+    }
 
     const baseInput = document.getElementById(`nss_base_${id}`);
     const digInput = document.getElementById(`nss_dig_${id}`);
@@ -1367,7 +1416,8 @@
           nss_base: p.nss_base || '',
           nss_dig: p.nss_dig || '',
           nss: p.nss || '',
-          lastAnnotation: newAnnotation,
+          lastAnnotation: p.lastAnnotation || newAnnotation,
+          historialNotas: p.historialNotas,
           ps: p.ps,
           filtro: p.filtro || '400',
           qs: p.qs || '310',
@@ -1789,7 +1839,7 @@
       <td style="${tdCenter}">Temp</td>
       <td style="${tdCenter}">SatO2</td>
       <td colspan="8" rowspan="2" style="${tdLeft} vertical-align: top; font-size: 7.5pt; line-height: 1.1;">
-        ${obs}
+        ${obs.replace(/\n/g, "<br>")}
       </td>
     </tr>
     <tr style="height: 14px; text-align: center;">
@@ -4020,6 +4070,77 @@ function detectarYMostrarDuplicados() {
     renderListaPendientesPaciente(p);
     renderCards();
     showToast("Pendiente eliminado");
+  }
+
+
+  async function marcarControlHemocultivoTomado(id) {
+    const p = currentPatients.find(item => item.id === id);
+    if (!p) return;
+    const fechaToma = document.getElementById(`toma_ctrl_${id}`).value;
+    if (!fechaToma) { alert("Ingresa la fecha de toma."); return; }
+
+    if (!p.vigilanciaDatos) p.vigilanciaDatos = {};
+    p.vigilanciaDatos.controlHemocultivo = {
+      estado: 'pendiente_resultado',
+      fechaToma: fechaToma
+    };
+    
+    // Also add to cultivos
+    if (!p.vigilanciaDatos.cultivos) p.vigilanciaDatos.cultivos = {};
+    p.vigilanciaDatos.cultivos.central = true;
+    p.vigilanciaDatos.cultivos.fecha = fechaToma;
+
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", p.id);
+        await window.fsUpdateDoc(pRef, { vigilanciaDatos: p.vigilanciaDatos });
+      } catch (err) { console.error(err); }
+    }
+    
+    renderCards();
+    abrirModalNotificaciones();
+    showToast(`✓ Toma registrada el ${fechaToma}. Pendiente recabar resultado.`);
+  }
+
+  async function guardarResultadoControlHemocultivo(id) {
+    const p = currentPatients.find(item => item.id === id);
+    if (!p) return;
+    const resText = document.getElementById(`res_ctrl_${id}`).value.trim();
+    if (!resText) { alert("Ingresa el resultado del cultivo."); return; }
+
+    if (!p.vigilanciaDatos) p.vigilanciaDatos = {};
+    if (!p.vigilanciaDatos.controlHemocultivo) p.vigilanciaDatos.controlHemocultivo = {};
+    
+    p.vigilanciaDatos.controlHemocultivo.estado = 'completado';
+    p.vigilanciaDatos.controlHemocultivo.resultado = resText;
+    p.vigilanciaDatos.controlHemocultivo.fechaResultado = document.getElementById('sessionDate').value;
+    
+    if (!p.vigilanciaDatos.cultivos) p.vigilanciaDatos.cultivos = {};
+    p.vigilanciaDatos.cultivos.resultado = resText;
+
+    // Agregar nota automática
+    const dateKey = document.getElementById('sessionDate').value;
+    const newNote = `Resultado Hemocultivo Control (Tomado: ${p.vigilanciaDatos.controlHemocultivo.fechaToma}): ${resText}`;
+    if (!p.historialNotas) p.historialNotas = {};
+    let curNote = p.historialNotas[dateKey] || '';
+    p.historialNotas[dateKey] = curNote ? `${curNote}\n\n${newNote}` : newNote;
+    p.anotaciones = p.historialNotas[dateKey];
+    p.lastAnnotation = p.anotaciones;
+
+    if (window.db) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", p.id);
+        await window.fsUpdateDoc(pRef, { 
+            vigilanciaDatos: p.vigilanciaDatos,
+            historialNotas: p.historialNotas,
+            lastAnnotation: p.lastAnnotation
+        });
+      } catch (err) { console.error(err); }
+    }
+    
+    renderCards();
+    abrirModalNotificaciones();
+    showToast(`✓ Resultado registrado exitosamente.`);
   }
 
 </script>
