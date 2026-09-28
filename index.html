@@ -351,25 +351,59 @@
     .btn-warn { background: #d97706; color: #fff; }
     .btn-warn:hover { background: #b45309; }
 
-    /* Modals */
+    /* Modals - Fix para Viewport y Desfase Táctil en iOS/Safari */
+    html.modal-open, body.modal-open {
+      overflow: hidden !important;
+      height: 100% !important;
+      touch-action: none !important;
+      -webkit-overflow-scrolling: auto !important;
+    }
     .modal-overlay {
       display: none;
       position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 2000;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      min-height: -webkit-fill-available;
+      background: rgba(0, 0, 0, 0.65);
+      z-index: 5000;
       align-items: center;
       justify-content: center;
       padding: 14px;
+      box-sizing: border-box;
+      overscroll-behavior: contain;
+      touch-action: none;
+      -webkit-backdrop-filter: blur(2px);
+      backdrop-filter: blur(2px);
     }
     .modal-card {
       background: #fff;
       width: 100%;
       max-width: 650px;
-      border-radius: 10px;
+      border-radius: 14px;
       padding: 18px;
-      max-height: 90vh;
+      max-height: 85dvh;
+      max-height: calc(100dvh - 36px);
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      position: relative;
+      box-sizing: border-box;
+      touch-action: pan-y;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    }
+    /* Evitar auto-zoom molesto de iOS en inputs de fecha/texto en modales */
+    .modal-card input, .modal-card select, .modal-card textarea {
+      font-size: 16px !important;
+    }
+    @media (min-width: 600px) {
+      .modal-card input, .modal-card select, .modal-card textarea {
+        font-size: 13px !important;
+      }
     }
 
     .toast {
@@ -4749,6 +4783,27 @@ function detectarYMostrarDuplicados() {
     abrirModalNotificaciones();
   }
 
+
+  // Observador universal de modales para bloquear scroll del fondo y eliminar desfase táctil en iOS
+  document.addEventListener('DOMContentLoaded', () => {
+    const modalObserver = new MutationObserver(() => {
+      const anyOpen = Array.from(document.querySelectorAll('.modal-overlay')).some(m => {
+        return m.style.display && m.style.display !== 'none';
+      });
+      if (anyOpen) {
+        document.body.classList.add('modal-open');
+        document.documentElement.classList.add('modal-open');
+      } else {
+        document.body.classList.remove('modal-open');
+        document.documentElement.classList.remove('modal-open');
+      }
+    });
+
+    document.querySelectorAll('.modal-overlay').forEach(el => {
+      modalObserver.observe(el, { attributes: true, attributeFilter: ['style', 'class'] });
+    });
+  });
+
 </script>
 
   
@@ -5397,12 +5452,12 @@ function detectarYMostrarDuplicados() {
           <input type="text" id="txtPendOtro" placeholder="Ej. Laboratorios mensuales, cita con cirugía vascular, etc..." style="width: 100%; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; outline: none;">
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 140px; gap: 10px; align-items: flex-end;">
-          <div>
+        <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 160px;">
             <label style="font-size: 11.5px; font-weight: 700; color: #475569; display: block; margin-bottom: 3px;">📅 Fecha en que debe realizarse:</label>
-            <input type="date" id="datePendRealizar" style="width: 100%; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; outline: none; font-weight: 600;">
+            <input type="date" id="datePendRealizar" style="width: 100%; padding: 8px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-weight: 600; outline: none; background: #fff; box-sizing: border-box;">
           </div>
-          <button class="btn-save" style="padding: 7px 12px; font-size: 12px; height: 34px; justify-content: center; background: #ca8a04;" onclick="guardarPendienteParaPaciente()">➕ Agregar</button>
+          <button type="button" class="btn-save" style="padding: 8px 16px; min-height: 40px; justify-content: center; background: #ca8a04; font-weight: 700; flex: 1; min-width: 120px;" onclick="guardarPendienteParaPaciente()">➕ Agregar</button>
         </div>
       </div>
 
