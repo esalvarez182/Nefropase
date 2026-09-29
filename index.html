@@ -499,40 +499,42 @@
   </header>
 
   <!-- Controls -->
-  <div class="control-strip">
-    <div class="day-selector-group" style="flex-wrap: wrap;">
-      <label for="daySelect">🗓️ Día:</label>
-      <select id="daySelect" onchange="onDayChanged()">
-        <option value="DOMINGO">Domingo</option>
-        <option value="LUNES">Lunes</option>
-        <option value="MARTES" selected>Martes</option>
-        <option value="MIERCOLES">Miércoles</option>
-        <option value="JUEVES">Jueves</option>
-        <option value="VIERNES">Viernes</option>
-        <option value="SABADO">Sábado</option>
-      </select>
-      <input type="date" id="sessionDate" onchange="onDateChanged()">
-      <label for="shiftSelect" style="font-size: 12px; font-weight: 600; margin-left: 6px;">⏰ Turno:</label>
-      <select id="shiftSelect" onchange="onShiftChanged()" style="padding: 6px 10px; border: 1px solid #94a3b8; border-radius: 6px; font-size: 13px; font-weight: 600; outline: none; background: #f8fafc;">
-        <option value="TODOS">Todos</option>
-        <option value="MATUTINO_1">1er Matutino</option>
-        <option value="MATUTINO_2">2do Matutino</option>
-        <option value="VESPERTINO_1">1er Vespertino</option>
-        <option value="VESPERTINO_2">2do Vespertino</option>
-        <option value="NOCTURNO_1">1er Nocturno</option>
-        <option value="NOCTURNO_2">2do Nocturno</option>
-      </select>
-      <span id="barSummary" style="font-size: 11.5px; font-weight: 700; color: #1e40af; background: #eff6ff; padding: 5px 9px; border-radius: 6px; border: 1px solid #bfdbfe;">0 pacientes</span>
-    </div>
-    <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; flex: 1; justify-content: flex-end;">
-      <div style="position: relative; flex: 1; min-width: 170px; max-width: 280px;">
+  <div class="control-strip" style="flex-direction: column; align-items: stretch;">
+    <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 4px;">
+      <div class="day-selector-group" style="flex-wrap: wrap;">
+        <label for="daySelect">🗓️ Día:</label>
+        <select id="daySelect" onchange="onDayChanged()">
+          <option value="DOMINGO">Domingo</option>
+          <option value="LUNES">Lunes</option>
+          <option value="MARTES" selected>Martes</option>
+          <option value="MIERCOLES">Miércoles</option>
+          <option value="JUEVES">Jueves</option>
+          <option value="VIERNES">Viernes</option>
+          <option value="SABADO">Sábado</option>
+        </select>
+        <input type="date" id="sessionDate" onchange="onDateChanged()">
+        <label for="shiftSelect" style="font-size: 12px; font-weight: 600; margin-left: 6px;">⏰ Turno:</label>
+        <select id="shiftSelect" onchange="onShiftChanged()" style="padding: 6px 10px; border: 1px solid #94a3b8; border-radius: 6px; font-size: 13px; font-weight: 600; outline: none; background: #f8fafc;">
+          <option value="TODOS">Todos</option>
+          <option value="MATUTINO_1">1er Matutino</option>
+          <option value="MATUTINO_2">2do Matutino</option>
+          <option value="VESPERTINO_1">1er Vespertino</option>
+          <option value="VESPERTINO_2">2do Vespertino</option>
+          <option value="NOCTURNO_1">1er Nocturno</option>
+          <option value="NOCTURNO_2">2do Nocturno</option>
+        </select>
+        <span id="barSummary" style="font-size: 11.5px; font-weight: 700; color: #1e40af; background: #eff6ff; padding: 5px 9px; border-radius: 6px; border: 1px solid #bfdbfe;">0 pacientes</span>
+      </div>
+      <div style="position: relative; flex: 1; min-width: 170px; max-width: 300px;">
         <input type="text" id="patientSearchInput" placeholder="🔍 Buscar paciente por nombre..." oninput="onSearchInput(this.value)" style="width: 100%; padding: 6px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; outline: none; background: #fff;">
       </div>
+    </div>
+    <div style="display: flex; gap: 8px; align-items: center; overflow-x: auto; padding-bottom: 2px; white-space: nowrap; -webkit-overflow-scrolling: touch;">
       <button class="btn-light" style="padding: 6px 10px; font-size: 12px; font-weight: 700; color: #0f172a; border: 1px solid #cbd5e1;" onclick="togglePastePanel()">📥 Importar</button>
       <button class="btn-action" style="padding: 6px 13px; font-size: 12px; font-weight: 700;" onclick="openDirectorioPacientesModal()">👥 Pacientes</button>
       <button class="btn-save" style="padding: 6px 11px; font-size: 12px; font-weight: 700;" onclick="openAddPatientModal()">➕ Agregar Paciente</button>
       <button class="btn-warn" style="padding: 6px 11px; font-size: 12px; font-weight: 700;" onclick="openReporteVigilanciaModal()">🛡️ Reporte Vigilancia</button>
-      <button class="btn-light" style="padding: 6px 10px; font-size: 12px;" onclick="openMoverDiaModal()">🔄 Mover Censo</button>
+      <button class="btn-light" style="padding: 6px 10px; font-size: 12px; border: 1px solid #cbd5e1;" onclick="openMoverDiaModal()">🔄 Mover Censo</button>
     </div>
   </div>
   </div>
