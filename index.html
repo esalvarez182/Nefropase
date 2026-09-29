@@ -3002,7 +3002,6 @@ MÉDICOS RESPONSABLES: ${medico}`;
   }
 
   let reportePacientesData = [];
-  let reporteFiltroActual = 'TODOS'; // 'TODOS', 'CON_CULTIVO', o el nombre específico de la bacteria
 
   function formatTurnoNombre(code) {
     if (!code) return 'No especificado';
@@ -3013,55 +3012,6 @@ MÉDICOS RESPONSABLES: ${medico}`;
     if (code === 'NOCTURNO_1') return '1er Turno Nocturno';
     if (code === 'NOCTURNO_2') return '2do Turno Nocturno';
     return code;
-  }
-
-  function extraerMicroorganismoDePaciente(p) {
-    if (!p) return '';
-    const v = p.vigilanciaDatos || {};
-    const cult = v.cultivos || {};
-    const ctrl = v.controlHemocultivo || {};
-    let res = (cult.resultado || ctrl.resultado || '').trim();
-    return res;
-  }
-
-  function actualizarSelectorBacteriasDisponibles() {
-    const sel = document.getElementById('selectFiltroBacteria');
-    if (!sel) return;
-
-    // Recolectar todas las bacterias distintas
-    const conteoBacterias = {};
-    (reportePacientesData || []).forEach(p => {
-      const org = extraerMicroorganismoDePaciente(p);
-      if (org && org !== '-' && org.toLowerCase() !== 'negativo' && org.toLowerCase() !== 'pendiente' && org.toLowerCase() !== 'sin resultado') {
-        // Normalizar primera letra mayúscula o mantener
-        const key = org.trim();
-        conteoBacterias[key] = (conteoBacterias[key] || 0) + 1;
-      }
-    });
-
-    let html = `
-      <option value="TODOS" ${reporteFiltroActual === 'TODOS' ? 'selected' : ''}>📋 Todos los pacientes en vigilancia (${(reportePacientesData || []).length})</option>
-      <option value="CON_CULTIVO" ${reporteFiltroActual === 'CON_CULTIVO' ? 'selected' : ''}>🩸 Con cualquier cultivo positivo</option>
-    `;
-
-    const bacteriaKeys = Object.keys(conteoBacterias).sort((a, b) => a.localeCompare(b));
-    if (bacteriaKeys.length > 0) {
-      html += `<optgroup label="Bacterias / Microorganismos Detectados:">`;
-      bacteriaKeys.forEach(bac => {
-        const isSelected = (reporteFiltroActual === bac) ? 'selected' : '';
-        html += `<option value="${bac}" ${isSelected}>🦠 ${bac} (${conteoBacterias[bac]})</option>`;
-      });
-      html += `</optgroup>`;
-    } else {
-      html += `<option value="" disabled>No hay cultivos con bacteria especificada</option>`;
-    }
-
-    sel.innerHTML = html;
-  }
-
-  function cambiarFiltroBacteria(valor) {
-    reporteFiltroActual = valor || 'TODOS';
-    renderTablaReporteVigilancia();
   }
 
   async function openReporteVigilanciaModal() {
@@ -3093,61 +3043,10 @@ MÉDICOS RESPONSABLES: ${medico}`;
     }
 
     reportePacientesData = allVig;
-    actualizarSelectorBacteriasDisponibles();
     renderTablaReporteVigilancia();
   }
 
-  function getListaPacientesFiltradaReporte() {
-    if (!reportePacientesData || reportePacientesData.length === 0) return [];
-
-    if (reporteFiltroActual === 'TODOS') {
-      return reportePacientesData;
-    }
-
-    if (reporteFiltroActual === 'CON_CULTIVO') {
-      return reportePacientesData.filter(p => {
-        const org = extraerMicroorganismoDePaciente(p).toLowerCase();
-        return org && org !== '-' && org !== 'negativo' && org !== 'sin resultado' && org !== 'pendiente';
-      });
-    }
-
-    // Filtro por bacteria específica seleccionada
-    const filtroNorm = normalizeSearchText(reporteFiltroActual);
-    return reportePacientesData.filter(p => {
-      const org = extraerMicroorganismoDePaciente(p);
-      const notas = `${p.anotaciones || ''} ${p.lastAnnotation || ''}`;
-      const searchTarget = normalizeSearchText(`${org} ${notas}`);
-      return searchTarget.includes(filtroNorm);
-    });
-  }
-
-  function renderTablaReporteVigilancia() {
-    const list = getListaPacientesFiltradaReporte();
-    const totalLabel = document.getElementById('reporteTotalPacientes');
-    if (totalLabel) {
-      if (reporteFiltroActual === 'TODOS') {
-        totalLabel.innerHTML = `Total de pacientes en vigilancia activa: <strong>${reportePacientesData.length}</strong>`;
-      } else if (reporteFiltroActual === 'CON_CULTIVO') {
-        totalLabel.innerHTML = `🩸 Pacientes con cultivo positivo registrado: <strong>${list.length}</strong> de ${reportePacientesData.length}`;
-      } else {
-        totalLabel.innerHTML = `🔬 Pacientes con <strong>${reporteFiltroActual}</strong>: <strong>${list.length}</strong> de ${reportePacientesData.length}`;
-      }
-    }
-
-    if (list.length === 0) {
-      document.getElementById('reporteContenidoHtml').innerHTML = `
-        <div style="text-align:center; padding:30px; color:#64748b;">
-          <p style="font-size:14px; font-weight:700; color:#0f172a; margin-bottom:6px;">
-            ${reporteFiltroActual === 'TODOS' 
-              ? 'No hay pacientes con bandera de vigilancia activa.' 
-              : `No se encontraron pacientes con hemocultivo positivo para "${reporteFiltroActual}".`}
-          </p>
-          <p style="font-size:12px;">Para registrar datos de hemocultivos o catéter, haz clic en el botón <strong>🛡️ Vigilar Acceso</strong> en la tarjeta del paciente.</p>
-        </div>
-      `;
-      return;
-    }
-
+  function generarHtmlTablaReporte(list) {
     let tableHtml = `
       <table border="1" cellspacing="0" cellpadding="6" style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:11px; border-color:#cbd5e1;">
         <thead>
@@ -3244,8 +3143,27 @@ MÉDICOS RESPONSABLES: ${medico}`;
         </tbody>
       </table>
     `;
+    return tableHtml;
+  }
 
-    document.getElementById('reporteContenidoHtml').innerHTML = tableHtml;
+  function renderTablaReporteVigilancia() {
+    const list = reportePacientesData || [];
+    const totalLabel = document.getElementById('reporteTotalPacientes');
+    if (totalLabel) {
+      totalLabel.innerHTML = `Total de pacientes en vigilancia activa: <strong>${list.length}</strong>`;
+    }
+
+    if (list.length === 0) {
+      document.getElementById('reporteContenidoHtml').innerHTML = `
+        <div style="text-align:center; padding:30px; color:#64748b;">
+          <p style="font-size:14px; font-weight:700; color:#0f172a; margin-bottom:6px;">No hay pacientes con bandera de vigilancia activa.</p>
+          <p style="font-size:12px;">Para registrar datos de hemocultivos o catéter, haz clic en el botón <strong>🛡️ Vigilar Acceso</strong> en la tarjeta del paciente.</p>
+        </div>
+      `;
+      return;
+    }
+
+    document.getElementById('reporteContenidoHtml').innerHTML = generarHtmlTablaReporte(list);
   }
 
   function closeReporteVigilanciaModal() {
@@ -3253,17 +3171,11 @@ MÉDICOS RESPONSABLES: ${medico}`;
   }
 
   async function copyReporteVigilanciaHtml() {
-    const list = getListaPacientesFiltradaReporte();
+    const list = reportePacientesData || [];
     if (list.length === 0) {
-      alert("No hay pacientes para copiar en la vista actual.");
+      alert("No hay pacientes para copiar.");
       return;
     }
-
-    const bacteriaTitulo = (reporteFiltroActual === 'TODOS') 
-      ? 'VIGILANCIA GENERAL DE ACCESOS VASCULARES' 
-      : (reporteFiltroActual === 'CON_CULTIVO')
-        ? 'PACIENTES CON AISLAMIENTO MICROBIANO EN HEMOCULTIVO'
-        : `PACIENTES CON AISLAMIENTO DE: ${reporteFiltroActual.toUpperCase()}`;
 
     let rowsHtml = '';
     list.forEach(p => {
@@ -3303,7 +3215,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
     const fullHtml = `
       <div style="font-family: Arial, sans-serif; margin-bottom: 8px;">
-        <h3 style="color: #1e3a8a; margin: 0 0 4px;">REPORTE EPIDEMIOLÓGICO: ${bacteriaTitulo}</h3>
+        <h3 style="color: #1e3a8a; margin: 0 0 4px;">REPORTE EPIDEMIOLÓGICO: VIGILANCIA DE ACCESOS VASCULARES</h3>
         <p style="font-size: 10pt; color: #475569; margin: 0 0 10px;">Fecha de emisión: ${getSelectedDateFormatted()} &bull; Total pacientes: ${list.length}</p>
       </div>
       <table border="1" cellspacing="0" cellpadding="5" style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 10pt; width: 100%;">
@@ -3326,32 +3238,127 @@ MÉDICOS RESPONSABLES: ${medico}`;
     `;
 
     await copyRichHtml(fullHtml);
-    showToast("¡Tabla copiada! Abre Google Docs (docs.new) y presiona Pegar (Ctrl + V)");
+    showToast("¡Tabla copiada! Abre tu documento en Google Docs (docs.new) y pega (Ctrl + V)");
+  }
+
+  function descargarReporteVigilanciaDoc() {
+    const list = reportePacientesData || [];
+    if (list.length === 0) {
+      alert("No hay pacientes para descargar.");
+      return;
+    }
+
+    let rowsHtml = '';
+    list.forEach(p => {
+      const v = p.vigilanciaDatos || {};
+      const acc = v.accesos || {};
+      const cult = v.cultivos || {};
+      const ctrl = v.controlHemocultivo || {};
+      const tx = v.tratamiento || {};
+      const cat = v.cateterManejo || {};
+
+      const fechaHc = cult.fecha || ctrl.fechaToma || '-';
+      const resHc = cult.resultado || ctrl.resultado || 'Sin resultado';
+      const txEsquema = (tx.inicia === 'SI') ? (tx.esquema || 'Iniciado') : 'Sin antibiótico';
+      const cambioCat = `${cat.cambiado || v.cateterCambiado || 'NO'}${cat.fechaCambio || v.fechaCambioCateter ? ' (' + (cat.fechaCambio || v.fechaCambioCateter) + ')' : ''}`;
+      
+      let previosArr = [];
+      if (acc.yd_cant) previosArr.push(`YD: ${acc.yd_cant}`);
+      if (acc.yi_cant) previosArr.push(`YI: ${acc.yi_cant}`);
+      if (acc.fd_cant) previosArr.push(`FD: ${acc.fd_cant}`);
+      if (acc.fi_cant) previosArr.push(`FI: ${acc.fi_cant}`);
+      const accHist = `${acc.actual || 'No reg.'} (Colocado: ${acc.fechaColocacion || '-'}) | Previos: ${previosArr.length > 0 ? previosArr.join(', ') : 'Ninguno'}`;
+      const dialisisHist = `DP: ${v.dp || 'No'}${v.dpObs ? ' (' + v.dpObs + ')' : ''}`;
+
+      rowsHtml += `
+        <tr>
+          <td style="border: 1px solid #333; padding: 5px; font-weight: bold;">${p.nombre} (Cama ${p.maquina || '-'})</td>
+          <td style="border: 1px solid #333; padding: 5px;">${(p.dias || []).join(', ')} - ${formatTurnoNombre(p.turno)}</td>
+          <td style="border: 1px solid #333; padding: 5px; text-align: center;">${fechaHc}</td>
+          <td style="border: 1px solid #333; padding: 5px; font-weight: bold;">${resHc}</td>
+          <td style="border: 1px solid #333; padding: 5px;">${txEsquema}</td>
+          <td style="border: 1px solid #333; padding: 5px; text-align: center;">${cambioCat}</td>
+          <td style="border: 1px solid #333; padding: 5px;">${accHist}</td>
+          <td style="border: 1px solid #333; padding: 5px;">${dialisisHist}</td>
+        </tr>
+      `;
+    });
+
+    const docContent = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head>
+        <meta charset='utf-8'>
+        <title>Reporte Epidemiologico Vigilancia</title>
+        <style>
+          body { font-family: Arial, sans-serif; font-size: 10pt; color: #1e293b; }
+          h2 { color: #1e40af; margin-bottom: 2px; }
+          p.sub { color: #64748b; font-size: 9pt; margin-top: 0; margin-bottom: 12px; }
+          table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+          th { background-color: #1e40af; color: #ffffff; padding: 6px; border: 1px solid #1e3a8a; text-align: left; }
+          td { border: 1px solid #94a3b8; padding: 5px; vertical-align: top; }
+        </style>
+      </head>
+      <body>
+        <h2>REPORTE EPIDEMIOLÓGICO: VIGILANCIA DE ACCESOS VASCULARES</h2>
+        <p class="sub">Fecha de emisión: ${getSelectedDateFormatted()} | Total de pacientes: ${list.length}</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Paciente</th>
+              <th>Días y Turno</th>
+              <th>Fecha Hemocultivo</th>
+              <th>Resultado Microbiano</th>
+              <th>Tratamiento Antimicrobiano</th>
+              <th>¿Cambio de Catéter? (Fecha)</th>
+              <th>Historial Angioaccesos</th>
+              <th>Historial Diálisis</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob(['\ufeff' + docContent], { type: 'application/msword;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const fechaHoy = document.getElementById('sessionDate').value;
+    a.href = url;
+    a.download = `Reporte_Vigilancia_Docs_${fechaHoy}.doc`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    showToast("✓ Archivo .doc descargado para Google Docs / Word");
   }
 
   function exportarReporteVigilanciaCSV() {
-    const list = getListaPacientesFiltradaReporte();
+    const list = reportePacientesData || [];
     if (list.length === 0) {
       alert("No hay pacientes para exportar.");
       return;
     }
 
+    const cleanCell = s => String(s || '').replace(/[\r\n]+/g, ' ').replace(/"/g, '""').trim();
+
     const headers = [
       "Paciente",
       "Cama",
-      "Dias",
+      "Dias_Sesion",
       "Turno",
-      "Fecha Hemocultivo",
-      "Resultado Microbiano",
-      "Tratamiento Antimicrobiano",
-      "Fecha Inicio Tx",
-      "Cambio de Cateter",
-      "Fecha Cambio Cateter",
-      "Acceso Actual",
-      "Fecha Colocacion Acceso",
-      "Historial Angioaccesos Previos",
-      "Antecedente Dialisis Peritoneal",
-      "Observaciones Dialisis"
+      "Fecha_Hemocultivo",
+      "Resultado_Microbiano",
+      "Tratamiento_Antimicrobiano",
+      "Fecha_Inicio_Tx",
+      "Cambio_Cateter",
+      "Fecha_Cambio_Cateter",
+      "Acceso_Actual",
+      "Fecha_Colocacion_Acceso",
+      "Accesos_Previos",
+      "Antecedente_Dialisis_Peritoneal",
+      "Observaciones_Dialisis_Hospitalizacion"
     ];
 
     const rows = list.map(p => {
@@ -3369,40 +3376,36 @@ MÉDICOS RESPONSABLES: ${medico}`;
       if (acc.fi_cant) previosArr.push(`FI: ${acc.fi_cant}`);
 
       return [
-        `"${(p.nombre || '').replace(/"/g, '""')}"`,
-        `"${p.maquina || ''}"`,
-        `"${(p.dias || []).join(' - ')}"`,
-        `"${formatTurnoNombre(p.turno)}"`,
-        `"${cult.fecha || ctrl.fechaToma || ''}"`,
-        `"${(cult.resultado || ctrl.resultado || '').replace(/"/g, '""')}"`,
-        `"${(tx.esquema || '').replace(/"/g, '""')}"`,
-        `"${tx.fechaInicio || ''}"`,
-        `"${cat.cambiado || v.cateterCambiado || 'NO'}"`,
-        `"${cat.fechaCambio || v.fechaCambioCateter || ''}"`,
-        `"${acc.actual || ''}"`,
-        `"${acc.fechaColocacion || ''}"`,
-        `"${previosArr.join(' | ')}"`,
-        `"${v.dp || 'NO'}"`,
-        `"${(v.dpObs || '').replace(/"/g, '""')}"`
+        `"${cleanCell(p.nombre)}"`,
+        `"${cleanCell(p.maquina)}"`,
+        `"${cleanCell((p.dias || []).join(' - '))}"`,
+        `"${cleanCell(formatTurnoNombre(p.turno))}"`,
+        `"${cleanCell(cult.fecha || ctrl.fechaToma)}"`,
+        `"${cleanCell(cult.resultado || ctrl.resultado)}"`,
+        `"${cleanCell(tx.esquema)}"`,
+        `"${cleanCell(tx.fechaInicio)}"`,
+        `"${cleanCell(cat.cambiado || v.cateterCambiado || 'NO')}"`,
+        `"${cleanCell(cat.fechaCambio || v.fechaCambioCateter)}"`,
+        `"${cleanCell(acc.actual)}"`,
+        `"${cleanCell(acc.fechaColocacion)}"`,
+        `"${cleanCell(previosArr.join(' | '))}"`,
+        `"${cleanCell(v.dp || 'NO')}"`,
+        `"${cleanCell(v.dpObs || v.hospObs)}"`
       ];
     });
 
-    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(r => r.join(","))].join("\r\n");
+    // Delimitador ';' con formato UTF-8 BOM para que Excel y Google Sheets reconozcan las columnas ordenadas sin desconfigurarse
+    const csvContent = "\uFEFFsep=;\r\n" + [headers.join(";"), ...rows.map(r => r.join(";"))].join("\r\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    const safeName = reporteFiltroActual === 'TODOS' 
-      ? 'Reporte_Vigilancia_General' 
-      : (reporteFiltroActual === 'CON_CULTIVO')
-        ? 'Reporte_Cultivos_Positivos'
-        : `Reporte_${reporteFiltroActual.replace(/[^a-zA-Z0-9]/g, '_')}`;
     const fechaHoy = document.getElementById('sessionDate').value;
     a.href = url;
-    a.download = `${safeName}_${fechaHoy}.csv`;
+    a.download = `Reporte_Vigilancia_Accesos_${fechaHoy}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    showToast(`✓ Archivo CSV descargado: ${safeName}`);
+    showToast("✓ Archivo CSV descargado para Sheets / Excel");
   }
 
   async function copyReporteVigilanciaTexto() {
@@ -5334,7 +5337,7 @@ function detectarYMostrarDuplicados() {
 
   <!-- MODAL: REPORTE DE VIGILANCIA DE ACCESOS -->
   <div id="reporteVigilanciaModal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 850px;">
+    <div class="modal-card" style="max-width: 900px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 2px solid #f59e0b; padding-bottom: 8px;">
         <h3 style="font-size: 16.5px; color: #92400e; display: flex; align-items: center; gap: 6px;">
           🛡️ Reporte Epidemiológico: Vigilancia de Accesos Vasculares
@@ -5344,18 +5347,12 @@ function detectarYMostrarDuplicados() {
 
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
         <div>
-          <span id="reporteTotalPacientes" style="font-size: 12.5px; font-weight: 700; color: #b45309;">Cargando pacientes en vigilancia...</span>
-          <div style="display: flex; gap: 8px; margin-top: 6px; align-items: center; flex-wrap: wrap;">
-            <label for="selectFiltroBacteria" style="font-size: 11px; font-weight: 800; color: #1e3a8a;">🔬 Filtrar por Microorganismo / Bacteria:</label>
-            <select id="selectFiltroBacteria" onchange="cambiarFiltroBacteria(this.value)" style="padding: 5px 8px; font-size: 11.5px; font-weight: 700; border-radius: 6px; border: 1.5px solid #93c5fd; background: #fff; color: #1e3a8a; outline: none; max-width: 280px;">
-              <option value="TODOS">📋 Todos los pacientes en vigilancia</option>
-              <option value="CON_CULTIVO">🩸 Con cultivo positivo registrado</option>
-            </select>
-          </div>
+          <span id="reporteTotalPacientes" style="font-size: 13px; font-weight: 700; color: #b45309;">Cargando pacientes en vigilancia...</span>
         </div>
         <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
-          <button class="btn-save" style="padding: 6px 11px; font-size: 11.5px; background: #059669;" onclick="exportarReporteVigilanciaCSV()">📊 Exportar a Sheets (.CSV)</button>
-          <button class="btn-action" style="padding: 6px 11px; font-size: 11.5px;" onclick="copyReporteVigilanciaHtml()">📋 Copiar para Google Docs</button>
+          <button class="btn-save" style="padding: 6px 11px; font-size: 11.5px; background: #059669;" onclick="exportarReporteVigilanciaCSV()">📊 Descargar para Sheets (.csv)</button>
+          <button class="btn-save" style="padding: 6px 11px; font-size: 11.5px; background: #2563eb;" onclick="descargarReporteVigilanciaDoc()">📄 Descargar para Docs (.doc)</button>
+          <button class="btn-action" style="padding: 6px 11px; font-size: 11.5px;" onclick="copyReporteVigilanciaHtml()">📋 Copiar Tabla</button>
           <button class="btn-light" style="padding: 6px 10px; font-size: 11.5px;" onclick="openAddVigManualModal()">➕ Paciente Extra</button>
         </div>
       </div>
@@ -5365,7 +5362,7 @@ function detectarYMostrarDuplicados() {
       <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
         <button class="btn-light" onclick="closeReporteVigilanciaModal()">Cerrar</button>
       </div>
-    </div>
+    </div></div>
   </div>
 
 
