@@ -676,7 +676,17 @@
   }
 
   function getTextoObservaciones(p) {
-    let baseObs = (p.lastAnnotation || p.anotaciones || '').trim();
+    const dateKey = document.getElementById('sessionDate').value;
+    let baseObs = '';
+    
+    // Obtener la nota correspondiente a la fecha activa seleccionada
+    const notaFecha = (p.historialNotas && p.historialNotas[dateKey] !== undefined)
+      ? p.historialNotas[dateKey]
+      : (p.anotaciones !== undefined && p.anotaciones !== null && p.anotaciones.trim() !== '')
+        ? p.anotaciones
+        : obtenerNotaParaFecha(p, dateKey);
+
+    baseObs = (notaFecha || '').trim();
 
     // Eliminar formato anterior si existía [VIGILANCIA: ...]
     baseObs = baseObs.replace(/\[VIGILANCIA:[^\]]+\]/gi, '').trim();
@@ -740,10 +750,20 @@
   }
 
   function obtenerNotaParaFecha(p, dateKey) {
-    if (p.anotaciones !== undefined && p.anotaciones !== null) return p.anotaciones;
-    if (!p.historialNotas) return p.lastAnnotation || '';
-    const dates = Object.keys(p.historialNotas).filter(d => d <= dateKey).sort();
-    if (dates.length > 0) return p.historialNotas[dates[dates.length - 1]];
+    if (!p) return '';
+    // 1. Si existe nota específica guardada para la fecha exacta consultada:
+    if (p.historialNotas && p.historialNotas[dateKey] !== undefined && p.historialNotas[dateKey] !== null) {
+      return p.historialNotas[dateKey];
+    }
+    // 2. Si retrocedo a un día anterior que no tiene nota registrada en esa fecha exacta:
+    // buscar la última nota registrada en fechas menores o iguales a dateKey
+    if (p.historialNotas) {
+      const pastDates = Object.keys(p.historialNotas).filter(d => d <= dateKey && p.historialNotas[d].trim() !== '').sort();
+      if (pastDates.length > 0) {
+        return p.historialNotas[pastDates[pastDates.length - 1]];
+      }
+    }
+    // 3. Si estoy en el día actual o futuro y no hay nota propia, heredar la última nota previa
     return p.lastAnnotation || '';
   }
 
@@ -1637,7 +1657,7 @@ function cerrarModalNotificaciones() {
           <div class="obs-box-header">
             <span>📌 Anotación Acumulativa (Se guarda para las próximas sesiones):</span>
           </div>
-          <textarea id="obs_${p.id}" placeholder="Escribe aquí observaciones clínicas, cultivos, medicamentos..." onchange="autoSavePatient('${p.id}')">${obtenerNotaParaFecha(p, document.getElementById('sessionDate').value)}</textarea>
+          <textarea id="obs_${p.id}" placeholder="Escribe aquí observaciones clínicas, cultivos, medicamentos..." oninput="onNotaInputLive('${p.id}', this.value)" onchange="autoSavePatient('${p.id}')">${obtenerNotaParaFecha(p, document.getElementById('sessionDate').value)}</textarea>
         </div>
 
         <div class="card-actions">
@@ -1816,6 +1836,27 @@ function cerrarModalNotificaciones() {
     } else {
       if (!isSilent) showToast(`✓ Datos de ${p.nombre} guardados`);
     }
+  }
+
+  
+  let debounceSaveTimeout = null;
+  function onNotaInputLive(patientId, val) {
+    const p = currentPatients.find(item => item.id === patientId);
+    if (!p) return;
+    const dateKey = document.getElementById('sessionDate').value;
+    p.anotaciones = val;
+    if (!p.historialNotas) p.historialNotas = {};
+    p.historialNotas[dateKey] = val;
+
+    const allDates = Object.keys(p.historialNotas).sort();
+    if (dateKey >= allDates[allDates.length - 1]) {
+      p.lastAnnotation = val;
+    }
+
+    clearTimeout(debounceSaveTimeout);
+    debounceSaveTimeout = setTimeout(() => {
+      savePatientData(patientId, true, false);
+    }, 800);
   }
 
   function autoSavePatient(id) { savePatientData(id, true, false); }
@@ -2673,6 +2714,8 @@ MÉDICOS RESPONSABLES: ${medico}`;
       document.getElementById('vigIniciaTx').value = 'NO';
       document.getElementById('vigFechaTx').value = '';
       document.getElementById('vigTxEsquema').value = '';
+      document.getElementById('vigCambioCateter').value = 'NO';
+      document.getElementById('vigFechaCambioCateter').value = '';
       toggleVigTxFields(false);
 
       document.getElementById('btnQuitarVigilancia').style.display = p.vigilanciaAcceso ? 'inline-flex' : 'none';
@@ -2722,6 +2765,10 @@ MÉDICOS RESPONSABLES: ${medico}`;
     document.getElementById('vigFechaTx').value = tx.fechaInicio || '';
     document.getElementById('vigTxEsquema').value = tx.esquema || '';
     toggleVigTxFields(tx.inicia === 'SI');
+
+    const catManejo = v.cateterManejo || {};
+    document.getElementById('vigCambioCateter').value = catManejo.cambiado || v.cateterCambiado || 'NO';
+    document.getElementById('vigFechaCambioCateter').value = catManejo.fechaCambio || v.fechaCambioCateter || '';
 
     // Show/hide button to withdraw
     document.getElementById('btnQuitarVigilancia').style.display = p.vigilanciaAcceso ? 'inline-flex' : 'none';
@@ -2851,6 +2898,11 @@ MÉDICOS RESPONSABLES: ${medico}`;
       esquema: esquemaTx
     };
 
+    const cateterManejo = {
+      cambiado: document.getElementById('vigCambioCateter').value,
+      fechaCambio: document.getElementById('vigFechaCambioCateter').value || ''
+    };
+
     p.vigilanciaAcceso = true;
     if (!p.vigilanciaDatos) p.vigilanciaDatos = {};
 
@@ -2869,6 +2921,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
       dpObs: dpObs,
       cultivos: cultivos,
       tratamiento: tratamiento,
+      cateterManejo: cateterManejo,
       pasosDiferidos: pasosDif,
       datosIncompletos: (pasosDif.length > 0)
     };
@@ -2949,6 +3002,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
   }
 
   let reportePacientesData = [];
+  let reporteFiltroActual = 'TODOS'; // 'TODOS', 'CON_CULTIVO', o el nombre específico de la bacteria
 
   function formatTurnoNombre(code) {
     if (!code) return 'No especificado';
@@ -2961,9 +3015,58 @@ MÉDICOS RESPONSABLES: ${medico}`;
     return code;
   }
 
+  function extraerMicroorganismoDePaciente(p) {
+    if (!p) return '';
+    const v = p.vigilanciaDatos || {};
+    const cult = v.cultivos || {};
+    const ctrl = v.controlHemocultivo || {};
+    let res = (cult.resultado || ctrl.resultado || '').trim();
+    return res;
+  }
+
+  function actualizarSelectorBacteriasDisponibles() {
+    const sel = document.getElementById('selectFiltroBacteria');
+    if (!sel) return;
+
+    // Recolectar todas las bacterias distintas
+    const conteoBacterias = {};
+    (reportePacientesData || []).forEach(p => {
+      const org = extraerMicroorganismoDePaciente(p);
+      if (org && org !== '-' && org.toLowerCase() !== 'negativo' && org.toLowerCase() !== 'pendiente' && org.toLowerCase() !== 'sin resultado') {
+        // Normalizar primera letra mayúscula o mantener
+        const key = org.trim();
+        conteoBacterias[key] = (conteoBacterias[key] || 0) + 1;
+      }
+    });
+
+    let html = `
+      <option value="TODOS" ${reporteFiltroActual === 'TODOS' ? 'selected' : ''}>📋 Todos los pacientes en vigilancia (${(reportePacientesData || []).length})</option>
+      <option value="CON_CULTIVO" ${reporteFiltroActual === 'CON_CULTIVO' ? 'selected' : ''}>🩸 Con cualquier cultivo positivo</option>
+    `;
+
+    const bacteriaKeys = Object.keys(conteoBacterias).sort((a, b) => a.localeCompare(b));
+    if (bacteriaKeys.length > 0) {
+      html += `<optgroup label="Bacterias / Microorganismos Detectados:">`;
+      bacteriaKeys.forEach(bac => {
+        const isSelected = (reporteFiltroActual === bac) ? 'selected' : '';
+        html += `<option value="${bac}" ${isSelected}>🦠 ${bac} (${conteoBacterias[bac]})</option>`;
+      });
+      html += `</optgroup>`;
+    } else {
+      html += `<option value="" disabled>No hay cultivos con bacteria especificada</option>`;
+    }
+
+    sel.innerHTML = html;
+  }
+
+  function cambiarFiltroBacteria(valor) {
+    reporteFiltroActual = valor || 'TODOS';
+    renderTablaReporteVigilancia();
+  }
+
   async function openReporteVigilanciaModal() {
     document.getElementById('reporteVigilanciaModal').style.display = 'flex';
-    document.getElementById('reporteTotalPacientes').innerText = 'Consultando base de datos...';
+    document.getElementById('reporteTotalPacientes').innerText = 'Consultando base de datos completa...';
     document.getElementById('reporteContenidoHtml').innerHTML = '<p style="text-align:center; color:#64748b; padding:20px;">Cargando censo completo de vigilancia...</p>';
 
     let allVig = [];
@@ -2975,7 +3078,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
         const snap = await window.fsGetDocs(patientsRef);
         snap.forEach(docSnap => {
           const data = { id: docSnap.id, ...docSnap.data() };
-          if (data.vigilanciaAcceso === true) {
+          if (data.vigilanciaAcceso === true && !data.eliminado && !data.fusionadoEn) {
             allVig.push(data);
           }
         });
@@ -2986,121 +3089,151 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
     // Fallback con pacientes locales si la nube no devolvió o está offline
     if (allVig.length === 0) {
-      allVig = currentPatients.filter(p => p.vigilanciaAcceso === true);
+      allVig = currentPatients.filter(p => p.vigilanciaAcceso === true && !p.eliminado && !p.fusionadoEn);
     }
 
     reportePacientesData = allVig;
-    document.getElementById('reporteTotalPacientes').innerText = `Total de pacientes en vigilancia activa: ${allVig.length}`;
+    actualizarSelectorBacteriasDisponibles();
+    renderTablaReporteVigilancia();
+  }
 
-    if (allVig.length === 0) {
+  function getListaPacientesFiltradaReporte() {
+    if (!reportePacientesData || reportePacientesData.length === 0) return [];
+
+    if (reporteFiltroActual === 'TODOS') {
+      return reportePacientesData;
+    }
+
+    if (reporteFiltroActual === 'CON_CULTIVO') {
+      return reportePacientesData.filter(p => {
+        const org = extraerMicroorganismoDePaciente(p).toLowerCase();
+        return org && org !== '-' && org !== 'negativo' && org !== 'sin resultado' && org !== 'pendiente';
+      });
+    }
+
+    // Filtro por bacteria específica seleccionada
+    const filtroNorm = normalizeSearchText(reporteFiltroActual);
+    return reportePacientesData.filter(p => {
+      const org = extraerMicroorganismoDePaciente(p);
+      const notas = `${p.anotaciones || ''} ${p.lastAnnotation || ''}`;
+      const searchTarget = normalizeSearchText(`${org} ${notas}`);
+      return searchTarget.includes(filtroNorm);
+    });
+  }
+
+  function renderTablaReporteVigilancia() {
+    const list = getListaPacientesFiltradaReporte();
+    const totalLabel = document.getElementById('reporteTotalPacientes');
+    if (totalLabel) {
+      if (reporteFiltroActual === 'TODOS') {
+        totalLabel.innerHTML = `Total de pacientes en vigilancia activa: <strong>${reportePacientesData.length}</strong>`;
+      } else if (reporteFiltroActual === 'CON_CULTIVO') {
+        totalLabel.innerHTML = `🩸 Pacientes con cultivo positivo registrado: <strong>${list.length}</strong> de ${reportePacientesData.length}`;
+      } else {
+        totalLabel.innerHTML = `🔬 Pacientes con <strong>${reporteFiltroActual}</strong>: <strong>${list.length}</strong> de ${reportePacientesData.length}`;
+      }
+    }
+
+    if (list.length === 0) {
       document.getElementById('reporteContenidoHtml').innerHTML = `
         <div style="text-align:center; padding:30px; color:#64748b;">
-          <p style="font-size:14px; font-weight:700; color:#0f172a; margin-bottom:6px;">No hay pacientes con bandera de vigilancia activa.</p>
-          <p style="font-size:12px;">Para agregar un paciente a este reporte, haz clic en el botón <strong>🛡️ Vigilar Acceso</strong> en su tarjeta.</p>
+          <p style="font-size:14px; font-weight:700; color:#0f172a; margin-bottom:6px;">
+            ${reporteFiltroActual === 'TODOS' 
+              ? 'No hay pacientes con bandera de vigilancia activa.' 
+              : `No se encontraron pacientes con hemocultivo positivo para "${reporteFiltroActual}".`}
+          </p>
+          <p style="font-size:12px;">Para registrar datos de hemocultivos o catéter, haz clic en el botón <strong>🛡️ Vigilar Acceso</strong> en la tarjeta del paciente.</p>
         </div>
       `;
       return;
     }
 
-    // Render HTML Table
     let tableHtml = `
-      <table border="1" cellspacing="0" cellpadding="6" style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:11.5px; border-color:#cbd5e1;">
+      <table border="1" cellspacing="0" cellpadding="6" style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:11px; border-color:#cbd5e1;">
         <thead>
           <tr style="background:#fef3c7; color:#92400e; text-align:left; font-size:11px;">
             <th style="padding:6px; border:1px solid #cbd5e1;">Paciente</th>
             <th style="padding:6px; border:1px solid #cbd5e1;">Días / Turno</th>
-            <th style="padding:6px; border:1px solid #cbd5e1;">Historial de Accesos</th>
-            <th style="padding:6px; border:1px solid #cbd5e1;">Hospitalizaciones (Último Mes)</th>
-            <th style="padding:6px; border:1px solid #cbd5e1;">Diálisis Peritoneal</th>
-            <th style="padding:6px; border:1px solid #cbd5e1; background: #fee2e2; color: #991b1b;">Cultivos y Tratamiento</th>
+            <th style="padding:6px; border:1px solid #cbd5e1;">Fecha Hemocultivo</th>
+            <th style="padding:6px; border:1px solid #cbd5e1; background: #fee2e2; color: #991b1b;">Resultado Microbiano</th>
+            <th style="padding:6px; border:1px solid #cbd5e1;">Tratamiento Antimicrobiano</th>
+            <th style="padding:6px; border:1px solid #cbd5e1; background: #eff6ff; color: #1e40af;">¿Cambio de Catéter?</th>
+            <th style="padding:6px; border:1px solid #cbd5e1;">Historial Angioaccesos</th>
+            <th style="padding:6px; border:1px solid #cbd5e1;">Historial Diálisis</th>
             <th style="padding:6px; border:1px solid #cbd5e1; text-align: center;">Acción</th>
           </tr>
         </thead>
         <tbody>
     `;
 
-    allVig.forEach(p => {
+    list.forEach(p => {
       const v = p.vigilanciaDatos || {};
       const acc = v.accesos || {};
+      const cult = v.cultivos || {};
+      const ctrl = v.controlHemocultivo || {};
+      const tx = v.tratamiento || {};
+      const cat = v.cateterManejo || {};
       
-      const diasStr = (p.dias && p.dias.length > 0) ? p.dias.join(', ') : 'Sin días asignados';
+      const diasStr = (p.dias && p.dias.length > 0) ? p.dias.join(', ') : 'Sin días';
       const turnoStr = formatTurnoNombre(p.turno);
 
-      // Accesos
+      // Fecha y Resultado de Hemocultivo
+      const fechaHc = cult.fecha || ctrl.fechaToma || 'No registrada';
+      const resHc = (cult.resultado || ctrl.resultado || 'Sin resultado').trim();
+      const tieneAislamiento = resHc && resHc !== 'Sin resultado' && resHc.toLowerCase() !== 'negativo' && resHc.toLowerCase() !== 'pendiente';
+
+      // Tratamiento
+      let txTexto = 'Sin antibiótico';
+      if (tx.inicia === 'SI' && tx.esquema) {
+        txTexto = `<strong>${tx.esquema}</strong>`;
+        if (tx.fechaInicio) txTexto += `<br><small style="color:#64748b;">Inicio: ${tx.fechaInicio}</small>`;
+      }
+
+      // Cambio de catéter
+      const cambioVal = cat.cambiado || v.cateterCambiado || 'NO';
+      const cambioFecha = cat.fechaCambio || v.fechaCambioCateter || '';
+      let cambioHtml = `<strong>${cambioVal}</strong>`;
+      if (cambioFecha) cambioHtml += `<br><small style="color:#1e40af;">Fecha: ${cambioFecha}</small>`;
+
+      // Historial de Accesos
       let accesosText = `<strong>Actual:</strong> ${acc.actual || 'No registrado'}`;
-      if (acc.fechaColocacion) accesosText += `<br><small style="color:#64748b;">Fecha colocación: ${acc.fechaColocacion}</small>`;
-      
+      if (acc.fechaColocacion) accesosText += `<br><small style="color:#64748b;">Colocado: ${acc.fechaColocacion}</small>`;
       let previosArr = [];
-      if (acc.yd_cant) previosArr.push(`Yugular Der: ${acc.yd_cant}`);
-      if (acc.yi_cant) previosArr.push(`Yugular Izq: ${acc.yi_cant}`);
-      if (acc.fd_cant) previosArr.push(`Femoral Der: ${acc.fd_cant}`);
-      if (acc.fi_cant) previosArr.push(`Femoral Izq: ${acc.fi_cant}`);
-      
-      if (previosArr.length > 0) {
-        accesosText += `<br><small style="color:#475569;">Previos: ${previosArr.join(' | ')}</small>`;
-      }
+      if (acc.yd_cant) previosArr.push(`YD: ${acc.yd_cant}`);
+      if (acc.yi_cant) previosArr.push(`YI: ${acc.yi_cant}`);
+      if (acc.fd_cant) previosArr.push(`FD: ${acc.fd_cant}`);
+      if (acc.fi_cant) previosArr.push(`FI: ${acc.fi_cant}`);
+      if (previosArr.length > 0) accesosText += `<br><small style="color:#475569;">Previos: ${previosArr.join(' | ')}</small>`;
 
-      // Hospitalizaciones
-      let hospText = `<strong>${v.hospUltimoMes || 'No'}</strong>`;
-      if (v.hospObs) {
-        hospText += `<br><span style="font-size:11px; color:#475569;">${v.hospObs}</span>`;
-      }
-
-      // DP
-      let dpText = `<strong>${v.dp || 'No'}</strong>`;
-      if (v.dpObs) {
-        dpText += `<br><span style="font-size:11px; color:#475569;">${v.dpObs}</span>`;
-      }
-
-      // Cultivos & Tratamiento
-      const cult = v.cultivos || {};
-      const tx = v.tratamiento || {};
-      let cultDetails = [];
-      if (cult.central) cultDetails.push('Central');
-      if (cult.periferico) cultDetails.push('Periférico');
-      if (cult.sitio) cultDetails.push('Sitio de salida');
-
-      let cultHtml = '';
-      if (cultDetails.length > 0 || cult.fecha || cult.resultado) {
-        cultHtml += `<strong>Cultivos:</strong> ${cultDetails.length > 0 ? cultDetails.join(', ') : 'Registrado'}`;
-        if (cult.fecha) cultHtml += `<br><small style="color:#475569;">Toma: ${cult.fecha}</small>`;
-        if (cult.resultado) cultHtml += `<br><strong style="color:#991b1b; font-size:11px;">Resultado: ${cult.resultado}</strong>`;
-      } else {
-        cultHtml += `<span style="color:#94a3b8;">Sin cultivos</span>`;
-      }
-
-      let txHtml = '';
-      if (tx.inicia === 'SI') {
-        const diasTx = calcularDiasTranscurridos(tx.fechaInicio);
-        txHtml += `<div style="margin-top: 5px; padding-top: 4px; border-top: 1px dashed #fca5a5;">`;
-        txHtml += `<strong style="color:#b91c1c;">Tx Antibiótico:</strong> ${tx.esquema || 'Iniciado'}`;
-        if (tx.fechaInicio) txHtml += `<br><small style="color:#475569;">Inicio: ${tx.fechaInicio} (${diasTx >= 0 ? diasTx + ' días' : '-'})</small>`;
-        if (diasTx >= 14) {
-          txHtml += `<br><span style="background:#fee2e2; color:#991b1b; font-size:10px; font-weight:800; padding:1px 5px; border-radius:4px; border:1px solid #f87171;">🚨 14 DÍAS CUMPLIDOS</span>`;
-        }
-        txHtml += `</div>`;
-      } else {
-        txHtml += `<br><small style="color:#94a3b8;">Sin antibiótico</small>`;
+      // Historial de Diálisis (DP / Hospitalizaciones)
+      let dialisisText = `<strong>DP:</strong> ${v.dp || 'No'}`;
+      if (v.dpObs) dialisisText += `<br><small style="color:#475569;">${v.dpObs}</small>`;
+      if (v.hospUltimoMes === 'SI' && v.hospObs) {
+        dialisisText += `<br><small style="color:#b45309;">Hosp: ${v.hospObs}</small>`;
       }
 
       tableHtml += `
-        <tr style="vertical-align:top;">
+        <tr style="vertical-align:top; background: ${tieneAislamiento ? '#fffbf5' : '#fff'};">
           <td style="padding:6px; border:1px solid #cbd5e1; font-weight:700; color:#1e3a8a;">
             ${p.nombre}
-            ${(v.datosIncompletos) ? '<br><span style="background:#fee2e2; color:#b91c1c; font-size:9.5px; font-weight:800; padding:1px 5px; border-radius:3px;">⚠️ DATOS DIFERIDOS</span>' : ''}
-            <br><small style="font-weight:normal; color:#64748b;">Máq/Cama: ${p.maquina || '-'}</small>
+            ${(v.datosIncompletos) ? '<br><span style="background:#fee2e2; color:#b91c1c; font-size:9.5px; font-weight:800; padding:1px 5px; border-radius:3px;">⚠️ DIFERIDO</span>' : ''}
+            <br><small style="font-weight:normal; color:#64748b;">Cama: ${p.maquina || '-'}</small>
           </td>
           <td style="padding:6px; border:1px solid #cbd5e1;">
             <strong>${diasStr}</strong>
             <br><small style="color:#475569;">${turnoStr}</small>
           </td>
+          <td style="padding:6px; border:1px solid #cbd5e1;">${fechaHc}</td>
+          <td style="padding:6px; border:1px solid #cbd5e1; background: ${tieneAislamiento ? '#fee2e2' : '#f8fafc'}; color: ${tieneAislamiento ? '#991b1b' : '#1e293b'}; font-weight: ${tieneAislamiento ? '800' : 'normal'};">
+            ${resHc}
+          </td>
+          <td style="padding:6px; border:1px solid #cbd5e1;">${txTexto}</td>
+          <td style="padding:6px; border:1px solid #cbd5e1; background: #f0f9ff;">${cambioHtml}</td>
           <td style="padding:6px; border:1px solid #cbd5e1;">${accesosText}</td>
-          <td style="padding:6px; border:1px solid #cbd5e1;">${hospText}</td>
-          <td style="padding:6px; border:1px solid #cbd5e1;">${dpText}</td>
-          <td style="padding:6px; border:1px solid #cbd5e1; background: #fff5f5;">${cultHtml}${txHtml}</td>
+          <td style="padding:6px; border:1px solid #cbd5e1;">${dialisisText}</td>
           <td style="padding:6px; border:1px solid #cbd5e1; text-align: center; vertical-align: middle;">
             <button class="btn-save" style="padding: 5px 9px; font-size: 11px; font-weight: 700; white-space: nowrap;" onclick="editarVigilanciaDesdeReporte('${p.id}')">
-              ✏️ Editar / Completar
+              ✏️ Editar
             </button>
           </td>
         </tr>
@@ -3120,56 +3253,161 @@ MÉDICOS RESPONSABLES: ${medico}`;
   }
 
   async function copyReporteVigilanciaHtml() {
-    const cont = document.getElementById('reporteContenidoHtml');
-    if (!cont || reportePacientesData.length === 0) {
-      alert("No hay pacientes para copiar.");
+    const list = getListaPacientesFiltradaReporte();
+    if (list.length === 0) {
+      alert("No hay pacientes para copiar en la vista actual.");
       return;
     }
-    await copyRichHtml(cont.innerHTML);
-    showToast("¡Tabla de reporte copiada! Lista para Google Docs o Word");
+
+    const bacteriaTitulo = (reporteFiltroActual === 'TODOS') 
+      ? 'VIGILANCIA GENERAL DE ACCESOS VASCULARES' 
+      : (reporteFiltroActual === 'CON_CULTIVO')
+        ? 'PACIENTES CON AISLAMIENTO MICROBIANO EN HEMOCULTIVO'
+        : `PACIENTES CON AISLAMIENTO DE: ${reporteFiltroActual.toUpperCase()}`;
+
+    let rowsHtml = '';
+    list.forEach(p => {
+      const v = p.vigilanciaDatos || {};
+      const acc = v.accesos || {};
+      const cult = v.cultivos || {};
+      const ctrl = v.controlHemocultivo || {};
+      const tx = v.tratamiento || {};
+      const cat = v.cateterManejo || {};
+
+      const fechaHc = cult.fecha || ctrl.fechaToma || '-';
+      const resHc = cult.resultado || ctrl.resultado || 'Sin resultado';
+      const txEsquema = (tx.inicia === 'SI') ? (tx.esquema || 'Iniciado') : 'Sin antibiótico';
+      const cambioCat = `${cat.cambiado || v.cateterCambiado || 'NO'}${cat.fechaCambio || v.fechaCambioCateter ? ' (' + (cat.fechaCambio || v.fechaCambioCateter) + ')' : ''}`;
+      
+      let previosArr = [];
+      if (acc.yd_cant) previosArr.push(`YD: ${acc.yd_cant}`);
+      if (acc.yi_cant) previosArr.push(`YI: ${acc.yi_cant}`);
+      if (acc.fd_cant) previosArr.push(`FD: ${acc.fd_cant}`);
+      if (acc.fi_cant) previosArr.push(`FI: ${acc.fi_cant}`);
+      const accHist = `${acc.actual || 'No reg.'} (Colocado: ${acc.fechaColocacion || '-'}) | Previos: ${previosArr.length > 0 ? previosArr.join(', ') : 'Ninguno'}`;
+      const dialisisHist = `DP: ${v.dp || 'No'}${v.dpObs ? ' (' + v.dpObs + ')' : ''}`;
+
+      rowsHtml += `
+        <tr>
+          <td style="border: 1px solid #000; padding: 4px; font-weight: bold;">${p.nombre} (Cama ${p.maquina || '-'})</td>
+          <td style="border: 1px solid #000; padding: 4px;">${(p.dias || []).join(', ')} - ${formatTurnoNombre(p.turno)}</td>
+          <td style="border: 1px solid #000; padding: 4px; text-align: center;">${fechaHc}</td>
+          <td style="border: 1px solid #000; padding: 4px; font-weight: bold;">${resHc}</td>
+          <td style="border: 1px solid #000; padding: 4px;">${txEsquema}</td>
+          <td style="border: 1px solid #000; padding: 4px; text-align: center;">${cambioCat}</td>
+          <td style="border: 1px solid #000; padding: 4px;">${accHist}</td>
+          <td style="border: 1px solid #000; padding: 4px;">${dialisisHist}</td>
+        </tr>
+      `;
+    });
+
+    const fullHtml = `
+      <div style="font-family: Arial, sans-serif; margin-bottom: 8px;">
+        <h3 style="color: #1e3a8a; margin: 0 0 4px;">REPORTE EPIDEMIOLÓGICO: ${bacteriaTitulo}</h3>
+        <p style="font-size: 10pt; color: #475569; margin: 0 0 10px;">Fecha de emisión: ${getSelectedDateFormatted()} &bull; Total pacientes: ${list.length}</p>
+      </div>
+      <table border="1" cellspacing="0" cellpadding="5" style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 10pt; width: 100%;">
+        <thead>
+          <tr style="background-color: #1e40af; color: #ffffff;">
+            <th style="border: 1px solid #000; padding: 5px;">Paciente</th>
+            <th style="border: 1px solid #000; padding: 5px;">Días y Turno</th>
+            <th style="border: 1px solid #000; padding: 5px;">Fecha Hemocultivo</th>
+            <th style="border: 1px solid #000; padding: 5px;">Resultado Microbiano</th>
+            <th style="border: 1px solid #000; padding: 5px;">Tratamiento Antimicrobiano</th>
+            <th style="border: 1px solid #000; padding: 5px;">¿Cambio de Catéter? (Fecha)</th>
+            <th style="border: 1px solid #000; padding: 5px;">Historial Angioaccesos</th>
+            <th style="border: 1px solid #000; padding: 5px;">Historial Diálisis</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+    `;
+
+    await copyRichHtml(fullHtml);
+    showToast("¡Tabla copiada! Abre Google Docs (docs.new) y presiona Pegar (Ctrl + V)");
+  }
+
+  function exportarReporteVigilanciaCSV() {
+    const list = getListaPacientesFiltradaReporte();
+    if (list.length === 0) {
+      alert("No hay pacientes para exportar.");
+      return;
+    }
+
+    const headers = [
+      "Paciente",
+      "Cama",
+      "Dias",
+      "Turno",
+      "Fecha Hemocultivo",
+      "Resultado Microbiano",
+      "Tratamiento Antimicrobiano",
+      "Fecha Inicio Tx",
+      "Cambio de Cateter",
+      "Fecha Cambio Cateter",
+      "Acceso Actual",
+      "Fecha Colocacion Acceso",
+      "Historial Angioaccesos Previos",
+      "Antecedente Dialisis Peritoneal",
+      "Observaciones Dialisis"
+    ];
+
+    const rows = list.map(p => {
+      const v = p.vigilanciaDatos || {};
+      const acc = v.accesos || {};
+      const cult = v.cultivos || {};
+      const ctrl = v.controlHemocultivo || {};
+      const tx = v.tratamiento || {};
+      const cat = v.cateterManejo || {};
+
+      let previosArr = [];
+      if (acc.yd_cant) previosArr.push(`YD: ${acc.yd_cant}`);
+      if (acc.yi_cant) previosArr.push(`YI: ${acc.yi_cant}`);
+      if (acc.fd_cant) previosArr.push(`FD: ${acc.fd_cant}`);
+      if (acc.fi_cant) previosArr.push(`FI: ${acc.fi_cant}`);
+
+      return [
+        `"${(p.nombre || '').replace(/"/g, '""')}"`,
+        `"${p.maquina || ''}"`,
+        `"${(p.dias || []).join(' - ')}"`,
+        `"${formatTurnoNombre(p.turno)}"`,
+        `"${cult.fecha || ctrl.fechaToma || ''}"`,
+        `"${(cult.resultado || ctrl.resultado || '').replace(/"/g, '""')}"`,
+        `"${(tx.esquema || '').replace(/"/g, '""')}"`,
+        `"${tx.fechaInicio || ''}"`,
+        `"${cat.cambiado || v.cateterCambiado || 'NO'}"`,
+        `"${cat.fechaCambio || v.fechaCambioCateter || ''}"`,
+        `"${acc.actual || ''}"`,
+        `"${acc.fechaColocacion || ''}"`,
+        `"${previosArr.join(' | ')}"`,
+        `"${v.dp || 'NO'}"`,
+        `"${(v.dpObs || '').replace(/"/g, '""')}"`
+      ];
+    });
+
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(r => r.join(","))].join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const safeName = reporteFiltroActual === 'TODOS' 
+      ? 'Reporte_Vigilancia_General' 
+      : (reporteFiltroActual === 'CON_CULTIVO')
+        ? 'Reporte_Cultivos_Positivos'
+        : `Reporte_${reporteFiltroActual.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const fechaHoy = document.getElementById('sessionDate').value;
+    a.href = url;
+    a.download = `${safeName}_${fechaHoy}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    showToast(`✓ Archivo CSV descargado: ${safeName}`);
   }
 
   async function copyReporteVigilanciaTexto() {
-    if (reportePacientesData.length === 0) {
-      alert("No hay pacientes para copiar.");
-      return;
-    }
-
-    let txt = `REPORTE EPIDEMIOLÓGICO: VIGILANCIA DE ACCESOS VASCULARES\n`;
-    txt += `Fecha de emisión: ${getSelectedDateFormatted()}\n`;
-    txt += `Total pacientes: ${reportePacientesData.length}\n\n`;
-
-    reportePacientesData.forEach((p, idx) => {
-      const v = p.vigilanciaDatos || {};
-      const acc = v.accesos || {};
-      const diasStr = (p.dias && p.dias.length > 0) ? p.dias.join(', ') : '-';
-      const turnoStr = formatTurnoNombre(p.turno);
-
-      let previos = [];
-      if (acc.yd_cant) previos.push(`YD: ${acc.yd_cant}`);
-      if (acc.yi_cant) previos.push(`YI: ${acc.yi_cant}`);
-      if (acc.fd_cant) previos.push(`FD: ${acc.fd_cant}`);
-      if (acc.fi_cant) previos.push(`FI: ${acc.fi_cant}`);
-
-      txt += `${idx + 1}. PACIENTE: ${p.nombre} (Máq: ${p.maquina || '-'})
-`;
-      txt += `   - Días y Turno: ${diasStr} | ${turnoStr}
-`;
-      txt += `   - Acceso Actual: ${acc.actual || 'No registrado'}${acc.fechaColocacion ? ' (Colocado: ' + acc.fechaColocacion + ')' : ''}
-`;
-      if (previos.length > 0) txt += `   - Historial Accesos Previos: ${previos.join(', ')}
-`;
-      txt += `   - Hospitalizaciones Último Mes: ${v.hospUltimoMes || 'No'}${v.hospObs ? ' (' + v.hospObs + ')' : ''}
-`;
-      txt += `   - Antecedente Diálisis Peritoneal: ${v.dp || 'No'}${v.dpObs ? ' (' + v.dpObs + ')' : ''}
-
-`;
-    });
-
-    await navigator.clipboard.writeText(txt);
-    showToast("¡Texto plano del reporte copiado al portapapeles!");
+    exportarReporteVigilanciaCSV();
   }
-
 
   // FUNCIONALIDAD: AGREGAR PACIENTE MANUAL AL REPORTE DE VIGILANCIA
   function openAddVigManualModal() {
@@ -4626,6 +4864,11 @@ function detectarYMostrarDuplicados() {
       esquema: document.getElementById('vigTxEsquema').value.trim()
     };
 
+    const cateterManejo = {
+      cambiado: document.getElementById('vigCambioCateter').value,
+      fechaCambio: document.getElementById('vigFechaCambioCateter').value || ''
+    };
+
     p.vigilanciaAcceso = true;
     p.vigilanciaDatos = {
       ...(p.vigilanciaDatos || {}),
@@ -4635,7 +4878,8 @@ function detectarYMostrarDuplicados() {
       dp: dpVal,
       dpObs: dpObs,
       cultivos: cultivos,
-      tratamiento: tratamiento
+      tratamiento: tratamiento,
+      cateterManejo: cateterManejo
     };
   }
 
@@ -5055,6 +5299,26 @@ function detectarYMostrarDuplicados() {
           </div>
         </div>
 
+        <!-- Recambio o Retiro de Catéter -->
+        <div style="background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px; margin-bottom: 14px;">
+          <strong style="font-size: 12px; color: #1e3a8a; display: block; margin-bottom: 6px;">🔄 Manejo del Catéter (Recambio / Retiro):</strong>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div>
+              <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 2px;">¿Se cambió o retiró el catéter?:</label>
+              <select id="vigCambioCateter" style="width: 100%; padding: 5px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; background: #fff;">
+                <option value="NO">No</option>
+                <option value="SI">Sí</option>
+                <option value="EN ESPERA">En espera</option>
+                <option value="NO APLICA">No aplica (FAV/Prótesis)</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 2px;">📅 Fecha de recambio / retiro:</label>
+              <input type="date" id="vigFechaCambioCateter" style="width: 100%; padding: 4px 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; outline: none; background: #fff;">
+            </div>
+          </div>
+        </div>
+
         <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 18px; flex-wrap: wrap;">
           <div style="display: flex; gap: 6px;">
             <button class="btn-light" onclick="avanzarPasoCompletado(2)">⬅ Atrás</button>
@@ -5079,11 +5343,20 @@ function detectarYMostrarDuplicados() {
       </div>
 
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
-        <span id="reporteTotalPacientes" style="font-size: 12.5px; font-weight: 700; color: #b45309;">Cargando pacientes en vigilancia...</span>
-        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-          <button class="btn-save" style="padding: 6px 12px; font-size: 12px;" onclick="openAddVigManualModal()">➕ Paciente Extra a Vigilancia</button>
-          <button class="btn-action" style="padding: 6px 12px; font-size: 12px;" onclick="copyReporteVigilanciaHtml()">📋 Copiar Tabla para Docs</button>
-          <button class="btn-light" style="padding: 6px 12px; font-size: 12px;" onclick="copyReporteVigilanciaTexto()">📝 Copiar Texto</button>
+        <div>
+          <span id="reporteTotalPacientes" style="font-size: 12.5px; font-weight: 700; color: #b45309;">Cargando pacientes en vigilancia...</span>
+          <div style="display: flex; gap: 8px; margin-top: 6px; align-items: center; flex-wrap: wrap;">
+            <label for="selectFiltroBacteria" style="font-size: 11px; font-weight: 800; color: #1e3a8a;">🔬 Filtrar por Microorganismo / Bacteria:</label>
+            <select id="selectFiltroBacteria" onchange="cambiarFiltroBacteria(this.value)" style="padding: 5px 8px; font-size: 11.5px; font-weight: 700; border-radius: 6px; border: 1.5px solid #93c5fd; background: #fff; color: #1e3a8a; outline: none; max-width: 280px;">
+              <option value="TODOS">📋 Todos los pacientes en vigilancia</option>
+              <option value="CON_CULTIVO">🩸 Con cultivo positivo registrado</option>
+            </select>
+          </div>
+        </div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+          <button class="btn-save" style="padding: 6px 11px; font-size: 11.5px; background: #059669;" onclick="exportarReporteVigilanciaCSV()">📊 Exportar a Sheets (.CSV)</button>
+          <button class="btn-action" style="padding: 6px 11px; font-size: 11.5px;" onclick="copyReporteVigilanciaHtml()">📋 Copiar para Google Docs</button>
+          <button class="btn-light" style="padding: 6px 10px; font-size: 11.5px;" onclick="openAddVigManualModal()">➕ Paciente Extra</button>
         </div>
       </div>
 
@@ -5452,12 +5725,12 @@ function detectarYMostrarDuplicados() {
           <input type="text" id="txtPendOtro" placeholder="Ej. Laboratorios mensuales, cita con cirugía vascular, etc..." style="width: 100%; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; outline: none;">
         </div>
 
-        <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
-          <div style="flex: 1; min-width: 160px;">
+        <div style="display: grid; grid-template-columns: 1fr 140px; gap: 10px; align-items: flex-end;">
+          <div>
             <label style="font-size: 11.5px; font-weight: 700; color: #475569; display: block; margin-bottom: 3px;">📅 Fecha en que debe realizarse:</label>
-            <input type="date" id="datePendRealizar" style="width: 100%; padding: 8px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-weight: 600; outline: none; background: #fff; box-sizing: border-box;">
+            <input type="date" id="datePendRealizar" style="width: 100%; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; outline: none; font-weight: 600;">
           </div>
-          <button type="button" class="btn-save" style="padding: 8px 16px; min-height: 40px; justify-content: center; background: #ca8a04; font-weight: 700; flex: 1; min-width: 120px;" onclick="guardarPendienteParaPaciente()">➕ Agregar</button>
+          <button type="button" class="btn-save" style="padding: 7px 12px; font-size: 12px; height: 34px; justify-content: center; background: #ca8a04;" onclick="guardarPendienteParaPaciente()">➕ Agregar</button>
         </div>
       </div>
 
