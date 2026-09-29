@@ -3170,13 +3170,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
     document.getElementById('reporteVigilanciaModal').style.display = 'none';
   }
 
-  async function copyReporteVigilanciaHtml() {
-    const list = reportePacientesData || [];
-    if (list.length === 0) {
-      alert("No hay pacientes para copiar.");
-      return;
-    }
-
+  function generarHtmlParaDocs(list) {
     let rowsHtml = '';
     list.forEach(p => {
       const v = p.vigilanciaDatos || {};
@@ -3201,34 +3195,30 @@ MÉDICOS RESPONSABLES: ${medico}`;
 
       rowsHtml += `
         <tr>
-          <td style="border: 1px solid #000; padding: 4px; font-weight: bold;">${p.nombre} (Cama ${p.maquina || '-'})</td>
-          <td style="border: 1px solid #000; padding: 4px;">${(p.dias || []).join(', ')} - ${formatTurnoNombre(p.turno)}</td>
-          <td style="border: 1px solid #000; padding: 4px; text-align: center;">${fechaHc}</td>
-          <td style="border: 1px solid #000; padding: 4px; font-weight: bold;">${resHc}</td>
-          <td style="border: 1px solid #000; padding: 4px;">${txEsquema}</td>
-          <td style="border: 1px solid #000; padding: 4px; text-align: center;">${cambioCat}</td>
-          <td style="border: 1px solid #000; padding: 4px;">${accHist}</td>
-          <td style="border: 1px solid #000; padding: 4px;">${dialisisHist}</td>
+          <td style="border: 1px solid #334155; padding: 6px; font-weight: bold;">${p.nombre} (Cama ${p.maquina || '-'})</td>
+          <td style="border: 1px solid #334155; padding: 6px;">${(p.dias || []).join(', ')} - ${formatTurnoNombre(p.turno)}</td>
+          <td style="border: 1px solid #334155; padding: 6px; text-align: center;">${fechaHc}</td>
+          <td style="border: 1px solid #334155; padding: 6px; font-weight: bold; color: #991b1b;">${resHc}</td>
+          <td style="border: 1px solid #334155; padding: 6px;">${txEsquema}</td>
+          <td style="border: 1px solid #334155; padding: 6px; text-align: center;">${cambioCat}</td>
+          <td style="border: 1px solid #334155; padding: 6px;">${accHist}</td>
+          <td style="border: 1px solid #334155; padding: 6px;">${dialisisHist}</td>
         </tr>
       `;
     });
 
-    const fullHtml = `
-      <div style="font-family: Arial, sans-serif; margin-bottom: 8px;">
-        <h3 style="color: #1e3a8a; margin: 0 0 4px;">REPORTE EPIDEMIOLÓGICO: VIGILANCIA DE ACCESOS VASCULARES</h3>
-        <p style="font-size: 10pt; color: #475569; margin: 0 0 10px;">Fecha de emisión: ${getSelectedDateFormatted()} &bull; Total pacientes: ${list.length}</p>
-      </div>
-      <table border="1" cellspacing="0" cellpadding="5" style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 10pt; width: 100%;">
+    return `
+      <table border="1" cellspacing="0" cellpadding="6" style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 10pt; width: 100%;">
         <thead>
           <tr style="background-color: #1e40af; color: #ffffff;">
-            <th style="border: 1px solid #000; padding: 5px;">Paciente</th>
-            <th style="border: 1px solid #000; padding: 5px;">Días y Turno</th>
-            <th style="border: 1px solid #000; padding: 5px;">Fecha Hemocultivo</th>
-            <th style="border: 1px solid #000; padding: 5px;">Resultado Microbiano</th>
-            <th style="border: 1px solid #000; padding: 5px;">Tratamiento Antimicrobiano</th>
-            <th style="border: 1px solid #000; padding: 5px;">¿Cambio de Catéter? (Fecha)</th>
-            <th style="border: 1px solid #000; padding: 5px;">Historial Angioaccesos</th>
-            <th style="border: 1px solid #000; padding: 5px;">Historial Diálisis</th>
+            <th style="border: 1px solid #1e3a8a; padding: 6px;">Paciente</th>
+            <th style="border: 1px solid #1e3a8a; padding: 6px;">Días y Turno</th>
+            <th style="border: 1px solid #1e3a8a; padding: 6px;">Fecha Hemocultivo</th>
+            <th style="border: 1px solid #1e3a8a; padding: 6px;">Resultado Microbiano</th>
+            <th style="border: 1px solid #1e3a8a; padding: 6px;">Tratamiento Antimicrobiano</th>
+            <th style="border: 1px solid #1e3a8a; padding: 6px;">¿Cambio de Catéter? (Fecha)</th>
+            <th style="border: 1px solid #1e3a8a; padding: 6px;">Historial Angioaccesos</th>
+            <th style="border: 1px solid #1e3a8a; padding: 6px;">Historial Diálisis</th>
           </tr>
         </thead>
         <tbody>
@@ -3236,9 +3226,63 @@ MÉDICOS RESPONSABLES: ${medico}`;
         </tbody>
       </table>
     `;
+  }
 
-    await copyRichHtml(fullHtml);
-    showToast("¡Tabla copiada! Abre tu documento en Google Docs (docs.new) y pega (Ctrl + V)");
+  async function copyReporteVigilanciaHtml() {
+    const list = reportePacientesData || [];
+    if (list.length === 0) {
+      alert("No hay pacientes para copiar.");
+      return;
+    }
+
+    const tableHtml = generarHtmlParaDocs(list);
+    const fullHtml = `
+      <div style="font-family: Arial, sans-serif; margin-bottom: 8px;">
+        <h3 style="color: #1e3a8a; margin: 0 0 4px;">REPORTE EPIDEMIOLÓGICO: VIGILANCIA DE ACCESOS VASCULARES</h3>
+        <p style="font-size: 10pt; color: #475569; margin: 0 0 10px;">Fecha de emisión: ${getSelectedDateFormatted()} &bull; Total pacientes: ${list.length}</p>
+      </div>
+      ${tableHtml}
+    `;
+
+    let copied = false;
+
+    // Método 1: Intentar portapapeles moderno
+    if (navigator.clipboard && window.ClipboardItem) {
+      try {
+        const blobHtml = new Blob([fullHtml], { type: 'text/html' });
+        const blobText = new Blob([fullHtml.replace(/<[^>]+>/g, ' ')], { type: 'text/plain' });
+        await navigator.clipboard.write([new ClipboardItem({ 'text/html': blobHtml, 'text/plain': blobText })]);
+        copied = true;
+      } catch (err1) {
+        console.warn("Fallo ClipboardItem, probando método de selección directa:", err1);
+      }
+    }
+
+    // Método 2: Selección directa del nodo (100% infalible en Safari/iOS y móviles)
+    if (!copied) {
+      try {
+        const tableContainer = document.getElementById('reporteContenidoHtml');
+        const tableEl = tableContainer ? tableContainer.querySelector('table') : null;
+        if (tableEl) {
+          const range = document.createRange();
+          range.selectNode(tableEl);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          copied = document.execCommand('copy');
+          sel.removeAllRanges();
+        }
+      } catch (err2) {
+        console.warn("Fallo execCommand:", err2);
+      }
+    }
+
+    if (copied) {
+      showToast("✓ ¡Tabla copiada con formato! Pégala con Ctrl + V en Google Docs");
+    } else {
+      // Si el navegador bloqueó todo acceso al portapapeles, descargar el archivo de inmediato
+      descargarReporteVigilanciaDoc();
+    }
   }
 
   function descargarReporteVigilanciaDoc() {
@@ -3248,42 +3292,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
       return;
     }
 
-    let rowsHtml = '';
-    list.forEach(p => {
-      const v = p.vigilanciaDatos || {};
-      const acc = v.accesos || {};
-      const cult = v.cultivos || {};
-      const ctrl = v.controlHemocultivo || {};
-      const tx = v.tratamiento || {};
-      const cat = v.cateterManejo || {};
-
-      const fechaHc = cult.fecha || ctrl.fechaToma || '-';
-      const resHc = cult.resultado || ctrl.resultado || 'Sin resultado';
-      const txEsquema = (tx.inicia === 'SI') ? (tx.esquema || 'Iniciado') : 'Sin antibiótico';
-      const cambioCat = `${cat.cambiado || v.cateterCambiado || 'NO'}${cat.fechaCambio || v.fechaCambioCateter ? ' (' + (cat.fechaCambio || v.fechaCambioCateter) + ')' : ''}`;
-      
-      let previosArr = [];
-      if (acc.yd_cant) previosArr.push(`YD: ${acc.yd_cant}`);
-      if (acc.yi_cant) previosArr.push(`YI: ${acc.yi_cant}`);
-      if (acc.fd_cant) previosArr.push(`FD: ${acc.fd_cant}`);
-      if (acc.fi_cant) previosArr.push(`FI: ${acc.fi_cant}`);
-      const accHist = `${acc.actual || 'No reg.'} (Colocado: ${acc.fechaColocacion || '-'}) | Previos: ${previosArr.length > 0 ? previosArr.join(', ') : 'Ninguno'}`;
-      const dialisisHist = `DP: ${v.dp || 'No'}${v.dpObs ? ' (' + v.dpObs + ')' : ''}`;
-
-      rowsHtml += `
-        <tr>
-          <td style="border: 1px solid #333; padding: 5px; font-weight: bold;">${p.nombre} (Cama ${p.maquina || '-'})</td>
-          <td style="border: 1px solid #333; padding: 5px;">${(p.dias || []).join(', ')} - ${formatTurnoNombre(p.turno)}</td>
-          <td style="border: 1px solid #333; padding: 5px; text-align: center;">${fechaHc}</td>
-          <td style="border: 1px solid #333; padding: 5px; font-weight: bold;">${resHc}</td>
-          <td style="border: 1px solid #333; padding: 5px;">${txEsquema}</td>
-          <td style="border: 1px solid #333; padding: 5px; text-align: center;">${cambioCat}</td>
-          <td style="border: 1px solid #333; padding: 5px;">${accHist}</td>
-          <td style="border: 1px solid #333; padding: 5px;">${dialisisHist}</td>
-        </tr>
-      `;
-    });
-
+    const tableHtml = generarHtmlParaDocs(list);
     const docContent = `
       <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
       <head>
@@ -3301,23 +3310,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
       <body>
         <h2>REPORTE EPIDEMIOLÓGICO: VIGILANCIA DE ACCESOS VASCULARES</h2>
         <p class="sub">Fecha de emisión: ${getSelectedDateFormatted()} | Total de pacientes: ${list.length}</p>
-        <table>
-          <thead>
-            <tr>
-              <th>Paciente</th>
-              <th>Días y Turno</th>
-              <th>Fecha Hemocultivo</th>
-              <th>Resultado Microbiano</th>
-              <th>Tratamiento Antimicrobiano</th>
-              <th>¿Cambio de Catéter? (Fecha)</th>
-              <th>Historial Angioaccesos</th>
-              <th>Historial Diálisis</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml}
-          </tbody>
-        </table>
+        ${tableHtml}
       </body>
       </html>
     `;
@@ -3394,7 +3387,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
       ];
     });
 
-    // Delimitador ';' con formato UTF-8 BOM para que Excel y Google Sheets reconozcan las columnas ordenadas sin desconfigurarse
+    // Delimitador ';' con cabecera sep=; y UTF-8 BOM para que Excel y Google Sheets reconozcan las columnas ordenadas sin desconfigurarse
     const csvContent = "\uFEFFsep=;\r\n" + [headers.join(";"), ...rows.map(r => r.join(";"))].join("\r\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -5337,7 +5330,7 @@ function detectarYMostrarDuplicados() {
 
   <!-- MODAL: REPORTE DE VIGILANCIA DE ACCESOS -->
   <div id="reporteVigilanciaModal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 900px;">
+    <div class="modal-card" style="max-width: 980px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 2px solid #f59e0b; padding-bottom: 8px;">
         <h3 style="font-size: 16.5px; color: #92400e; display: flex; align-items: center; gap: 6px;">
           🛡️ Reporte Epidemiológico: Vigilancia de Accesos Vasculares
@@ -5345,15 +5338,23 @@ function detectarYMostrarDuplicados() {
         <button onclick="closeReporteVigilanciaModal()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #78350f;">&times;</button>
       </div>
 
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <div>
-          <span id="reporteTotalPacientes" style="font-size: 13px; font-weight: 700; color: #b45309;">Cargando pacientes en vigilancia...</span>
+          <span id="reporteTotalPacientes" style="font-size: 13.5px; font-weight: 800; color: #1e3a8a;">Cargando censo de vigilancia...</span>
         </div>
-        <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
-          <button class="btn-save" style="padding: 6px 11px; font-size: 11.5px; background: #059669;" onclick="exportarReporteVigilanciaCSV()">📊 Descargar para Sheets (.csv)</button>
-          <button class="btn-save" style="padding: 6px 11px; font-size: 11.5px; background: #2563eb;" onclick="descargarReporteVigilanciaDoc()">📄 Descargar para Docs (.doc)</button>
-          <button class="btn-action" style="padding: 6px 11px; font-size: 11.5px;" onclick="copyReporteVigilanciaHtml()">📋 Copiar Tabla</button>
-          <button class="btn-light" style="padding: 6px 10px; font-size: 11.5px;" onclick="openAddVigManualModal()">➕ Paciente Extra</button>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+          <button type="button" class="btn-action" style="padding: 7px 12px; font-size: 12px; font-weight: 700; background: #16a34a;" onclick="copyReporteVigilanciaHtml()" title="Copia la tabla con formato y colores para pegarla directamente en Google Docs">
+            📋 Copiar Tabla para Docs
+          </button>
+          <button type="button" class="btn-save" style="padding: 7px 12px; font-size: 12px; font-weight: 700; background: #2563eb;" onclick="descargarReporteVigilanciaDoc()" title="Descarga un archivo editable compatible con Google Docs y Word">
+            📄 Descargar para Docs (.doc)
+          </button>
+          <button type="button" class="btn-save" style="padding: 7px 12px; font-size: 12px; font-weight: 700; background: #059669;" onclick="exportarReporteVigilanciaCSV()" title="Descarga una hoja de cálculo con columnas ordenadas sin desconfigurarse">
+            📊 Descargar para Sheets (.csv)
+          </button>
+          <button type="button" class="btn-light" style="padding: 7px 10px; font-size: 12px; border: 1px solid #cbd5e1;" onclick="openAddVigManualModal()">
+            ➕ Paciente Extra
+          </button>
         </div>
       </div>
 
@@ -5362,7 +5363,7 @@ function detectarYMostrarDuplicados() {
       <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
         <button class="btn-light" onclick="closeReporteVigilanciaModal()">Cerrar</button>
       </div>
-    </div></div>
+    </div>
   </div>
 
 
