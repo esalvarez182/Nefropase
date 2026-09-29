@@ -3056,7 +3056,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
             <th style="padding:6px; border:1px solid #cbd5e1;">Fecha Hemocultivo</th>
             <th style="padding:6px; border:1px solid #cbd5e1; background: #fee2e2; color: #991b1b;">Resultado Microbiano</th>
             <th style="padding:6px; border:1px solid #cbd5e1;">Tratamiento Antimicrobiano</th>
-            <th style="padding:6px; border:1px solid #cbd5e1; background: #eff6ff; color: #1e40af;">¿Cambio de Catéter?</th>
+            <th style="padding:6px; border:1px solid #cbd5e1; background: #eff6ff; color: #1e40af;">¿Se recolocó catéter?</th>
             <th style="padding:6px; border:1px solid #cbd5e1;">Historial Angioaccesos</th>
             <th style="padding:6px; border:1px solid #cbd5e1;">Historial Diálisis</th>
             <th style="padding:6px; border:1px solid #cbd5e1; text-align: center;">Acción</th>
@@ -3216,7 +3216,7 @@ MÉDICOS RESPONSABLES: ${medico}`;
             <th style="border: 1px solid #1e3a8a; padding: 6px;">Fecha Hemocultivo</th>
             <th style="border: 1px solid #1e3a8a; padding: 6px;">Resultado Microbiano</th>
             <th style="border: 1px solid #1e3a8a; padding: 6px;">Tratamiento Antimicrobiano</th>
-            <th style="border: 1px solid #1e3a8a; padding: 6px;">¿Cambio de Catéter? (Fecha)</th>
+            <th style="border: 1px solid #1e3a8a; padding: 6px;">¿Se recolocó catéter? (Fecha)</th>
             <th style="border: 1px solid #1e3a8a; padding: 6px;">Historial Angioaccesos</th>
             <th style="border: 1px solid #1e3a8a; padding: 6px;">Historial Diálisis</th>
           </tr>
@@ -3345,8 +3345,8 @@ MÉDICOS RESPONSABLES: ${medico}`;
       "Resultado_Microbiano",
       "Tratamiento_Antimicrobiano",
       "Fecha_Inicio_Tx",
-      "Cambio_Cateter",
-      "Fecha_Cambio_Cateter",
+      "Se_Recoloco_Cateter",
+      "Fecha_Recolocacion",
       "Acceso_Actual",
       "Fecha_Colocacion_Acceso",
       "Accesos_Previos",
@@ -5295,22 +5295,20 @@ function detectarYMostrarDuplicados() {
           </div>
         </div>
 
-        <!-- Recambio o Retiro de Catéter -->
+        <!-- Recolocación de Catéter -->
         <div style="background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px; margin-bottom: 14px;">
-          <strong style="font-size: 12px; color: #1e3a8a; display: block; margin-bottom: 6px;">🔄 Manejo del Catéter (Recambio / Retiro):</strong>
+          <strong style="font-size: 12px; color: #1e3a8a; display: block; margin-bottom: 6px;">🔄 Catéter:</strong>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div>
-              <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 2px;">¿Se cambió o retiró el catéter?:</label>
-              <select id="vigCambioCateter" style="width: 100%; padding: 5px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; background: #fff;">
+              <label style="font-size: 11.5px; font-weight: 700; color: #475569; display: block; margin-bottom: 3px;">¿Se recolocó catéter?:</label>
+              <select id="vigCambioCateter" style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; font-weight: 600; background: #fff;">
                 <option value="NO">No</option>
                 <option value="SI">Sí</option>
-                <option value="EN ESPERA">En espera</option>
-                <option value="NO APLICA">No aplica (FAV/Prótesis)</option>
               </select>
             </div>
             <div>
-              <label style="font-size: 11px; font-weight: 700; color: #475569; display: block; margin-bottom: 2px;">📅 Fecha de recambio / retiro:</label>
-              <input type="date" id="vigFechaCambioCateter" style="width: 100%; padding: 4px 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; outline: none; background: #fff;">
+              <label style="font-size: 11.5px; font-weight: 700; color: #475569; display: block; margin-bottom: 3px;">📅 ¿Cuándo?:</label>
+              <input type="date" id="vigFechaCambioCateter" style="width: 100%; padding: 5px 6px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; outline: none; background: #fff;">
             </div>
           </div>
         </div>
