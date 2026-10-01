@@ -1274,25 +1274,6 @@
           <span>NefroPase Cloud</span>
         </div>
       
-  <!-- SCRIPT SCROLL MENU -->
-  <script>
-    let lastScrollTop = 0;
-    window.addEventListener('scroll', function() {
-      const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
-      const menu = document.getElementById('topMenuContainer');
-      
-      if (menu) {
-        if (currentScroll > lastScrollTop && currentScroll > 80) {
-          // Hacia abajo (ocultar)
-          menu.style.transform = 'translateY(-100%)';
-        } else {
-          // Hacia arriba (mostrar)
-          menu.style.transform = 'translateY(0)';
-        }
-      }
-      lastScrollTop = currentScroll <= 0 ? 0 : currentScroll; // Evitar scroll negativo en iOS
-    }, { passive: true });
-  </script>
 </body>
       </html>
     `);
@@ -3375,25 +3356,6 @@ MÉDICOS RESPONSABLES: ${medico}`;
         <p class="sub">Fecha de emisión: ${getSelectedDateFormatted()} | Total de pacientes: ${list.length}</p>
         ${tableHtml}
       
-  <!-- SCRIPT SCROLL MENU -->
-  <script>
-    let lastScrollTop = 0;
-    window.addEventListener('scroll', function() {
-      const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
-      const menu = document.getElementById('topMenuContainer');
-      
-      if (menu) {
-        if (currentScroll > lastScrollTop && currentScroll > 80) {
-          // Hacia abajo (ocultar)
-          menu.style.transform = 'translateY(-100%)';
-        } else {
-          // Hacia arriba (mostrar)
-          menu.style.transform = 'translateY(0)';
-        }
-      }
-      lastScrollTop = currentScroll <= 0 ? 0 : currentScroll; // Evitar scroll negativo en iOS
-    }, { passive: true });
-  </script>
 </body>
       </html>
     `;
@@ -5833,6 +5795,7 @@ function detectarYMostrarDuplicados() {
       </div>
     </div>
   </div>
+
 
 
   <!-- SCRIPT SCROLL MENU -->
