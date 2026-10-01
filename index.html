@@ -1273,7 +1273,27 @@
           <span>* Ordenado cronológicamente por día y turno de llegada.</span>
           <span>NefroPase Cloud</span>
         </div>
-      </body>
+      
+  <!-- SCRIPT SCROLL MENU -->
+  <script>
+    let lastScrollTop = 0;
+    window.addEventListener('scroll', function() {
+      const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
+      const menu = document.getElementById('topMenuContainer');
+      
+      if (menu) {
+        if (currentScroll > lastScrollTop && currentScroll > 80) {
+          // Hacia abajo (ocultar)
+          menu.style.transform = 'translateY(-100%)';
+        } else {
+          // Hacia arriba (mostrar)
+          menu.style.transform = 'translateY(0)';
+        }
+      }
+      lastScrollTop = currentScroll <= 0 ? 0 : currentScroll; // Evitar scroll negativo en iOS
+    }, { passive: true });
+  </script>
+</body>
       </html>
     `);
     printWin.document.close();
@@ -3354,7 +3374,27 @@ MÉDICOS RESPONSABLES: ${medico}`;
         <h2>REPORTE EPIDEMIOLÓGICO: VIGILANCIA DE ACCESOS VASCULARES</h2>
         <p class="sub">Fecha de emisión: ${getSelectedDateFormatted()} | Total de pacientes: ${list.length}</p>
         ${tableHtml}
-      </body>
+      
+  <!-- SCRIPT SCROLL MENU -->
+  <script>
+    let lastScrollTop = 0;
+    window.addEventListener('scroll', function() {
+      const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
+      const menu = document.getElementById('topMenuContainer');
+      
+      if (menu) {
+        if (currentScroll > lastScrollTop && currentScroll > 80) {
+          // Hacia abajo (ocultar)
+          menu.style.transform = 'translateY(-100%)';
+        } else {
+          // Hacia arriba (mostrar)
+          menu.style.transform = 'translateY(0)';
+        }
+      }
+      lastScrollTop = currentScroll <= 0 ? 0 : currentScroll; // Evitar scroll negativo en iOS
+    }, { passive: true });
+  </script>
+</body>
       </html>
     `;
 
@@ -5794,5 +5834,25 @@ function detectarYMostrarDuplicados() {
     </div>
   </div>
 
+
+  <!-- SCRIPT SCROLL MENU -->
+  <script>
+    let lastScrollTop = 0;
+    window.addEventListener('scroll', function() {
+      const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
+      const menu = document.getElementById('topMenuContainer');
+      
+      if (menu) {
+        if (currentScroll > lastScrollTop && currentScroll > 80) {
+          // Hacia abajo (ocultar)
+          menu.style.transform = 'translateY(-100%)';
+        } else {
+          // Hacia arriba (mostrar)
+          menu.style.transform = 'translateY(0)';
+        }
+      }
+      lastScrollTop = currentScroll <= 0 ? 0 : currentScroll; // Evitar scroll negativo en iOS
+    }, { passive: true });
+  </script>
 </body>
 </html>
