@@ -5795,35 +5795,69 @@ function detectarYMostrarDuplicados() {
     </div>
   </div>
 
-  <!-- SCRIPT SCROLL MENU -->
+    <!-- SCRIPT SCROLL MENU -->
   <script>
     let lastScrollTop = 0;
-    window.addEventListener('scroll', function() {
-      // 1. Evitar que el menú se oculte si el usuario está interactuando con los controles (ej. teclado abierto)
-      if (document.activeElement && document.activeElement.closest('#topMenuContainer')) {
-        return;
-      }
-
-      const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
-      const menu = document.getElementById('topMenuContainer');
+    let isMenuInteracted = false;
+    let menuInteractionTimeout;
+    const menuContainer = document.getElementById('topMenuContainer');
+    
+    if (menuContainer) {
+      // 1. Detectar toques físicos en el menú para bloquear la animación
+      menuContainer.addEventListener('touchstart', function() {
+        isMenuInteracted = true;
+        clearTimeout(menuInteractionTimeout);
+      }, { passive: true });
       
-      if (menu) {
-        // 2. Umbral de tolerancia para evitar que micro-scrolls (o rebotes en iOS) activen la animación
-        if (Math.abs(currentScroll - lastScrollTop) <= 5) {
+      menuContainer.addEventListener('touchend', function() {
+        menuInteractionTimeout = setTimeout(() => {
+          if (!menuContainer.contains(document.activeElement)) {
+            isMenuInteracted = false;
+          }
+        }, 800);
+      }, { passive: true });
+
+      // 2. Detectar cuando un input o buscador tiene el foco (teclado abierto)
+      menuContainer.addEventListener('focusin', function() {
+        isMenuInteracted = true;
+        clearTimeout(menuInteractionTimeout);
+        menuContainer.style.transform = 'translateY(0)'; // Forzar visible
+      });
+
+      menuContainer.addEventListener('focusout', function() {
+        menuInteractionTimeout = setTimeout(() => {
+          if (!menuContainer.contains(document.activeElement)) {
+            isMenuInteracted = false;
+          }
+        }, 500);
+      });
+
+      // 3. Lógica de Scroll
+      window.addEventListener('scroll', function() {
+        const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
+        
+        // Si el usuario está interactuando con el menú, NO hacemos nada (evita el salto)
+        if (isMenuInteracted) {
           lastScrollTop = currentScroll <= 0 ? 0 : currentScroll;
           return;
         }
 
-        if (currentScroll > lastScrollTop && currentScroll > 80) {
-          // Hacia abajo (ocultar)
-          menu.style.transform = 'translateY(-100%)';
-        } else {
-          // Hacia arriba (mostrar)
-          menu.style.transform = 'translateY(0)';
+        // Tolerancia de 10px para los rebotes de pantalla de iOS
+        if (Math.abs(currentScroll - lastScrollTop) <= 10) {
+          return;
         }
-      }
-      lastScrollTop = currentScroll <= 0 ? 0 : currentScroll; // Evitar scroll negativo
-    }, { passive: true });
+
+        if (currentScroll > lastScrollTop && currentScroll > 80) {
+          // Scroll hacia abajo -> Ocultar completamente (con todo y sombra)
+          menuContainer.style.transform = 'translateY(-120%)';
+        } else {
+          // Scroll hacia arriba -> Mostrar
+          menuContainer.style.transform = 'translateY(0)';
+        }
+        
+        lastScrollTop = currentScroll <= 0 ? 0 : currentScroll;
+      }, { passive: true });
+    }
   </script>
 </body>
 </html>
