@@ -544,7 +544,6 @@
       <button class="btn-light" style="padding: 6px 10px; font-size: 12px; border: 1px solid #cbd5e1; flex: 1 1 auto; justify-content: center;" onclick="openMoverDiaModal()">🔄 Mover</button>
     </div>
   </div>
-  </div> <!-- Cierre de topMenuContainer -->
   <!-- DIRECT PC PASTE PANEL -->
   <div class="pc-paste-container" id="pcPasteContainer" style="display: none;">
     <div class="paste-card">
@@ -5800,16 +5799,30 @@ function detectarYMostrarDuplicados() {
   <script>
     let lastScrollTop = 0;
     window.addEventListener('scroll', function() {
+      // 1. Evitar que el menú se oculte si el usuario está interactuando con los controles (ej. teclado abierto)
+      if (document.activeElement && document.activeElement.closest('#topMenuContainer')) {
+        return;
+      }
+
       const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
       const menu = document.getElementById('topMenuContainer');
+      
       if (menu) {
+        // 2. Umbral de tolerancia para evitar que micro-scrolls (o rebotes en iOS) activen la animación
+        if (Math.abs(currentScroll - lastScrollTop) <= 5) {
+          lastScrollTop = currentScroll <= 0 ? 0 : currentScroll;
+          return;
+        }
+
         if (currentScroll > lastScrollTop && currentScroll > 80) {
+          // Hacia abajo (ocultar)
           menu.style.transform = 'translateY(-100%)';
         } else {
+          // Hacia arriba (mostrar)
           menu.style.transform = 'translateY(0)';
         }
       }
-      lastScrollTop = currentScroll <= 0 ? 0 : currentScroll;
+      lastScrollTop = currentScroll <= 0 ? 0 : currentScroll; // Evitar scroll negativo
     }, { passive: true });
   </script>
 </body>
