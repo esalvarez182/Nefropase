@@ -485,7 +485,7 @@
   <div style="position: sticky; top: 0; z-index: 2000; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
   <!-- Header -->
   <header class="app-header">
-    <h1>🩺 NefroPase Cloud</h1>
+    <h1 style="cursor: pointer; user-select: none;" onclick="goHome()" title="Volver al día actual">🩺 NefroPase Cloud</h1>
     <div style="display: flex; align-items: center; gap: 12px;">
       <button id="btnNotif" style="background: rgba(255,255,255,0.2); border: none; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; position: relative;" onclick="abrirModalNotificaciones()">
         <span id="iconNotif" style="font-size: 18px; filter: grayscale(100%);">⚡</span>
@@ -1312,6 +1312,19 @@ function cerrarModalNotificaciones() {
   let isolatedPatientId = null;
   let activePatientForPiso = null;
   let activePreviewDocPatient = null;
+  let previousState = null;
+
+    function goHome() {
+    initDate();
+    document.getElementById('shiftSelect').value = 'TODOS';
+    currentShiftFilter = 'TODOS';
+    isolatedPatientId = null;
+    previousState = null;
+    const sInput = document.getElementById('patientSearchInput');
+    if (sInput) sInput.value = '';
+    loadDayPatients();
+    showToast("Mostrando censo de hoy");
+  }
 
   function initDate() {
     const today = new Date();
@@ -1466,7 +1479,30 @@ function cerrarModalNotificaciones() {
   function clearIsolatedView() {
     isolatedPatientId = null;
     document.getElementById('patientSearchInput').value = '';
-    renderCards();
+    if (previousState) {
+      document.getElementById('daySelect').value = previousState.day;
+      document.getElementById('shiftSelect').value = previousState.shift;
+      currentShiftFilter = previousState.shift;
+      updatePasteDayLabel();
+      
+      const targetDayIdx = ["DOMINGO", "LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"].indexOf(previousState.day);
+      const dateVal = document.getElementById('sessionDate').value;
+      if (dateVal && targetDayIdx !== -1) {
+        const parts = dateVal.split('-');
+        let current = new Date(parts[0], parts[1] - 1, parts[2]);
+        let diff = targetDayIdx - current.getDay();
+        current.setDate(current.getDate() + diff);
+        const yyyy = current.getFullYear();
+        const mm = String(current.getMonth() + 1).padStart(2, '0');
+        const dd = String(current.getDate()).padStart(2, '0');
+        document.getElementById('sessionDate').value = `${yyyy}-${mm}-${dd}`;
+      }
+      
+      previousState = null;
+      loadDayPatients();
+    } else {
+      renderCards();
+    }
   }
 
   function renderCards() {
@@ -4356,6 +4392,13 @@ function detectarYMostrarDuplicados() {
 
   async function irAPacienteDesdeDirectorio(patientId, dia, turno) {
     closeDirectorioPacientesModal();
+
+    if (!isolatedPatientId) {
+      previousState = {
+        day: document.getElementById('daySelect').value,
+        shift: currentShiftFilter
+      };
+    }
 
     const daySelect = document.getElementById('daySelect');
     let dayChanged = false;
