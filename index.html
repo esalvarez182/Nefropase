@@ -482,7 +482,7 @@
 <body>
 
   <!-- Sticky Wrapper para Buscador Global -->
-  <div id="topMenuContainer" style="position: fixed; top: 0; left: 0; right: 0; width: 100%; z-index: 2000; box-shadow: 0 4px 10px rgba(0,0,0,0.15); transition: transform 0.3s ease-in-out; background: #f8fafc;">
+  <div id="topMenuContainer" style="position: fixed; top: 0; left: 0; right: 0; width: 100%; z-index: 2000; box-shadow: 0 4px 10px rgba(0,0,0,0.15); transition: top 0.3s ease-in-out; background: #f8fafc;">
   <!-- Header -->
   <header class="app-header">
     <h1 style="cursor: pointer; user-select: none;" onclick="goHome()" title="Volver al día actual">🩺 NefroPase Cloud</h1>
@@ -543,7 +543,25 @@
       <button class="btn-warn" style="padding: 6px 10px; font-size: 12px; font-weight: 700; flex: 1 1 auto; justify-content: center;" onclick="openReporteVigilanciaModal()">🛡️ Vigilancia</button>
       <button class="btn-light" style="padding: 6px 10px; font-size: 12px; border: 1px solid #cbd5e1; flex: 1 1 auto; justify-content: center;" onclick="openMoverDiaModal()">🔄 Mover</button>
     </div>
-  </div>
+  </div> <!-- Cierre de topMenuContainer -->
+  
+  <div id="menuSpacer"></div>
+  <script>
+    function adjustSpacer() {
+      const menu = document.getElementById('topMenuContainer');
+      const spacer = document.getElementById('menuSpacer');
+      if (menu && spacer) {
+        spacer.style.height = menu.offsetHeight + 'px';
+      }
+    }
+    window.addEventListener('resize', adjustSpacer);
+    document.addEventListener('DOMContentLoaded', adjustSpacer);
+    // Ejecutar inmediatamente y tras un breve retraso para asegurar el renderizado
+    adjustSpacer();
+    setTimeout(adjustSpacer, 150);
+    setInterval(adjustSpacer, 2000); // Mantenimiento
+  </script>
+
   <!-- DIRECT PC PASTE PANEL -->
   <div class="pc-paste-container" id="pcPasteContainer" style="display: none;">
     <div class="paste-card">
@@ -5795,9 +5813,9 @@ function detectarYMostrarDuplicados() {
     </div>
   </div>
 
-    <!-- SCRIPT SCROLL MENU -->
+      <!-- SCRIPT SCROLL MENU -->
   <script>
-    let lastScrollTop = 0;
+    let lastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
     let isMenuInteracted = false;
     let menuInteractionTimeout;
     const menuContainer = document.getElementById('topMenuContainer');
@@ -5821,7 +5839,7 @@ function detectarYMostrarDuplicados() {
       menuContainer.addEventListener('focusin', function() {
         isMenuInteracted = true;
         clearTimeout(menuInteractionTimeout);
-        menuContainer.style.transform = 'translateY(0)'; // Forzar visible
+        menuContainer.style.top = '0px'; // Forzar visible
       });
 
       menuContainer.addEventListener('focusout', function() {
@@ -5832,7 +5850,7 @@ function detectarYMostrarDuplicados() {
         }, 500);
       });
 
-      // 3. Lógica de Scroll
+      // 3. Lógica de Scroll (Usando TOP en lugar de Transform)
       window.addEventListener('scroll', function() {
         const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
         
@@ -5842,17 +5860,18 @@ function detectarYMostrarDuplicados() {
           return;
         }
 
-        // Tolerancia de 10px para los rebotes de pantalla de iOS
-        if (Math.abs(currentScroll - lastScrollTop) <= 10) {
+        // Tolerancia para los rebotes de pantalla
+        if (Math.abs(currentScroll - lastScrollTop) <= 5) {
           return;
         }
 
         if (currentScroll > lastScrollTop && currentScroll > 80) {
-          // Scroll hacia abajo -> Ocultar completamente (con todo y sombra)
-          menuContainer.style.transform = 'translateY(-120%)';
+          // Scroll hacia abajo -> Ocultar usando TOP
+          const hideOffset = menuContainer.offsetHeight + 15;
+          menuContainer.style.top = '-' + hideOffset + 'px';
         } else {
           // Scroll hacia arriba -> Mostrar
-          menuContainer.style.transform = 'translateY(0)';
+          menuContainer.style.top = '0px';
         }
         
         lastScrollTop = currentScroll <= 0 ? 0 : currentScroll;
