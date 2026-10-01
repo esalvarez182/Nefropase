@@ -1273,8 +1273,7 @@
           <span>* Ordenado cronológicamente por día y turno de llegada.</span>
           <span>NefroPase Cloud</span>
         </div>
-      
-</body>
+      </body>
       </html>
     `);
     printWin.document.close();
@@ -3356,8 +3355,8 @@ MÉDICOS RESPONSABLES: ${medico}`;
         <p class="sub">Fecha de emisión: ${getSelectedDateFormatted()} | Total de pacientes: ${list.length}</p>
         ${tableHtml}
       
-</body>
-      </html>
+
+      
     `;
 
     const blob = new Blob(['\ufeff' + docContent], { type: 'application/msword;charset=utf-8' });
@@ -5796,25 +5795,20 @@ function detectarYMostrarDuplicados() {
     </div>
   </div>
 
-
-
   <!-- SCRIPT SCROLL MENU -->
   <script>
     let lastScrollTop = 0;
     window.addEventListener('scroll', function() {
       const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
       const menu = document.getElementById('topMenuContainer');
-      
       if (menu) {
         if (currentScroll > lastScrollTop && currentScroll > 80) {
-          // Hacia abajo (ocultar)
           menu.style.transform = 'translateY(-100%)';
         } else {
-          // Hacia arriba (mostrar)
           menu.style.transform = 'translateY(0)';
         }
       }
-      lastScrollTop = currentScroll <= 0 ? 0 : currentScroll; // Evitar scroll negativo en iOS
+      lastScrollTop = currentScroll <= 0 ? 0 : currentScroll;
     }, { passive: true });
   </script>
 </body>
