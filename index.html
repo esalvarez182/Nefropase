@@ -1990,6 +1990,8 @@ function cerrarModalNotificaciones() {
       clave: c.clave,
       nombre: p.nombre,
       nss: p.nss || p.nss_base || '',
+      expediente: p.nss_base ? (p.nss_dig ? `${p.nss_base}/${p.nss_dig}` : p.nss_base) : (p.nss || ''),
+      dias: (p.dias || []).map(d => d.substring(0, 3)).join(', ') + (p.turno ? ' - ' + formatTurnoNombre(p.turno).toUpperCase() : ''),
       fechaKey: document.getElementById('sessionDate').value,
       html: generateGoogleDocTable(p)
     };
@@ -2002,7 +2004,7 @@ function cerrarModalNotificaciones() {
       });
       const r = await resp.json();
       if (r.ok) {
-        const extra = r.convertido ? ' (se convirtió a Documento de Google)' : '';
+        const extra = r.creado ? ' (DOCUMENTO NUEVO creado para este paciente)' : r.convertido ? ' (se convirtió a Documento de Google)' : '';
         setTimeout(() => showToast(`✅ Nota ${r.accion} en "${r.documento}"${extra}`), 2700);
       } else if (r.error === 'no_encontrado') {
         alert(`⚠️ La nota se guardó en NefroPase, pero NO se agregó a Google Docs:\n\n${r.mensaje}.\n\nRevisa que el documento tenga el mismo nombre que el paciente.`);
