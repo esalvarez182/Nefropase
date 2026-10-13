@@ -2520,7 +2520,7 @@ function cerrarModalNotificaciones() {
   function generateGoogleDocTable(p) {
     const fecha = getSelectedDateFormatted();
     const isVesp = p.turno && p.turno.includes('VESPERTINO');
-    const medicoTurno = isVesp ? "Dra. Farris / Dr Sanchez" : "Dra. Hernandez / Dr. Sanchez";
+    const medicoTurno = isVesp ? "Dra. Farris" : "Dra. Hernandez";
     const elabora = (p.elaboro || nombreQuienElabora() || '').trim();
     const medico = elabora ? medicoTurno + ' / ' + elabora : medicoTurno;
     const obs = getTextoObservaciones(p);
@@ -2728,7 +2728,7 @@ function cerrarModalNotificaciones() {
 
   function formatNotaPiso(p, tiempo, potasio) {
     const isVesp = p.turno && p.turno.includes('VESPERTINO');
-    const medicoTurno = isVesp ? "Dra. Farris / Dr Sanchez" : "Dra. Hernandez / Dr. Sanchez";
+    const medicoTurno = isVesp ? "Dra. Farris" : "Dra. Hernandez";
     const elabora = (p.elaboro || nombreQuienElabora() || '').trim();
     const medico = elabora ? medicoTurno + ' / ' + elabora : medicoTurno;
     const eventualidades = getTextoObservaciones(p);
