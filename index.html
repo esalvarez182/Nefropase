@@ -496,10 +496,10 @@
     function mostrarAcceso(estado, texto) {
       const capa = document.getElementById('accesoGate');
       if (!capa) return;
-      capa.hidden = (estado === 'ok');
+      capa.style.display = (estado === 'ok') ? 'none' : 'flex';
       document.getElementById('accesoMsg').innerHTML = texto || '';
-      document.getElementById('btnEntrarGoogle').hidden = (estado !== 'fuera');
-      document.getElementById('btnCambiarCuenta').hidden = (estado !== 'denegado');
+      document.getElementById('btnEntrarGoogle').style.display = (estado === 'fuera') ? 'block' : 'none';
+      document.getElementById('btnCambiarCuenta').style.display = (estado === 'denegado') ? 'block' : 'none';
     }
 
     window.npEntrar = async () => {
@@ -574,8 +574,8 @@
       <h2 style="margin: 6px 0 4px; font-size: 22px; color: #1e3a8a;">NefroPase Cloud</h2>
       <p style="margin: 0 0 16px; font-size: 13px; color: #64748b;">Servicio de Nefrología · Acceso solo para residentes autorizados</p>
       <p id="accesoMsg" style="margin: 0 0 18px; font-size: 14px; color: #0f172a; line-height: 1.45;">Cargando…</p>
-      <button id="btnEntrarGoogle" hidden onclick="npEntrar()" style="width: 100%; padding: 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; background: #ffffff; font-size: 15px; font-weight: 700; color: #0f172a; cursor: pointer;">Entrar con Google</button>
-      <button id="btnCambiarCuenta" hidden onclick="npSalir()" style="width: 100%; padding: 12px; border: 0; border-radius: 10px; background: #1e40af; font-size: 15px; font-weight: 700; color: #ffffff; cursor: pointer;">Entrar con otra cuenta</button>
+      <button id="btnEntrarGoogle" onclick="npEntrar()" style="display: none; text-align: center; width: 100%; padding: 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; background: #ffffff; font-size: 15px; font-weight: 700; color: #0f172a; cursor: pointer;">Entrar con Google</button>
+      <button id="btnCambiarCuenta" onclick="npSalir()" style="display: none; text-align: center; width: 100%; padding: 12px; border: 0; border-radius: 10px; background: #1e40af; font-size: 15px; font-weight: 700; color: #ffffff; cursor: pointer;">Entrar con otra cuenta</button>
     </div>
   </div>
 
