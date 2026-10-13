@@ -1951,8 +1951,10 @@ function cerrarModalNotificaciones() {
 
   function configurarDrive() {
     const c = leerCfgDrive();
-    const url = prompt('URL del script de Google (termina en /exec).\nDéjalo vacío para DESACTIVAR el envío a Google Docs en este equipo:', c.url);
+    let url = prompt('Pega la URL del script de Google (termina en /exec).' + (c.url ? '\n(Ya hay una configurada; se reemplazará por la que pegues.)' : '') + '\nDéjalo vacío para DESACTIVAR el envío a Google Docs en este equipo:', '');
     if (url === null) return;
+    url = url.trim();
+    if (!url && c.url && !confirm('¿Desactivar el envío a Google Docs en este equipo?')) return;
     try {
       if (!url.trim()) {
         localStorage.removeItem('np_drive_url');
@@ -1961,8 +1963,8 @@ function cerrarModalNotificaciones() {
         actualizarIconoDrive();
         return;
       }
-      if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(url.trim())) {
-        alert('La URL debe empezar con https://script.google.com/ y terminar en /exec');
+      if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url)) {
+        alert('La URL no es válida. Debe tener la forma:\nhttps://script.google.com/macros/s/.../exec\n\nCópiala completa una sola vez y vuelve a intentarlo.');
         return;
       }
       const clave = prompt('Clave secreta (la misma que pusiste en el script):', c.clave);
