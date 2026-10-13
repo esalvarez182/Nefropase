@@ -487,6 +487,7 @@
   <header class="app-header">
     <h1 style="cursor: pointer; user-select: none;" onclick="goHome()" title="Volver al día actual">🩺 NefroPase Cloud</h1>
     <div style="display: flex; align-items: center; gap: 12px;">
+      <button id="btnDriveCfg" title="Enviar notas a Google Docs al dar Guardar" style="background: rgba(255,255,255,0.2); border: none; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 17px;" onclick="configurarDrive()">📄</button>
       <button id="btnNotif" style="background: rgba(255,255,255,0.2); border: none; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; position: relative;" onclick="abrirModalNotificaciones()">
         <span id="iconNotif" style="font-size: 18px; filter: grayscale(100%);">⚡</span>
         <span id="badgeNotif" style="display: none; position: absolute; top: -2px; right: -2px; background: #dc2626; color: white; font-size: 10px; font-weight: bold; border-radius: 50%; width: 16px; height: 16px; align-items: center; justify-content: center;">0</span>
@@ -1920,7 +1921,103 @@ function cerrarModalNotificaciones() {
   }
 
   function autoSavePatient(id) { savePatientData(id, true, false); }
-  function savePatientManual(id) { savePatientData(id, false, true); }
+  async function savePatientManual(id) {
+    await savePatientData(id, false, true);
+    if (driveConfigurado()) enviarNotaADrive(id);
+  }
+
+  // ===== ENVÍO AUTOMÁTICO DE LA NOTA A GOOGLE DOCS (Apps Script) =====
+  function leerCfgDrive() {
+    try {
+      return {
+        url: localStorage.getItem('np_drive_url') || '',
+        clave: localStorage.getItem('np_drive_clave') || ''
+      };
+    } catch (e) { return { url: '', clave: '' }; }
+  }
+
+  function driveConfigurado() {
+    const c = leerCfgDrive();
+    return !!(c.url && c.clave);
+  }
+
+  function actualizarIconoDrive() {
+    const b = document.getElementById('btnDriveCfg');
+    if (!b) return;
+    const on = driveConfigurado();
+    b.style.filter = on ? 'none' : 'grayscale(100%)';
+    b.title = on ? 'Envío a Google Docs ACTIVO (toca para cambiar)' : 'Envío a Google Docs desactivado (toca para configurar)';
+  }
+
+  function configurarDrive() {
+    const c = leerCfgDrive();
+    const url = prompt('URL del script de Google (termina en /exec).\nDéjalo vacío para DESACTIVAR el envío a Google Docs en este equipo:', c.url);
+    if (url === null) return;
+    try {
+      if (!url.trim()) {
+        localStorage.removeItem('np_drive_url');
+        localStorage.removeItem('np_drive_clave');
+        showToast('Envío a Google Docs desactivado en este equipo');
+        actualizarIconoDrive();
+        return;
+      }
+      if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(url.trim())) {
+        alert('La URL debe empezar con https://script.google.com/ y terminar en /exec');
+        return;
+      }
+      const clave = prompt('Clave secreta (la misma que pusiste en el script):', c.clave);
+      if (clave === null || !clave.trim()) return;
+      localStorage.setItem('np_drive_url', url.trim());
+      localStorage.setItem('np_drive_clave', clave.trim());
+      showToast('✓ Envío a Google Docs activado. Se usará al dar 💾 Guardar');
+    } catch (e) {
+      alert('No se pudo guardar la configuración en este navegador.');
+    }
+    actualizarIconoDrive();
+  }
+
+  async function enviarNotaADrive(id) {
+    const p = currentPatients.find(item => item.id === id);
+    if (!p) return;
+    if (!navigator.onLine) {
+      showToast('⚠️ Sin internet: la nota no se envió a Google Docs. Vuelve a dar Guardar con señal');
+      return;
+    }
+    const c = leerCfgDrive();
+    const payload = {
+      clave: c.clave,
+      nombre: p.nombre,
+      nss: p.nss || p.nss_base || '',
+      fechaKey: document.getElementById('sessionDate').value,
+      html: generateGoogleDocTable(p)
+    };
+    setTimeout(() => showToast(`📄 Enviando nota de ${p.nombre} a Google Docs...`), 2700);
+    try {
+      const resp = await fetch(c.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
+      const r = await resp.json();
+      if (r.ok) {
+        const extra = r.convertido ? ' (se convirtió a Documento de Google)' : '';
+        setTimeout(() => showToast(`✅ Nota ${r.accion} en "${r.documento}"${extra}`), 2700);
+      } else if (r.error === 'no_encontrado') {
+        alert(`⚠️ La nota se guardó en NefroPase, pero NO se agregó a Google Docs:\n\n${r.mensaje}.\n\nRevisa que el documento tenga el mismo nombre que el paciente.`);
+      } else if (r.error === 'varios') {
+        alert(`⚠️ La nota NO se agregó a Google Docs.\n\n${r.mensaje}\n\nDeja un solo documento con el nombre del paciente en la carpeta de notas.`);
+      } else if (r.error === 'clave') {
+        alert('⚠️ Clave incorrecta. Toca el ícono 📄 de arriba para corregirla.');
+      } else {
+        alert('⚠️ No se pudo agregar la nota a Google Docs:\n' + (r.mensaje || 'error desconocido'));
+      }
+    } catch (err) {
+      console.warn('Error enviando a Google Docs:', err);
+      alert('⚠️ No se pudo conectar con el script de Google. La nota sí quedó guardada en NefroPase.');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', actualizarIconoDrive);
 
   // ROBUST PARSER (Adapted directly from v11 dynamic column mapping)
   
