@@ -1813,6 +1813,10 @@ function cerrarModalNotificaciones() {
             <label>Temp (°C):</label>
             <input type="text" id="temp_${p.id}" value="${p.temp || '36.0'}" placeholder="36.0" onchange="autoSavePatient('${p.id}')">
           </div>
+          <div class="field-item" style="grid-column: span 2;">
+            <label>Elabora (Dr./Dra.):</label>
+            <input type="text" id="elaboro_${p.id}" value="${(p.elaboro || nombreQuienElabora()).replace(/"/g, '&quot;')}" placeholder="Nombre de quien llena la nota" onchange="autoSavePatient('${p.id}')">
+          </div>
         </div>
 
         <div class="obs-box">
@@ -1872,6 +1876,8 @@ function cerrarModalNotificaciones() {
     p.ta_out = document.getElementById(`taout_${id}`).value.trim();
     p.fc_out = document.getElementById(`fcout_${id}`).value.trim();
     p.temp = document.getElementById(`temp_${id}`).value.trim();
+    const elaboroInput = document.getElementById(`elaboro_${id}`);
+    if (elaboroInput) p.elaboro = elaboroInput.value.trim();
 
     const dateKey = document.getElementById('sessionDate').value;
     const newAnnotation = document.getElementById(`obs_${id}`).value.trim();
@@ -1929,6 +1935,7 @@ function cerrarModalNotificaciones() {
         ta_out: p.ta_out,
         fc_out: p.fc_out,
         temp: p.temp,
+        elaboro: p.elaboro || '',
         anotaciones: newAnnotation,
         visitado: p.visitado || false,
         visitadoAt: p.visitadoAt || null
@@ -1982,6 +1989,7 @@ function cerrarModalNotificaciones() {
           ta_out: p.ta_out,
           fc_out: p.fc_out,
           temp: p.temp,
+          elaboro: p.elaboro || '',
           anotaciones: newAnnotation,
           visitado: p.visitado || false,
           visitadoAt: p.visitadoAt || null
@@ -2025,6 +2033,12 @@ function cerrarModalNotificaciones() {
   async function savePatientManual(id) {
     await savePatientData(id, false, true);
     if (driveConfigurado()) enviarNotaADrive(id);
+  }
+
+  // Nombre de quien llena la nota: por defecto, el de la cuenta con la que entró.
+  function nombreQuienElabora() {
+    const u = window.npUsuario;
+    return u && u.nombre && u.nombre !== u.correo ? u.nombre : '';
   }
 
   // ===== ADMINISTRACIÓN DE ACCESOS =====
@@ -2506,7 +2520,9 @@ function cerrarModalNotificaciones() {
   function generateGoogleDocTable(p) {
     const fecha = getSelectedDateFormatted();
     const isVesp = p.turno && p.turno.includes('VESPERTINO');
-    const medico = isVesp ? "Dra. Farris / Dr Sanchez" : "Dra. Hernandez / Dr. Sanchez";
+    const medicoTurno = isVesp ? "Dra. Farris / Dr Sanchez" : "Dra. Hernandez / Dr. Sanchez";
+    const elabora = (p.elaboro || nombreQuienElabora() || '').trim();
+    const medico = elabora ? medicoTurno + ' / ' + elabora : medicoTurno;
     const obs = getTextoObservaciones(p);
 
     const tdBase = 'border: 1px solid #000; padding: 1px 2px; font-size: 7.5pt; line-height: 1.0; height: 13px; mso-line-height-rule: exactly; vertical-align: middle;';
@@ -2712,7 +2728,9 @@ function cerrarModalNotificaciones() {
 
   function formatNotaPiso(p, tiempo, potasio) {
     const isVesp = p.turno && p.turno.includes('VESPERTINO');
-    const medico = isVesp ? "Dra. Farris / Dr Sanchez" : "Dra. Hernandez / Dr. Sanchez";
+    const medicoTurno = isVesp ? "Dra. Farris / Dr Sanchez" : "Dra. Hernandez / Dr. Sanchez";
+    const elabora = (p.elaboro || nombreQuienElabora() || '').trim();
+    const medico = elabora ? medicoTurno + ' / ' + elabora : medicoTurno;
     const eventualidades = getTextoObservaciones(p);
 
     const taIn = p.ta_in ? `${p.ta_in} mmHg` : '-';
