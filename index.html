@@ -433,85 +433,25 @@
       animation: cardHighlightFlash 1.6s ease-out;
     }
 
-
-    /* ESTILOS DE SOLICITUD DE LABORATORIOS ISSSTE */
-    .btn-lab-item {
-      background: #f1f5f9;
-      border: 1px solid #cbd5e1;
-      color: #334155;
-      padding: 7px 6px;
-      border-radius: 6px;
-      font-size: 11.5px;
-      font-weight: 700;
-      cursor: pointer;
-      text-align: center;
-      transition: all 0.15s ease;
-      user-select: none;
-    }
+  
+    .btn-lab-item { background: #f1f5f9; border: 1px solid #cbd5e1; color: #334155; padding: 7px 6px; border-radius: 6px; font-size: 11.5px; font-weight: 700; cursor: pointer; text-align: center; transition: all 0.15s ease; user-select: none; }
     .btn-lab-item:hover { background: #e2e8f0; border-color: #94a3b8; }
-    .btn-lab-item.selected {
-      background: #0284c7 !important;
-      color: #ffffff !important;
-      border-color: #0369a1 !important;
-      box-shadow: 0 2px 4px rgba(2,132,199,0.3);
-    }
-    .btn-rutina-active {
-      background: linear-gradient(135deg, #15803d, #16a34a) !important;
-      color: white !important;
-    }
-
+    .btn-lab-item.selected { background: #0284c7 !important; color: #ffffff !important; border-color: #0369a1 !important; box-shadow: 0 2px 4px rgba(2,132,199,0.3); }
+    .btn-rutina-active { background: linear-gradient(135deg, #15803d, #16a34a) !important; color: white !important; }
     @media print {
       body * { visibility: hidden !important; }
       #printableArea, #printableArea * { visibility: visible !important; }
-      #printableArea {
-        position: absolute !important;
-        left: 0 !important;
-        top: 0 !important;
-        width: 100% !important;
-        display: block !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-      @page {
-        size: letter portrait;
-        margin: 8mm 12mm;
-      }
+      #printableArea { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; display: block !important; margin: 0 !important; padding: 0 !important; }
+      @page { size: letter portrait; margin: 8mm 12mm; }
     }
-
-    .solicitud-print-page {
-      font-family: Arial, Helvetica, sans-serif;
-      color: #000;
-      display: flex;
-      flex-direction: column;
-      gap: 12mm;
-    }
-    .form-tanto {
-      border: 1.8px solid #000;
-      padding: 7px 10px;
-      box-sizing: border-box;
-      background: #fff;
-      page-break-inside: avoid;
-    }
-    .issste-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      border-bottom: 1.5px solid #000;
-      padding-bottom: 3px;
-      margin-bottom: 3px;
-    }
+    .solicitud-print-page { font-family: Arial, Helvetica, sans-serif; color: #000; display: flex; flex-direction: column; gap: 12mm; }
+    .form-tanto { border: 1.8px solid #000; padding: 7px 10px; box-sizing: border-box; background: #fff; page-break-inside: avoid; }
+    .issste-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1.5px solid #000; padding-bottom: 3px; margin-bottom: 3px; }
     .issste-brand { font-size: 10.5px; line-height: 1.15; }
     .issste-brand strong { font-size: 12px; font-weight: 900; }
     .issste-sub { font-size: 8.5px; text-transform: uppercase; font-weight: bold; }
     .issste-meta { text-align: right; font-size: 8px; line-height: 1.2; font-weight: bold; }
-    .doc-banner {
-      text-align: center;
-      font-size: 11.5px;
-      font-weight: 900;
-      letter-spacing: 0.5px;
-      margin: 3px 0 5px 0;
-      text-transform: uppercase;
-    }
+    .doc-banner { text-align: center; font-size: 11.5px; font-weight: 900; letter-spacing: 0.5px; margin: 3px 0 5px 0; text-transform: uppercase; }
     .issste-grid-table { width: 100%; border-collapse: collapse; font-size: 9px; }
     .issste-grid-table td { border: 1px solid #000; padding: 3px 5px; vertical-align: top; }
     .label-cell { font-size: 7.5px; font-weight: bold; color: #000; text-transform: uppercase; display: block; margin-bottom: 1px; }
@@ -522,7 +462,6 @@
     .firma-area { height: 32px; border-bottom: 1px solid #000; margin-bottom: 2px; }
     .firma-sub { font-size: 7.5px; text-align: center; font-weight: bold; }
     .compromiso-tag { font-size: 7.5px; font-weight: bold; text-align: center; margin-top: 3px; letter-spacing: 0.5px; }
-
   </style>
 
   <!-- Firebase SDKs -->
@@ -531,6 +470,9 @@
     import { 
       getFirestore, enableIndexedDbPersistence, collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot 
     } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import {
+      getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCRVrRtLKaeBz3xGX7jAc0YUdpsMHHRDrU",
@@ -544,6 +486,7 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const auth = getAuth(app);
 
     // Activar persistencia offline en IndexedDB para trabajar sin señal
     try {
@@ -556,7 +499,6 @@
       console.warn("Error iniciando persistencia:", e);
     }
 
-    window.db = db;
     window.fsCollection = collection;
     window.fsDoc = doc;
     window.fsSetDoc = setDoc;
@@ -566,10 +508,132 @@
     window.fsDeleteDoc = deleteDoc;
     window.fsOnSnapshot = onSnapshot;
 
-    window.dispatchEvent(new Event('firebase-ready'));
+    // ===== ACCESO: solo residentes en la lista "accesos" y vigentes =====
+    const proveedor = new GoogleAuthProvider();
+    proveedor.setCustomParameters({ prompt: 'select_account' });
+    let iniciado = false;
+
+    function hoyISO() {
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    function venceISO(v) {
+      if (!v) return '';
+      const d = v.toDate ? v.toDate() : new Date(v);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    function mostrarAcceso(estado, texto) {
+      const capa = document.getElementById('accesoGate');
+      if (!capa) return;
+      capa.style.display = (estado === 'ok') ? 'none' : 'flex';
+      document.getElementById('accesoMsg').innerHTML = texto || '';
+      document.getElementById('btnEntrarGoogle').style.display = (estado === 'fuera') ? 'block' : 'none';
+      document.getElementById('btnCambiarCuenta').style.display = (estado === 'denegado') ? 'block' : 'none';
+    }
+
+    window.npEntrar = async () => {
+      try { await signInWithPopup(auth, proveedor); }
+      catch (e) {
+        if (e && (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment')) {
+          await signInWithRedirect(auth, proveedor);
+        } else if (e && e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') {
+          mostrarAcceso('fuera', 'No se pudo iniciar sesión (' + (e.code || e.message) + '). Intenta de nuevo.');
+        }
+      }
+    };
+    window.npSalir = async () => { await signOut(auth); location.reload(); };
+    window.npAuthToken = async () => auth.currentUser ? auth.currentUser.getIdToken() : '';
+    getRedirectResult(auth).catch(() => {});
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.npUsuario = null;
+        mostrarAcceso('fuera', 'Entra con la cuenta de Google que registraron los administradores.');
+        return;
+      }
+      const correo = (user.email || '').toLowerCase();
+      mostrarAcceso('cargando', 'Verificando acceso de <b>' + correo + '</b>…');
+      let datos = null;
+      try {
+        const snap = await getDoc(doc(db, 'accesos', correo));
+        datos = snap.exists() ? snap.data() : null;
+      } catch (e) {
+        console.warn('No se pudo leer la lista de acceso:', e);
+      }
+      if (!datos) {
+        // Periodo de transición: mientras el modo estricto esté apagado, quien entra con Google
+        // queda registrado en la lista para que los administradores lo revisen.
+        try {
+          const cfg = await getDoc(doc(db, 'config', 'acceso'));
+          if (!(cfg.exists() && cfg.data().estricto === true)) {
+            datos = { nombre: user.displayName || correo, rol: 'residente', activo: true, vence: null, autoRegistro: true, creado: new Date() };
+            await setDoc(doc(db, 'accesos', correo), datos);
+          }
+        } catch (e) {
+          console.warn('No se pudo registrar automáticamente:', e);
+        }
+      }
+      const vence = datos ? venceISO(datos.vence) : '';
+      const vigente = datos && datos.activo === true && (!vence || hoyISO() <= vence);
+      if (!vigente) {
+        window.npUsuario = null;
+        const motivo = !datos ? 'no está en la lista de acceso de NefroPase.'
+          : datos.activo !== true ? 'tiene el acceso desactivado.'
+          : 'tuvo acceso hasta el ' + vence.split('-').reverse().join('/') + ' (fin de rotación).';
+        mostrarAcceso('denegado', 'La cuenta <b>' + correo + '</b> ' + motivo + '<br>Pide acceso a un administrador del servicio.');
+        return;
+      }
+      window.npUsuario = { correo: correo, nombre: datos.nombre || user.displayName || correo, rol: datos.rol || 'residente', vence: vence };
+      mostrarAcceso('ok');
+      if (typeof window.npDespuesDeEntrar === 'function') window.npDespuesDeEntrar();
+      if (!iniciado) {
+        iniciado = true;
+        window.db = db;
+        window.dispatchEvent(new Event('firebase-ready'));
+      }
+    });
   </script>
 </head>
 <body>
+
+  <!-- Pantalla de acceso: cubre todo hasta que la cuenta esté verificada -->
+  <div id="accesoGate" style="position: fixed; inset: 0; z-index: 9999; background: #1e3a8a; display: flex; align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: #ffffff; border-radius: 14px; max-width: 420px; width: 100%; padding: 28px 24px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.25);">
+      <div style="font-size: 36px;">🩺</div>
+      <h2 style="margin: 6px 0 4px; font-size: 22px; color: #1e3a8a;">NefroPase Cloud</h2>
+      <p style="margin: 0 0 16px; font-size: 13px; color: #64748b;">Servicio de Nefrología · Acceso solo para residentes autorizados</p>
+      <p id="accesoMsg" style="margin: 0 0 18px; font-size: 14px; color: #0f172a; line-height: 1.45;">Cargando…</p>
+      <button id="btnEntrarGoogle" onclick="npEntrar()" style="display: none; text-align: center; width: 100%; padding: 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; background: #ffffff; font-size: 15px; font-weight: 700; color: #0f172a; cursor: pointer;">Entrar con Google</button>
+      <button id="btnCambiarCuenta" onclick="npSalir()" style="display: none; text-align: center; width: 100%; padding: 12px; border: 0; border-radius: 10px; background: #1e40af; font-size: 15px; font-weight: 700; color: #ffffff; cursor: pointer;">Entrar con otra cuenta</button>
+    </div>
+  </div>
+
+  <!-- Administración de accesos (solo administradores) -->
+  <div id="accesosModal" class="modal-overlay" style="display: none; position: fixed; inset: 0; z-index: 5000; background: rgba(15,23,42,0.55); align-items: flex-start; justify-content: center; padding: 20px; overflow-y: auto;">
+    <div style="background: #ffffff; border-radius: 12px; max-width: 720px; width: 100%; padding: 20px; margin-top: 30px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px;">
+        <h3 style="margin: 0; font-size: 17px; color: #1e3a8a;">🔐 Accesos a NefroPase</h3>
+        <button onclick="cerrarAccesos()" style="border: 0; background: #e2e8f0; border-radius: 8px; padding: 6px 10px; cursor: pointer; font-weight: 700;">✕</button>
+      </div>
+      <div id="accesosModo" style="font-size: 12.5px; padding: 8px 10px; border-radius: 8px; margin-bottom: 12px;"></div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; align-items: end; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; margin-bottom: 12px;">
+        <label style="font-size: 11.5px; font-weight: 700; color: #475569;">Correo de Google
+          <input id="accCorreo" type="email" placeholder="residente@gmail.com" style="width: 100%; padding: 7px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;"></label>
+        <label style="font-size: 11.5px; font-weight: 700; color: #475569;">Nombre
+          <input id="accNombre" type="text" placeholder="Dr(a). …" style="width: 100%; padding: 7px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;"></label>
+        <label style="font-size: 11.5px; font-weight: 700; color: #475569;">Tipo
+          <select id="accRol" onchange="document.getElementById('accVenceBox').style.display = this.value === 'rotante' ? 'block' : 'none'" style="width: 100%; padding: 7px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
+            <option value="residente">Residente de Nefrología</option>
+            <option value="rotante">Rotante</option>
+            <option value="admin">Administrador</option>
+          </select></label>
+        <label id="accVenceBox" style="display: none; font-size: 11.5px; font-weight: 700; color: #475569;">Fin de rotación
+          <input id="accVence" type="date" style="width: 100%; padding: 7px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;"></label>
+        <button onclick="guardarAcceso()" style="padding: 9px; border: 0; border-radius: 8px; background: #059669; color: #ffffff; font-weight: 700; cursor: pointer;">➕ Dar acceso</button>
+      </div>
+      <div id="accesosLista" style="display: flex; flex-direction: column; gap: 6px; font-size: 13px;">Cargando…</div>
+    </div>
+  </div>
 
   <!-- Sticky Wrapper para Buscador Global -->
   <div id="topMenuContainer" style="position: fixed; top: 0; left: 0; right: 0; width: 100%; z-index: 2000; box-shadow: 0 4px 10px rgba(0,0,0,0.15); transition: top 0.3s ease-in-out; background: #f8fafc;">
@@ -577,11 +641,11 @@
   <header class="app-header">
     <h1 style="cursor: pointer; user-select: none;" onclick="goHome()" title="Volver al día actual">🩺 NefroPase Cloud</h1>
     <div style="display: flex; align-items: center; gap: 12px;">
-              <!-- Botón en la misma línea de notificaciones para nueva solicitud -->
-        <button id="btnTopSolicitud" title="Generar Solicitud de Laboratorios ISSSTE" style="background: #ff9800; color: #ffffff; border: none; border-radius: 18px; padding: 6px 12px; font-weight: 700; font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer; transition: all 0.2s;" onclick="abrirModalBusquedaSolicitud()">
-          📋 + Solicitud Lab
-        </button>
-        <button id="btnNotif"  style="background: rgba(255,255,255,0.2); border: none; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; position: relative;" onclick="abrirModalNotificaciones()">
+      <button id="btnTopSolicitud" title="Generar Solicitud de Laboratorios ISSSTE" style="background: #ff9800; color: #ffffff; border: none; border-radius: 18px; padding: 6px 12px; font-weight: 700; font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer; transition: all 0.2s;" onclick="abrirModalBusquedaSolicitud()">📋 + Solicitud Lab</button>
+      <button id="btnAccesos" hidden title="Administrar accesos" style="background: rgba(255,255,255,0.2); border: none; border-radius: 50%; width: 34px; height: 34px; align-items: center; justify-content: center; cursor: pointer; font-size: 16px;" onclick="abrirAccesos()">🔐</button>
+      <button id="btnSalir" title="Cerrar sesión" style="background: rgba(255,255,255,0.2); border: none; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px;" onclick="if (confirm('¿Cerrar sesión en este equipo?')) npSalir()">🚪</button>
+      <button id="btnDriveCfg" title="Enviar notas a Google Docs al dar Guardar" style="background: rgba(255,255,255,0.2); border: none; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 17px;" onclick="configurarDrive()">📄</button>
+      <button id="btnNotif" style="background: rgba(255,255,255,0.2); border: none; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; position: relative;" onclick="abrirModalNotificaciones()">
         <span id="iconNotif" style="font-size: 18px; filter: grayscale(100%);">⚡</span>
         <span id="badgeNotif" style="display: none; position: absolute; top: -2px; right: -2px; background: #dc2626; color: white; font-size: 10px; font-weight: bold; border-radius: 50%; width: 16px; height: 16px; align-items: center; justify-content: center;">0</span>
       </button>
@@ -920,34 +984,8 @@
   }
 
   // Preloaded census
-  const PRELOADED_CENSUS = [
-    { id: "campos_bonilla", nombre: "CAMPOS BONILLA MARGARITA", maquina: "2", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "50", pp: "51.85", qs: "350", qd: "600", uf: "2.3 L", na: "138", bic: "3.5", temp: "36", filtro: "400", ta_in: "128/74", fc_in: "85", ta_out: "128/77", fc_out: "71", lastAnnotation: "Tuvo secrecion de sitio de salida, se tomo cultivo y se inicio clindamicina", vigilanciaAcceso: true },
-    { id: "acevedo_castaneda", nombre: "ACEVEDO CASTAÑEDA MARIA CONCEPCIÓN", maquina: "5", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "62.5", pp: "65.7", qs: "350", qd: "500", uf: "2.8 L", na: "137", bic: "3.3", temp: "37", filtro: "18", ta_in: "130/72", fc_in: "60", ta_out: "121/80", fc_out: "80", lastAnnotation: "Calambres al final de la sesion. Vigilar la proxima pb ajuste de peso seco", vigilanciaAcceso: false },
-    { id: "cortes_villavicencio", nombre: "CORTES VILLAVICENCIO MARIA TERESITA", maquina: "3", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "60", pp: "62", qs: "300", qd: "600", uf: "2.5 L", na: "136", bic: "3.4", temp: "36", filtro: "400", ta_in: "144/76", fc_in: "73", ta_out: "171/80", fc_out: "69", lastAnnotation: "Toma de cultivo siguente sesión y receta de hidroxicina-ITU (Dra Hernandez)", vigilanciaAcceso: false },
-    { id: "garcia_barraza", nombre: "GARCIA BARRAZA ROSALINDA", maquina: "4", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "62.5", pp: "64.8", qs: "310", qd: "600", uf: "2.2 L", na: "138", bic: "3.5", temp: "35", filtro: "19", ta_in: "126/76", fc_in: "72", ta_out: "138/92", fc_out: "68", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
-    { id: "perez_aragon", nombre: "PÉREZ ARAGÓN JESÚS", maquina: "1", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "78.5", pp: "83", qs: "310", qd: "600", uf: "3.2 L", na: "138", bic: "3.3", temp: "36.5", filtro: "400", ta_in: "140/87", fc_in: "91", ta_out: "129/88", fc_out: "80", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
-    { id: "martinez_garcia", nombre: "MARTINEZ GARCÍA VÍCTOR HUGO", maquina: "7", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "70", pp: "72.5", qs: "350", qd: "700", uf: "2.5 L", na: "137", bic: "3.3", temp: "36", filtro: "18", ta_in: "145/99", fc_in: "73", ta_out: "135/95", fc_out: "80", lastAnnotation: "ITU Receta Cipro 7 dias", vigilanciaAcceso: false },
-    { id: "marquez_vega", nombre: "MÁRQUEZ VEGA AURORA", maquina: "8", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "51", pp: "52.4", qs: "350", qd: "600", uf: "1.5 L", na: "138", bic: "3.1", temp: "36", filtro: "18", ta_in: "152/95", fc_in: "66", ta_out: "171/105", fc_out: "68", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
-    { id: "torija_zamora", nombre: "TORIJA ZAMORA MARIA DE LOS ANGELES", maquina: "9", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "53.5", pp: "54.1", qs: "320", qd: "500", uf: "0.5 L", na: "138", bic: "3.3", temp: "35.5", filtro: "18", ta_in: "129/83", fc_in: "80", ta_out: "139/100", fc_out: "77", lastAnnotation: "De conecto invecticio", vigilanciaAcceso: false },
-    { id: "ramos_coronel", nombre: "RAMOS CORONEL LEONOR", maquina: "10", turno: "MATUTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "83.5", pp: "90", qs: "320", qd: "500", uf: "2.5 L", na: "140", bic: "3.1", temp: "35.5", filtro: "18", ta_in: "122/82", fc_in: "80", ta_out: "152/101", fc_out: "80", lastAnnotation: "Cultivo de sitio de salida 04/08. Vancomicina 1g y Ertapenem 500mg", vigilanciaAcceso: true },
-    { id: "celerino_sanchez", nombre: "CELERINO SANCHEZ LINA JOSE BLAS", maquina: "1", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "68", pp: "70", qs: "200", qd: "500", uf: "0.3 L", na: "138", bic: "3.1", temp: "36", filtro: "18", ta_in: "137/74", fc_in: "80", ta_out: "140/80", fc_out: "80", lastAnnotation: "Ingresa a piso", vigilanciaAcceso: false },
-    { id: "cicle_daniel", nombre: "CICLE DANIEL CIRILO", maquina: "3", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "74", pp: "77.45", qs: "300", qd: "800", uf: "2.0 L", na: "138", bic: "3.0", temp: "36", filtro: "18", ta_in: "152/100", fc_in: "62", ta_out: "149/99", fc_out: "60", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
-    { id: "torres_cholula", nombre: "TORRES CHOLULA LUCIA", maquina: "4", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "71", pp: "71.95", qs: "300", qd: "500", uf: "2.0 L", na: "143", bic: "3.0", temp: "37", filtro: "19", ta_in: "162/91", fc_in: "82", ta_out: "151/73", fc_out: "74", lastAnnotation: "Presenta IRA toma Paracetamol", vigilanciaAcceso: false },
-    { id: "perez_ballinas", nombre: "PÉREZ BALLINAS ALBERTO ANSELMO", maquina: "5", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "78", pp: "79.8", qs: "350", qd: "800", uf: "1.1 L", na: "138", bic: "3.3", temp: "36", filtro: "18", ta_in: "99/65", fc_in: "75", ta_out: "159/84", fc_out: "60", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
-    { id: "cadena_castillo", nombre: "CADENA CASTILLO LUCAS", maquina: "6", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "46", pp: "48.3", qs: "250", qd: "600", uf: "2.6 L", na: "140", bic: "3.5", temp: "35.5", filtro: "18", ta_in: "155/120", fc_in: "80", ta_out: "147/117", fc_out: "81", lastAnnotation: "Catéter doblado ver funcionamiento", vigilanciaAcceso: true },
-    { id: "romero_sosa", nombre: "ROMERO SOSA GERMAN", maquina: "7", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "57", pp: "61", qs: "310", qd: "500", uf: "3.0 L", na: "136", bic: "3.0", temp: "37", filtro: "18", ta_in: "155/83", fc_in: "60", ta_out: "150/95", fc_out: "55", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
-    { id: "valerio_flores", nombre: "VALERIO FLORES MARCELINA", maquina: "10", turno: "MATUTINO_2", dias: ["MARTES", "JUEVES", "SABADO"], ps: "65", pp: "67.2", qs: "250", qd: "500", uf: "1.3 L", na: "138", bic: "3.1", temp: "36", filtro: "18", ta_in: "146/85", fc_in: "60", ta_out: "140/80", fc_out: "60", lastAnnotation: "Cita Cardio el 29 de septiembre, pendiente fecha de Holter", vigilanciaAcceso: false },
-    { id: "zarate_audelo", nombre: "ZÁRATE AUDELO CELSO ALBERTO", maquina: "1", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "53", pp: "54.5", qs: "300", qd: "700", uf: "1.5 L", na: "138", bic: "3.1", temp: "36", filtro: "400", ta_in: "120/83", fc_in: "67", ta_out: "174/107", fc_out: "51", lastAnnotation: "Se toma hemocultivo central y periferico por escalofrios", vigilanciaAcceso: true },
-    { id: "lopez_rojas", nombre: "LOPEZ ROJAS ROSENDO", maquina: "2", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "66.5", pp: "70.4", qs: "320", qd: "700", uf: "3.5 L", na: "138", bic: "3.0", temp: "36", filtro: "400", ta_in: "160/91", fc_in: "65", ta_out: "150/100", fc_out: "65", lastAnnotation: "Hospitalizado por neumonia en la cama 631", vigilanciaAcceso: false },
-    { id: "serrano_jimenez", nombre: "SERRANO JIMÉNEZ UBALDO", maquina: "3", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "78", pp: "81", qs: "320", qd: "700", uf: "2.8 L", na: "140", bic: "3.3", temp: "35", filtro: "400", ta_in: "181/104", fc_in: "60", ta_out: "187/96", fc_out: "51", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
-    { id: "esquivel_villalba", nombre: "ESQUIVEL VILLALBA RUFINO", maquina: "4", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "74.8", pp: "77.6", qs: "330", qd: "600", uf: "2.8 L", na: "138", bic: "3.0", temp: "36", filtro: "400", ta_in: "136/85", fc_in: "60", ta_out: "89/59", fc_out: "65", lastAnnotation: "Hipotension asintomatica", vigilanciaAcceso: false },
-    { id: "cuadrado_lucero", nombre: "CUADRADO LUCERO JOAQUIN", maquina: "5", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "84", pp: "87.5", qs: "290", qd: "600", uf: "3.5 L", na: "136", bic: "3.0", temp: "36", filtro: "400", ta_in: "119/91", fc_in: "99", ta_out: "134/101", fc_out: "91", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
-    { id: "morales_reyes", nombre: "MORALES REYES VICTORIA", maquina: "6", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "65", pp: "66", qs: "250", qd: "500", uf: "1.0 L", na: "137", bic: "3.0", temp: "36", filtro: "400", ta_in: "184/79", fc_in: "71", ta_out: "201/104", fc_out: "49", lastAnnotation: "Bradicardia e hipertension asintomatica", vigilanciaAcceso: false },
-    { id: "lopez_barrales", nombre: "LOPEZ BARRALES MARIA ISABEL TERES", maquina: "7", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "60", pp: "62", qs: "280", qd: "800", uf: "1.9 L", na: "139", bic: "3.1", temp: "35", filtro: "400", ta_in: "128/75", fc_in: "71", ta_out: "81/49", fc_out: "66", lastAnnotation: "Refiere dolor en fosa renal bilateral", vigilanciaAcceso: false },
-    { id: "bautista_moran", nombre: "BAUTISTA MORAN BERENIZZE GUADALU", maquina: "8", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "66.6", pp: "66.6", qs: "300", qd: "600", uf: "1.0 L", na: "137", bic: "3.0", temp: "36", filtro: "400", ta_in: "173/103", fc_in: "60", ta_out: "152/95", fc_out: "55", lastAnnotation: "Refiere cefalea. Se administra paracetamol", vigilanciaAcceso: false },
-    { id: "rivera_mendoza", nombre: "RIVERA MENDOZA JOSE JAIME", maquina: "9", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "65", pp: "63", qs: "290", qd: "500", uf: "1.0 L", na: "138", bic: "3.1", temp: "36", filtro: "400", ta_in: "129/79", fc_in: "67", ta_out: "138/82", fc_out: "72", lastAnnotation: "Ninguna", vigilanciaAcceso: false },
-    { id: "hernandez_cruz", nombre: "HERNÁNDEZ CRUZ ELENA", maquina: "10", turno: "VESPERTINO_1", dias: ["MARTES", "JUEVES", "SABADO"], ps: "44", pp: "50.3", qs: "260", qd: "500", uf: "3.0 L", na: "136", bic: "3.1", temp: "35", filtro: "400", ta_in: "162/82", fc_in: "99", ta_out: "149/96", fc_out: "87", lastAnnotation: "Parece que subio de peso", vigilanciaAcceso: false }
-  ];
+  // Censo precargado eliminado: los datos de pacientes viven solo en Firestore (con acceso controlado).
+  const PRELOADED_CENSUS = [];
 
 
   function calcularDiasTranscurridos(fechaStr) {
@@ -1384,397 +1422,7 @@
           <span>* Ordenado cronológicamente por día y turno de llegada.</span>
           <span>NefroPase Cloud</span>
         </div>
-      
-  <!-- ========================================================
-       MODALES DE SOLICITUD DE LABORATORIO ISSSTE
-       ======================================================== -->
-
-  <!-- MODAL: SELECCIONADOR DE LABORATORIOS -->
-  <div id="modalSolicitudLabs" class="modal-overlay" style="z-index: 5500;">
-    <div class="modal-card" style="max-width: 780px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 2px solid #0284c7; padding-bottom: 8px;">
-        <h3 id="modalSolicitudLabsTitulo" style="font-size: 16.5px; color: #0369a1; display: flex; align-items: center; gap: 6px;">
-          📋 Solicitud de Análisis Clínicos (ISSSTE)
-        </h3>
-        <button onclick="cerrarModalLabs()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #64748b;">&times;</button>
-      </div>
-
-      <!-- Botón Perfil RUTINA -->
-      <div style="margin-bottom: 12px;">
-        <button type="button" id="btnPerfilRutina" onclick="toggleRutina()" style="width: 100%; background: linear-gradient(135deg, #0d47a1, #1976d2); color: white; padding: 10px 12px; border: none; border-radius: 8px; font-size: 13px; font-weight: 800; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(13,71,161,0.25);">
-          ★ PERFIL RUTINA (BH, Qs, Es, Alb, Ac úrico, Hb1Ac, Tiempos, PFH, Lípidos, Tiroideo, PCR, Cinética Fe, PTHi, Ferritina, DHL, FA)
-        </button>
-      </div>
-
-      <!-- Botones Individuales de Laboratorios -->
-      <div id="contenedorBotonesLabs" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px;">
-        <!-- Inyectados por JS -->
-      </div>
-
-      <!-- Vista previa del desglose oficial -->
-      <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px; margin-bottom: 12px;">
-        <label style="font-size: 11.5px; font-weight: 800; color: #334155; text-transform: uppercase; display: block; margin-bottom: 4px;">
-          Estudios desglosados para la solicitud oficial:
-        </label>
-        <textarea id="txtEstudiosSolicitados" rows="3" style="width: 100%; border: 1px solid #94a3b8; border-radius: 6px; padding: 6px 8px; font-size: 12px; font-family: inherit; font-weight: 600; color: #0f172a;" placeholder="Selecciona los botones de arriba o escribe estudios adicionales..."></textarea>
-      </div>
-
-      <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
-        <button class="btn-light" onclick="limpiarSeleccionLabs()">Limpiar</button>
-        <div style="display: flex; gap: 8px;">
-          <button class="btn-light" onclick="cerrarModalLabs()">Cancelar</button>
-          <button class="btn-save" style="background: #0284c7;" onclick="imprimirSolicitudISSSTE()">🖨️ Generar e Imprimir Solicitud</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: BÚSQUEDA GLOBAL / NUEVO PACIENTE DESDE TOP BAR -->
-  <div id="modalBusquedaTopSolicitud" class="modal-overlay" style="z-index: 5500;">
-    <div class="modal-card" style="max-width: 500px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 2px solid #ff9800; padding-bottom: 8px;">
-        <h3 style="font-size: 16px; color: #b45309; display: flex; align-items: center; gap: 6px;">
-          📋 Nueva Solicitud de Laboratorios
-        </h3>
-        <button onclick="cerrarModalBusquedaSolicitud()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #64748b;">&times;</button>
-      </div>
-
-      <div style="margin-bottom: 12px;">
-        <label style="font-size: 12px; font-weight: 700; color: #334155; display: block; margin-bottom: 4px;">
-          Buscar paciente registrado en el censo:
-        </label>
-        <input type="text" id="inputBuscarModalSolicitud" placeholder="Escribe nombre o número de cama..." oninput="buscarPacientesEnModalSolicitud()" style="width: 100%; padding: 8px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none;">
-        <div id="listaResultadosModalSolicitud" style="max-height: 220px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; margin-top: 6px; background: #f8fafc;">
-          <!-- Inyectado por JS -->
-        </div>
-      </div>
-
-      <div style="text-align: center; margin: 12px 0; color: #64748b; font-size: 11px; font-weight: 800;">
-        ── O REGISTRAR NUEVO PACIENTE AL VUELO ──
-      </div>
-
-      <button type="button" class="btn-light" style="width: 100%; padding: 8px; border: 1.5px dashed #0284c7; color: #0284c7; background: #f0f9ff; font-weight: 700; justify-content: center;" onclick="cambiarANuevoPacienteParaSolicitud()">
-        + Registrar Nuevo Paciente al Vuelo
-      </button>
-    </div>
-  </div>
-
-  <!-- ÁREA OCULTA DE IMPRESIÓN (DUPLICADO MEDIA CARTA ISSSTE) -->
-  <div id="printableArea" style="display: none;"></div>
-
-  <script>
-    /* =====================================================================
-       CATÁLOGO Y LÓGICA DE SOLICITUD DE LABORATORIOS ISSSTE
-       ===================================================================== */
-    const LABS_CONFIG = [
-      { id: 'bh', label: 'BH', desglose: 'BH' },
-      { id: 'qs', label: 'Qs', desglose: 'Qs' },
-      { id: 'es', label: 'Es completos', desglose: 'Na, K, Cl, Ca, P, Mg' },
-      { id: 'pcr', label: 'PCR', desglose: 'PCR' },
-      { id: 'alb', label: 'Albumina', desglose: 'Albumina' },
-      { id: 'au', label: 'Ac urico', desglose: 'Ac urico' },
-      { id: 'hba1c', label: 'Hb1Ac', desglose: 'Hb1Ac' },
-      { id: 'tiempos', label: 'Tiempos de coagulacion', desglose: 'Tp, INR, Tpt' },
-      { id: 'cpk', label: 'CPK', desglose: 'CPK' },
-      { id: 'ckmb', label: 'CK-MB', desglose: 'CK-MB' },
-      { id: 'trop', label: 'Troponina I', desglose: 'Troponina I' },
-      { id: 'probnp', label: 'ProBNP', desglose: 'ProBNP' },
-      { id: 'dimerod', label: 'Dimero D', desglose: 'Dimero D' },
-      { id: 'fib', label: 'Fibrinogeno', desglose: 'Fibrinogeno' },
-      { id: 'proca', label: 'Procalcitonina', desglose: 'Procalcitonina' },
-      { id: 'ego', label: 'EGO', desglose: 'EGO' },
-      { id: 'pfh', label: 'Perfil hepatico', desglose: 'Perfil hepatico' },
-      { id: 'lipidos', label: 'Perfil de lipidos', desglose: 'Perfil de lipidos' },
-      { id: 'tiroideo', label: 'Perfil tiroideo', desglose: 'Perfil tiroideo' },
-      { id: 'fe', label: 'Cinetica de hierro', desglose: 'Cinetica de hierro' },
-      { id: 'ape', label: 'APE', desglose: 'APE' },
-      { id: 'pthi', label: 'PTHi', desglose: 'PTHi' },
-      { id: 'ferritina', label: 'Ferritina', desglose: 'Ferritina' },
-      { id: 'tumorales', label: 'Marcadores tumorales', desglose: 'Ca 125, Ca 19-9, AFP, ACE, HGC-B' },
-      { id: 'dhl', label: 'DHL', desglose: 'DHL' },
-      { id: 'fa', label: 'Fosfatasa Alcalina', desglose: 'Fosfatasa Alcalina' }
-    ];
-
-    const RUTINA_IDS = [
-      'bh', 'qs', 'es', 'alb', 'au', 'hba1c', 'tiempos',
-      'pfh', 'lipidos', 'tiroideo', 'pcr', 'fe', 'pthi', 'ferritina', 'dhl', 'fa'
-    ];
-
-    let pacienteSeleccionadoLab = null;
-    let selectedLabsMap = new Map();
-
-    function renderizarBotonesLabs() {
-      const cont = document.getElementById('contenedorBotonesLabs');
-      if (!cont) return;
-      cont.innerHTML = '';
-
-      LABS_CONFIG.forEach(lab => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'btn-lab-item';
-        btn.id = `btn-lab-${lab.id}`;
-        btn.innerText = lab.label;
-        btn.onclick = () => toggleLabItem(lab);
-        cont.appendChild(btn);
-      });
-    }
-
-    function abrirModalSolicitudLabPorId(patientId) {
-      let p = (currentPatients || []).find(item => item.id === patientId) ||
-              (todosLosPacientesDirectorio || []).find(item => item.id === patientId);
-      if (!p) return;
-      abrirModalSolicitudLab(p);
-    }
-
-    function abrirModalSolicitudLab(paciente) {
-      pacienteSeleccionadoLab = paciente;
-      document.getElementById('modalSolicitudLabsTitulo').innerText = 
-        `📋 Solicitud: ${paciente.nombre} (Cama ${paciente.maquina || 'S/C'})`;
-      limpiarSeleccionLabs();
-      document.getElementById('modalSolicitudLabs').style.display = 'flex';
-    }
-
-    function cerrarModalLabs() {
-      document.getElementById('modalSolicitudLabs').style.display = 'none';
-      pacienteSeleccionadoLab = null;
-    }
-
-    function toggleLabItem(lab) {
-      if (selectedLabsMap.has(lab.id)) {
-        selectedLabsMap.delete(lab.id);
-        const b = document.getElementById(`btn-lab-${lab.id}`);
-        if (b) b.classList.remove('selected');
-      } else {
-        selectedLabsMap.set(lab.id, lab.desglose);
-        const b = document.getElementById(`btn-lab-${lab.id}`);
-        if (b) b.classList.add('selected');
-      }
-      actualizarRutinaBotonStatus();
-      actualizarPreviewTexto();
-    }
-
-    function toggleRutina() {
-      const todos = RUTINA_IDS.every(id => selectedLabsMap.has(id));
-      RUTINA_IDS.forEach(id => {
-        const lab = LABS_CONFIG.find(l => l.id === id);
-        const btn = document.getElementById(`btn-lab-${id}`);
-        if (todos) {
-          selectedLabsMap.delete(id);
-          if (btn) btn.classList.remove('selected');
-        } else {
-          selectedLabsMap.set(id, lab.desglose);
-          if (btn) btn.classList.add('selected');
-        }
-      });
-      actualizarRutinaBotonStatus();
-      actualizarPreviewTexto();
-    }
-
-    function actualizarRutinaBotonStatus() {
-      const todos = RUTINA_IDS.every(id => selectedLabsMap.has(id));
-      const btn = document.getElementById('btnPerfilRutina');
-      if (!btn) return;
-      if (todos) {
-        btn.classList.add('btn-rutina-active');
-      } else {
-        btn.classList.remove('btn-rutina-active');
-      }
-    }
-
-    function actualizarPreviewTexto() {
-      const txt = Array.from(selectedLabsMap.values()).join(', ');
-      document.getElementById('txtEstudiosSolicitados').value = txt;
-    }
-
-    function limpiarSeleccionLabs() {
-      selectedLabsMap.clear();
-      document.querySelectorAll('.btn-lab-item').forEach(b => b.classList.remove('selected'));
-      const btn = document.getElementById('btnPerfilRutina');
-      if (btn) btn.classList.remove('btn-rutina-active');
-      document.getElementById('txtEstudiosSolicitados').value = '';
-    }
-
-    function imprimirSolicitudISSSTE() {
-      const textoEstudios = document.getElementById('txtEstudiosSolicitados').value.trim();
-      if (!textoEstudios) {
-        alert("Por favor selecciona al menos un laboratorio o escribe los análisis a solicitar.");
-        return;
-      }
-
-      const p = pacienteSeleccionadoLab || {};
-      const fecha = new Date();
-      const dia = String(fecha.getDate()).padStart(2, '0');
-      const mes = String(fecha.getMonth() + 1).padStart(2, '0');
-      const anio = String(fecha.getFullYear()).slice(-2);
-
-      const exp = p.nss_base ? (p.nss_dig ? `${p.nss_base}/${p.nss_dig}` : p.nss_base) : (p.nss || p.expediente || '');
-      const cama = p.maquina || p.cama || 'S/C';
-      const medico = 'Dr. Emmanuel Sánchez Álvarez';
-
-      const plantillaTanto = `
-        <div class="form-tanto">
-          <div class="issste-header">
-            <div class="issste-brand">
-              <strong>ISSSTE</strong><br>
-              <div class="issste-sub">Instituto de Seguridad y Servicios Sociales de los Trabajadores del Estado</div>
-              <strong>DELEGACIÓN PUEBLA</strong><br>
-              <strong>HOSPITAL REGIONAL PUEBLA</strong>
-            </div>
-            <div class="issste-meta">
-              FR-HRP-LB-19 v4 01/07/2022<br>
-              COPIA CONTROLADA
-            </div>
-          </div>
-
-          <div class="doc-banner">SOLICITUD DE ANÁLISIS CLÍNICOS</div>
-
-          <table class="issste-grid-table">
-            <tr>
-              <td colspan="2" style="width: 55%;">
-                <span class="label-cell">APELLIDO(S) Y NOMBRE(S) DEL PACIENTE</span>
-                <span class="value-cell">${p.nombre || ''}</span>
-              </td>
-              <td style="width: 20%;">
-                <span class="label-cell">NUMERO DE EXPEDIENTE</span>
-                <span class="value-cell">${exp}</span>
-              </td>
-              <td style="width: 25%;">
-                <span class="label-cell">FECHA</span>
-                <span class="value-cell">DÍA: <u>${dia}</u> MES: <u>${mes}</u> AÑO: <u>${anio}</u></span>
-              </td>
-            </tr>
-            <tr>
-              <td>
-                <span class="label-cell">CLAVE</span>
-                <span class="value-cell">00902235</span>
-              </td>
-              <td>
-                <span class="label-cell">CLAVE DE LA UNIDAD</span>
-                <span class="value-cell">02118</span>
-              </td>
-              <td>
-                <span class="label-cell">SEXO</span>
-                <span class="value-cell">${p.sexo || '-'}</span>
-              </td>
-              <td>
-                <span class="label-cell">EDAD</span>
-                <span class="value-cell">${p.edad ? p.edad + ' AÑOS' : '-'}</span>
-              </td>
-            </tr>
-            <tr>
-              <td colspan="2">
-                <span class="label-cell">SERVICIO</span>
-                <span class="value-cell">NEFROLOGIA</span>
-              </td>
-              <td colspan="2">
-                <span class="label-cell">CAMA</span>
-                <span class="value-cell">${cama}</span>
-              </td>
-            </tr>
-            <tr>
-              <td colspan="4">
-                <span class="label-cell">DIAGNÓSTICO PRESUNTIVO</span>
-                <span class="value-cell">${p.diagnostico || 'ERC EN HD'}</span>
-              </td>
-            </tr>
-            <tr>
-              <td colspan="4" class="analisis-box">
-                <span class="label-cell">ANÁLISIS SOLICITADO</span>
-                <div class="analisis-content">${textoEstudios}</div>
-              </td>
-            </tr>
-            <tr>
-              <td colspan="2" style="width: 45%;">
-                <span class="label-cell">MÉDICO TRATANTE</span>
-                <div class="firma-area"></div>
-                <div class="firma-sub">${medico} / NEFROLOGÍA</div>
-              </td>
-              <td colspan="2" style="width: 55%;">
-                <div class="consentimiento-text">
-                  En plena capacidad de mis facultades como paciente y bajo protesta de decir la verdad, declaro que me ha sido INFORMADO y entiendo las posibles complicaciones que se pueden presentar durante y posteriores a la toma de muestra sanguinea (Dolor, enrojecimiento, hematoma de la zona).
-                </div>
-                <div class="firma-area" style="height: 18px;"></div>
-                <div class="firma-sub">Nombre y firma del paciente o familiar que acepta el procedimiento</div>
-              </td>
-            </tr>
-          </table>
-          <div class="compromiso-tag">NUESTRO COMPROMISO: "SERVICIOS CON CALIDAD"</div>
-        </div>
-      `;
-
-      const area = document.getElementById('printableArea');
-      area.innerHTML = `
-        <div class="solicitud-print-page">
-          ${plantillaTanto}
-          ${plantillaTanto}
-        </div>
-      `;
-      area.style.display = 'block';
-
-      window.print();
-
-      setTimeout(() => {
-        area.style.display = 'none';
-        cerrarModalLabs();
-      }, 500);
-    }
-
-    /* Modal Búsqueda Top */
-    function abrirModalBusquedaSolicitud() {
-      document.getElementById('inputBuscarModalSolicitud').value = '';
-      buscarPacientesEnModalSolicitud();
-      document.getElementById('modalBusquedaTopSolicitud').style.display = 'flex';
-    }
-
-    function cerrarModalBusquedaSolicitud() {
-      document.getElementById('modalBusquedaTopSolicitud').style.display = 'none';
-    }
-
-    function buscarPacientesEnModalSolicitud() {
-      const q = document.getElementById('inputBuscarModalSolicitud').value.toLowerCase().trim();
-      const listDiv = document.getElementById('listaResultadosModalSolicitud');
-      listDiv.innerHTML = '';
-
-      let pool = (todosLosPacientesDirectorio && todosLosPacientesDirectorio.length > 0) ? todosLosPacientesDirectorio : currentPatients;
-      const filtrados = (pool || []).filter(p => 
-        !p.eliminado && !p.fusionadoEn &&
-        (!q || (p.nombre && p.nombre.toLowerCase().includes(q)) || (p.maquina && p.maquina.toLowerCase().includes(q)))
-      );
-
-      if (filtrados.length === 0) {
-        listDiv.innerHTML = '<div style="padding: 10px; color: #94a3b8; text-align: center; font-size: 12px;">No se encontraron coincidencias.</div>';
-        return;
-      }
-
-      filtrados.forEach(p => {
-        const item = document.createElement('div');
-        item.style.cssText = 'padding: 8px 10px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; cursor: pointer;';
-        item.innerHTML = `
-          <div>
-            <strong style="font-size: 12.5px; color: #1e3a8a;">${p.nombre}</strong><br>
-            <small style="color: #64748b; font-size: 11px;">Cama/Máq: <strong>${p.maquina || 'S/C'}</strong> &bull; Exp: ${p.nss_base || p.nss || 'S/E'}</small>
-          </div>
-          <button type="button" class="btn-save" style="padding: 4px 10px; font-size: 11px; background: #0284c7;">Seleccionar</button>
-        `;
-        item.onclick = () => {
-          cerrarModalBusquedaSolicitud();
-          abrirModalSolicitudLab(p);
-        };
-        listDiv.appendChild(item);
-      });
-    }
-
-    function cambiarANuevoPacienteParaSolicitud() {
-      cerrarModalBusquedaSolicitud();
-      openAddPatientModal();
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      renderizarBotonesLabs();
-    });
-  </script>
-
-</body>
+      </body>
       </html>
     `);
     printWin.document.close();
@@ -1901,7 +1549,7 @@ function cerrarModalNotificaciones() {
           allPatients.push({ id: docSnap.id, ...docSnap.data() });
         });
         
-        currentPatients = allPatients.filter(p => !p.eliminado && !p.fusionadoEn && p.dias && p.dias.includes(selectedDay));
+        currentPatients = allPatients.filter(p => !p.eliminado && !p.fusionadoEn && p.origen !== "Censo Drive" && p.dias && p.dias.includes(selectedDay));
         
         const sessionRef = window.fsDoc(window.db, "sesiones", dateKey);
         const sessionSnap = await window.fsGetDoc(sessionRef);
@@ -2195,6 +1843,10 @@ function cerrarModalNotificaciones() {
             <label>Temp (°C):</label>
             <input type="text" id="temp_${p.id}" value="${p.temp || '36.0'}" placeholder="36.0" onchange="autoSavePatient('${p.id}')">
           </div>
+          <div class="field-item" style="grid-column: span 2;">
+            <label>Elabora (Dr./Dra.):</label>
+            <input type="text" id="elaboro_${p.id}" value="${(p.elaboro || nombreQuienElabora()).replace(/"/g, '&quot;')}" placeholder="Nombre de quien llena la nota" onchange="autoSavePatient('${p.id}')">
+          </div>
         </div>
 
         <div class="obs-box">
@@ -2255,6 +1907,8 @@ function cerrarModalNotificaciones() {
     p.ta_out = document.getElementById(`taout_${id}`).value.trim();
     p.fc_out = document.getElementById(`fcout_${id}`).value.trim();
     p.temp = document.getElementById(`temp_${id}`).value.trim();
+    const elaboroInput = document.getElementById(`elaboro_${id}`);
+    if (elaboroInput) p.elaboro = elaboroInput.value.trim();
 
     const dateKey = document.getElementById('sessionDate').value;
     const newAnnotation = document.getElementById(`obs_${id}`).value.trim();
@@ -2312,6 +1966,7 @@ function cerrarModalNotificaciones() {
         ta_out: p.ta_out,
         fc_out: p.fc_out,
         temp: p.temp,
+        elaboro: p.elaboro || '',
         anotaciones: newAnnotation,
         visitado: p.visitado || false,
         visitadoAt: p.visitadoAt || null
@@ -2365,6 +2020,7 @@ function cerrarModalNotificaciones() {
           ta_out: p.ta_out,
           fc_out: p.fc_out,
           temp: p.temp,
+          elaboro: p.elaboro || '',
           anotaciones: newAnnotation,
           visitado: p.visitado || false,
           visitadoAt: p.visitadoAt || null
@@ -2405,7 +2061,218 @@ function cerrarModalNotificaciones() {
   }
 
   function autoSavePatient(id) { savePatientData(id, true, false); }
-  function savePatientManual(id) { savePatientData(id, false, true); }
+  async function savePatientManual(id) {
+    await savePatientData(id, false, true);
+    if (driveConfigurado()) enviarNotaADrive(id);
+  }
+
+  // Nombre de quien llena la nota: por defecto, el de la cuenta con la que entró.
+  function nombreQuienElabora() {
+    const u = window.npUsuario;
+    return u && u.nombre && u.nombre !== u.correo ? u.nombre : '';
+  }
+
+  // ===== ADMINISTRACIÓN DE ACCESOS =====
+  window.npDespuesDeEntrar = function () {
+    const u = window.npUsuario;
+    const b = document.getElementById('btnAccesos');
+    if (b) { const admin = u && u.rol === 'admin'; b.hidden = !admin; b.style.display = admin ? 'flex' : 'none'; }
+    const s = document.getElementById('btnSalir');
+    if (s && u) s.title = 'Cerrar sesión (' + u.correo + ')';
+    actualizarIconoDrive();
+  };
+
+  function fechaAcceso(v) {
+    if (!v) return '';
+    const d = v.toDate ? v.toDate() : new Date(v);
+    return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+  }
+
+  async function abrirAccesos() {
+    document.getElementById('accesosModal').style.display = 'flex';
+    await cargarAccesos();
+  }
+  function cerrarAccesos() { document.getElementById('accesosModal').style.display = 'none'; }
+
+  async function cargarAccesos() {
+    const lista = document.getElementById('accesosLista');
+    lista.textContent = 'Cargando…';
+    try {
+      const cfg = await window.fsGetDoc(window.fsDoc(window.db, 'config', 'acceso'));
+      const estricto = cfg.exists() && cfg.data().estricto === true;
+      const modo = document.getElementById('accesosModo');
+      modo.style.background = estricto ? '#ecfdf5' : '#fffbeb';
+      modo.style.border = '1px solid ' + (estricto ? '#059669' : '#d97706');
+      modo.innerHTML = estricto
+        ? '<b>Modo estricto activo:</b> solo entran las cuentas de esta lista. <button onclick="cambiarModoEstricto(false)" style="margin-left:6px;padding:3px 8px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer">Volver a transición</button>'
+        : '<b>Periodo de transición:</b> quien entra con Google se agrega solo a la lista. Revisa la lista y, cuando estén todos, activa el modo estricto. <button onclick="cambiarModoEstricto(true)" style="margin-left:6px;padding:3px 8px;border-radius:6px;border:0;background:#059669;color:#fff;font-weight:700;cursor:pointer">Activar modo estricto</button>';
+
+      const snap = await window.fsGetDocs(window.fsCollection(window.db, 'accesos'));
+      const filas = [];
+      snap.forEach(d => filas.push({ correo: d.id, ...d.data() }));
+      const orden = { admin: 0, residente: 1, rotante: 2 };
+      filas.sort((a, b) => (b.activo === true) - (a.activo === true) || (orden[a.rol] ?? 9) - (orden[b.rol] ?? 9) || a.correo.localeCompare(b.correo));
+      const hoy = new Date();
+      lista.innerHTML = filas.length ? '' : '<i>Sin cuentas registradas.</i>';
+      filas.forEach(f => {
+        const venc = f.vence ? (f.vence.toDate ? f.vence.toDate() : new Date(f.vence)) : null;
+        const vencido = venc && venc < hoy;
+        const estado = f.activo !== true ? '⛔ Desactivado' : vencido ? '⌛ Rotación terminada' : '✅ Activo';
+        const tipo = f.rol === 'admin' ? 'Administrador' : f.rol === 'rotante' ? 'Rotante hasta ' + fechaAcceso(f.vence) : 'Residente';
+        const fila = document.createElement('div');
+        fila.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;' + (f.activo !== true || vencido ? 'background:#f8fafc;color:#64748b;' : '');
+        const info = document.createElement('div');
+        info.style.minWidth = '0';
+        const nom = document.createElement('div'); nom.style.fontWeight = '700'; nom.textContent = (f.nombre || f.correo) + (f.autoRegistro ? '  · se registró solo, revisar' : '');
+        const det = document.createElement('div'); det.style.fontSize = '12px'; det.textContent = f.correo + ' · ' + tipo + ' · ' + estado;
+        info.appendChild(nom); info.appendChild(det);
+        const acciones = document.createElement('div');
+        acciones.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap';
+        const btnEdit = document.createElement('button');
+        btnEdit.textContent = '✏️ Editar';
+        btnEdit.style.cssText = 'padding:4px 8px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;cursor:pointer';
+        btnEdit.onclick = () => {
+          document.getElementById('accCorreo').value = f.correo;
+          document.getElementById('accNombre').value = f.nombre || '';
+          document.getElementById('accRol').value = f.rol || 'residente';
+          document.getElementById('accVenceBox').style.display = f.rol === 'rotante' ? 'block' : 'none';
+          if (venc) document.getElementById('accVence').value = venc.getFullYear() + '-' + String(venc.getMonth() + 1).padStart(2, '0') + '-' + String(venc.getDate()).padStart(2, '0');
+          document.getElementById('accCorreo').focus();
+        };
+        const btnTog = document.createElement('button');
+        const esYo = window.npUsuario && f.correo === window.npUsuario.correo;
+        btnTog.textContent = f.activo === true ? '⛔ Quitar acceso' : '✅ Reactivar';
+        btnTog.disabled = esYo;
+        btnTog.title = esYo ? 'No puedes quitarte el acceso a ti mismo' : '';
+        btnTog.style.cssText = 'padding:4px 8px;border:0;border-radius:6px;cursor:pointer;color:#fff;background:' + (f.activo === true ? '#dc2626' : '#059669') + (esYo ? ';opacity:.4;cursor:not-allowed' : '');
+        btnTog.onclick = async () => {
+          if (f.activo === true && !confirm('¿Quitar el acceso a ' + f.correo + '?')) return;
+          await window.fsUpdateDoc(window.fsDoc(window.db, 'accesos', f.correo), { activo: f.activo !== true, autoRegistro: false });
+          await cargarAccesos();
+        };
+        acciones.appendChild(btnEdit); acciones.appendChild(btnTog);
+        fila.appendChild(info); fila.appendChild(acciones);
+        lista.appendChild(fila);
+      });
+    } catch (e) {
+      lista.textContent = 'No se pudo cargar la lista: ' + (e.message || e);
+    }
+  }
+
+  async function guardarAcceso() {
+    const correo = document.getElementById('accCorreo').value.trim().toLowerCase();
+    const nombre = document.getElementById('accNombre').value.trim();
+    const rol = document.getElementById('accRol').value;
+    const venceTxt = document.getElementById('accVence').value;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) { alert('Escribe un correo válido.'); return; }
+    if (rol === 'rotante' && !venceTxt) { alert('Pon la fecha de fin de rotación.'); return; }
+    let vence = null;
+    if (rol === 'rotante') {
+      const [y, m, d] = venceTxt.split('-').map(Number);
+      vence = new Date(y, m - 1, d, 23, 59, 59);
+    }
+    try {
+      await window.fsSetDoc(window.fsDoc(window.db, 'accesos', correo), {
+        nombre: nombre || correo, rol: rol, activo: true, vence: vence, autoRegistro: false,
+        actualizadoPor: window.npUsuario ? window.npUsuario.correo : '', actualizado: new Date()
+      }, { merge: true });
+      ['accCorreo', 'accNombre', 'accVence'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('accRol').value = 'residente';
+      document.getElementById('accVenceBox').style.display = 'none';
+      showToast('✓ Acceso guardado para ' + correo);
+      await cargarAccesos();
+    } catch (e) {
+      alert('No se pudo guardar: ' + (e.message || e));
+    }
+  }
+
+  async function cambiarModoEstricto(estricto) {
+    if (estricto && !confirm('Con el modo estricto, solo entran las cuentas activas de la lista. ¿Activarlo?')) return;
+    await window.fsSetDoc(window.fsDoc(window.db, 'config', 'acceso'), { estricto: estricto, cambiadoPor: window.npUsuario ? window.npUsuario.correo : '', cambiado: new Date() }, { merge: true });
+    await cargarAccesos();
+  }
+
+  // ===== ENVÍO AUTOMÁTICO DE LA NOTA A GOOGLE DOCS (Apps Script) =====
+  // La URL ya viene configurada; el script verifica la cuenta con la que entraste.
+  const NP_DRIVE_URL_DEFAULT = 'https://script.google.com/macros/s/AKfycbzGe48hP7Dbh-u6HCDn-HSneTrPlT5i-qKvzzt-EF66Xtm0XGSOhUzRoOnDilGhAU8iug/exec';
+  function leerCfgDrive() {
+    let url = NP_DRIVE_URL_DEFAULT, apagado = false;
+    try {
+      apagado = localStorage.getItem('np_drive_off') === '1';
+    } catch (e) {}
+    return { url: apagado ? '' : url, clave: '' };
+  }
+
+  function driveConfigurado() {
+    return !!leerCfgDrive().url;
+  }
+
+  function actualizarIconoDrive() {
+    const b = document.getElementById('btnDriveCfg');
+    if (!b) return;
+    const on = driveConfigurado();
+    b.style.filter = on ? 'none' : 'grayscale(100%)';
+    b.title = on ? 'Envío a Google Docs ACTIVO en este equipo (toca para apagarlo)' : 'Envío a Google Docs APAGADO en este equipo (toca para encenderlo)';
+  }
+
+  function configurarDrive() {
+    const on = driveConfigurado();
+    if (!confirm(on ? '¿Apagar el envío automático de notas a Google Docs en este equipo?' : '¿Encender el envío automático de notas a Google Docs en este equipo?')) return;
+    try {
+      if (on) localStorage.setItem('np_drive_off', '1'); else localStorage.removeItem('np_drive_off');
+      localStorage.removeItem('np_drive_url');
+      localStorage.removeItem('np_drive_clave');
+    } catch (e) {}
+    showToast(on ? 'Envío a Google Docs apagado en este equipo' : '✓ Envío a Google Docs encendido');
+    actualizarIconoDrive();
+  }
+
+  async function enviarNotaADrive(id) {
+    const p = currentPatients.find(item => item.id === id);
+    if (!p) return;
+    if (!navigator.onLine) {
+      showToast('⚠️ Sin internet: la nota no se envió a Google Docs. Vuelve a dar Guardar con señal');
+      return;
+    }
+    const c = leerCfgDrive();
+    let idToken = '';
+    try { idToken = await window.npAuthToken(); } catch (e) {}
+    const payload = {
+      idToken: idToken,
+      nombre: p.nombre,
+      nss: p.nss || p.nss_base || '',
+      expediente: p.nss_base ? (p.nss_dig ? `${p.nss_base}/${p.nss_dig}` : p.nss_base) : (p.nss || ''),
+      dias: (p.dias || []).map(d => d.substring(0, 3)).join(', ') + (p.turno ? ' - ' + formatTurnoNombre(p.turno).toUpperCase() : ''),
+      fechaKey: document.getElementById('sessionDate').value,
+      html: generateGoogleDocTable(p)
+    };
+    setTimeout(() => showToast(`📄 Enviando nota de ${p.nombre} a Google Docs...`), 2700);
+    try {
+      const resp = await fetch(c.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
+      const r = await resp.json();
+      if (r.ok) {
+        const extra = r.creado ? ' (DOCUMENTO NUEVO creado para este paciente)' : r.convertido ? ' (se convirtió a Documento de Google)' : '';
+        setTimeout(() => showToast(`✅ Nota ${r.accion} en "${r.documento}"${extra}`), 2700);
+      } else if (r.error === 'no_encontrado') {
+        alert(`⚠️ La nota se guardó en NefroPase, pero NO se agregó a Google Docs:\n\n${r.mensaje}.\n\nRevisa que el documento tenga el mismo nombre que el paciente.`);
+      } else if (r.error === 'varios') {
+        alert(`⚠️ La nota NO se agregó a Google Docs.\n\n${r.mensaje}\n\nDeja un solo documento con el nombre del paciente en la carpeta de notas.`);
+      } else if (r.error === 'clave' || r.error === 'acceso') {
+        alert('⚠️ ' + (r.mensaje || 'Tu cuenta no tiene acceso vigente.') + '\nLa nota sí quedó guardada en NefroPase.');
+      } else {
+        alert('⚠️ No se pudo agregar la nota a Google Docs:\n' + (r.mensaje || 'error desconocido'));
+      }
+    } catch (err) {
+      console.warn('Error enviando a Google Docs:', err);
+      alert('⚠️ No se pudo conectar con el script de Google. La nota sí quedó guardada en NefroPase.');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', actualizarIconoDrive);
 
   // ROBUST PARSER (Adapted directly from v11 dynamic column mapping)
   
@@ -2684,7 +2551,9 @@ function cerrarModalNotificaciones() {
   function generateGoogleDocTable(p) {
     const fecha = getSelectedDateFormatted();
     const isVesp = p.turno && p.turno.includes('VESPERTINO');
-    const medico = isVesp ? "Dra. Farris / Dr Sanchez" : "Dra. Hernandez / Dr. Sanchez";
+    const medicoTurno = isVesp ? "Dra. Farris" : "Dra. Hernandez";
+    const elabora = (p.elaboro || nombreQuienElabora() || '').trim();
+    const medico = elabora ? medicoTurno + ' / ' + elabora : medicoTurno;
     const obs = getTextoObservaciones(p);
 
     const tdBase = 'border: 1px solid #000; padding: 1px 2px; font-size: 7.5pt; line-height: 1.0; height: 13px; mso-line-height-rule: exactly; vertical-align: middle;';
@@ -2890,7 +2759,9 @@ function cerrarModalNotificaciones() {
 
   function formatNotaPiso(p, tiempo, potasio) {
     const isVesp = p.turno && p.turno.includes('VESPERTINO');
-    const medico = isVesp ? "Dra. Farris / Dr Sanchez" : "Dra. Hernandez / Dr. Sanchez";
+    const medicoTurno = isVesp ? "Dra. Farris" : "Dra. Hernandez";
+    const elabora = (p.elaboro || nombreQuienElabora() || '').trim();
+    const medico = elabora ? medicoTurno + ' / ' + elabora : medicoTurno;
     const eventualidades = getTextoObservaciones(p);
 
     const taIn = p.ta_in ? `${p.ta_in} mmHg` : '-';
@@ -6361,6 +6232,275 @@ function detectarYMostrarDuplicados() {
         lastScrollTop = currentScroll <= 0 ? 0 : currentScroll;
       }, { passive: true });
     }
+  </script>
+
+  <!-- MODALES DE SOLICITUD DE LABORATORIO ISSSTE -->
+  <div id="modalSolicitudLabs" class="modal-overlay" style="z-index: 5500;">
+    <div class="modal-card" style="max-width: 780px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 2px solid #0284c7; padding-bottom: 8px;">
+        <h3 id="modalSolicitudLabsTitulo" style="font-size: 16.5px; color: #0369a1; display: flex; align-items: center; gap: 6px;">📋 Solicitud de Análisis Clínicos (ISSSTE)</h3>
+        <button onclick="cerrarModalLabs()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #64748b;">&times;</button>
+      </div>
+      <div style="margin-bottom: 12px;">
+        <button type="button" id="btnPerfilRutina" onclick="toggleRutina()" style="width: 100%; background: linear-gradient(135deg, #0d47a1, #1976d2); color: white; padding: 10px 12px; border: none; border-radius: 8px; font-size: 13px; font-weight: 800; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px;">
+          ★ PERFIL RUTINA (BH, Qs, Es, Alb, Ac úrico, Hb1Ac, Tiempos, PFH, Lípidos, Tiroideo, PCR, Cinética Fe, PTHi, Ferritina, DHL, FA)
+        </button>
+      </div>
+      <div id="contenedorBotonesLabs" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px;"></div>
+      <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px; margin-bottom: 12px;">
+        <label style="font-size: 11.5px; font-weight: 800; color: #334155; text-transform: uppercase; display: block; margin-bottom: 4px;">Estudios desglosados para la solicitud oficial:</label>
+        <textarea id="txtEstudiosSolicitados" rows="3" style="width: 100%; border: 1px solid #94a3b8; border-radius: 6px; padding: 6px 8px; font-size: 12px; font-weight: 600; color: #0f172a;" placeholder="Selecciona los botones de arriba o escribe estudios adicionales..."></textarea>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <button class="btn-light" onclick="limpiarSeleccionLabs()">Limpiar</button>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn-light" onclick="cerrarModalLabs()">Cancelar</button>
+          <button class="btn-save" style="background: #0284c7;" onclick="imprimirSolicitudISSSTE()">🖨️ Generar e Imprimir Solicitud</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalBusquedaTopSolicitud" class="modal-overlay" style="z-index: 5500;">
+    <div class="modal-card" style="max-width: 520px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 2px solid #ff9800; padding-bottom: 8px;">
+        <h3 style="font-size: 16px; color: #b45309;">📋 Nueva Solicitud de Laboratorios</h3>
+        <button onclick="cerrarModalBusquedaSolicitud()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #64748b;">&times;</button>
+      </div>
+      <div style="margin-bottom: 12px;">
+        <label style="font-size: 12px; font-weight: 700; color: #334155; display: block; margin-bottom: 4px;">Buscar paciente (Hemodiálisis o Censo Hospitalizados):</label>
+        <input type="text" id="inputBuscarModalSolicitud" placeholder="Escribe nombre, cama o expediente..." oninput="buscarPacientesEnModalSolicitud()" style="width: 100%; padding: 8px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none;">
+        <div id="listaResultadosModalSolicitud" style="max-height: 240px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; margin-top: 6px; background: #f8fafc;"></div>
+      </div>
+      <div style="text-align: center; margin: 12px 0; color: #64748b; font-size: 11px; font-weight: 800;">── O REGISTRAR NUEVO PACIENTE ──</div>
+      <button type="button" class="btn-light" style="width: 100%; padding: 8px; border: 1.5px dashed #0284c7; color: #0284c7; background: #f0f9ff; font-weight: 700; justify-content: center;" onclick="cambiarANuevoPacienteParaSolicitud()">+ Registrar Nuevo Paciente</button>
+    </div>
+  </div>
+
+  <div id="printableArea" style="display: none;"></div>
+
+  <script>
+    const LABS_CONFIG = [
+      { id: 'bh', label: 'BH', desglose: 'BH' },
+      { id: 'qs', label: 'Qs', desglose: 'Qs' },
+      { id: 'es', label: 'Es completos', desglose: 'Na, K, Cl, Ca, P, Mg' },
+      { id: 'pcr', label: 'PCR', desglose: 'PCR' },
+      { id: 'alb', label: 'Albumina', desglose: 'Albumina' },
+      { id: 'au', label: 'Ac urico', desglose: 'Ac urico' },
+      { id: 'hba1c', label: 'Hb1Ac', desglose: 'Hb1Ac' },
+      { id: 'tiempos', label: 'Tiempos de coagulacion', desglose: 'Tp, INR, Tpt' },
+      { id: 'cpk', label: 'CPK', desglose: 'CPK' },
+      { id: 'ckmb', label: 'CK-MB', desglose: 'CK-MB' },
+      { id: 'trop', label: 'Troponina I', desglose: 'Troponina I' },
+      { id: 'probnp', label: 'ProBNP', desglose: 'ProBNP' },
+      { id: 'dimerod', label: 'Dimero D', desglose: 'Dimero D' },
+      { id: 'fib', label: 'Fibrinogeno', desglose: 'Fibrinogeno' },
+      { id: 'proca', label: 'Procalcitonina', desglose: 'Procalcitonina' },
+      { id: 'ego', label: 'EGO', desglose: 'EGO' },
+      { id: 'pfh', label: 'Perfil hepatico', desglose: 'Perfil hepatico' },
+      { id: 'lipidos', label: 'Perfil de lipidos', desglose: 'Perfil de lipidos' },
+      { id: 'tiroideo', label: 'Perfil tiroideo', desglose: 'Perfil tiroideo' },
+      { id: 'fe', label: 'Cinetica de hierro', desglose: 'Cinetica de hierro' },
+      { id: 'ape', label: 'APE', desglose: 'APE' },
+      { id: 'pthi', label: 'PTHi', desglose: 'PTHi' },
+      { id: 'ferritina', label: 'Ferritina', desglose: 'Ferritina' },
+      { id: 'tumorales', label: 'Marcadores tumorales', desglose: 'Ca 125, Ca 19-9, AFP, ACE, HGC-B' },
+      { id: 'dhl', label: 'DHL', desglose: 'DHL' },
+      { id: 'fa', label: 'Fosfatasa Alcalina', desglose: 'Fosfatasa Alcalina' }
+    ];
+    const RUTINA_IDS = ['bh','qs','es','alb','au','hba1c','tiempos','pfh','lipidos','tiroideo','pcr','fe','pthi','ferritina','dhl','fa'];
+
+    // Censo Hospitalizados (Nefrocenso antes de EXTERNOS): exclusivos para buscador de solicitudes
+    let pacientesNefrocenso = [
+      { id: 'censo_501', cama: '501', maquina: '501', nombre: 'AGUILERA MORA ROBERTO', expediente: 'PORD690819/40', edad: '59', sexo: 'M', diagnostico: 'PO TNK 10/10 + ERC EN DP + DT2 + HAS', origen: 'Censo Drive' },
+      { id: 'censo_502', cama: '502', maquina: '502', nombre: 'JUAREZ GONZALEZ JUVENTINA', expediente: 'RAJD970222/60', edad: '53', sexo: 'M', diagnostico: 'DERRAME PLEURAL BILATERAL + ERC EN DP + HAS + DT2', origen: 'Censo Drive' },
+      { id: 'censo_503', cama: '503', maquina: '503', nombre: 'BARBOSA CORTEZ GUADALUPE', expediente: 'BACG730114/20', edad: '53', sexo: 'F', diagnostico: 'ERC KDIGO G5 + PO COLOCACIÓN DE TNK + DT2 + HAS', origen: 'Censo Drive' },
+      { id: 'censo_504', cama: '504', maquina: '504', nombre: 'GONZALEZ DOMINGUEZ IGNACIO', expediente: 'GOOF790630/50', edad: '75', sexo: 'M', diagnostico: 'ERC EN HD DE RESCATE + PO TNK + HAS + ICC FEVI REDUCIDA', origen: 'Censo Drive' },
+      { id: 'censo_505', cama: '505', maquina: '505', nombre: 'LOPEZ QUIROZ JESUS', expediente: 'LOZZ960527/50', edad: '63', sexo: 'M', diagnostico: 'SEPSIS SEC A INFECCIÓN ANGIOACCESO + ERC EN HD + HAS', origen: 'Censo Drive' },
+      { id: 'censo_506', cama: '506', maquina: '506', nombre: 'LOPEZ RINCON MAGALY DEL CARMEN', expediente: 'LORM750919/20', edad: '51', sexo: 'F', diagnostico: 'ERC EN HD + SX DE VENA CAVA', origen: 'Censo Drive' }
+    ];
+
+    let pacienteSeleccionadoLab = null;
+    let selectedLabsMap = new Map();
+
+    function renderizarBotonesLabs() {
+      const cont = document.getElementById('contenedorBotonesLabs');
+      if (!cont) return;
+      cont.innerHTML = '';
+      LABS_CONFIG.forEach(lab => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn-lab-item';
+        btn.id = 'btn-lab-' + lab.id;
+        btn.innerText = lab.label;
+        btn.onclick = () => toggleLabItem(lab);
+        cont.appendChild(btn);
+      });
+    }
+
+    function abrirModalSolicitudLabPorId(patientId) {
+      let p = (currentPatients || []).find(item => item.id === patientId) ||
+              (todosLosPacientesDirectorio || []).find(item => item.id === patientId) ||
+              pacientesNefrocenso.find(item => item.id === patientId);
+      if (!p) return;
+      abrirModalSolicitudLab(p);
+    }
+
+    function abrirModalSolicitudLab(paciente) {
+      pacienteSeleccionadoLab = paciente;
+      document.getElementById('modalSolicitudLabsTitulo').innerText = '📋 Solicitud: ' + paciente.nombre + ' (Cama ' + (paciente.cama || paciente.maquina || 'S/C') + ')';
+      limpiarSeleccionLabs();
+      document.getElementById('modalSolicitudLabs').style.display = 'flex';
+    }
+
+    function cerrarModalLabs() {
+      document.getElementById('modalSolicitudLabs').style.display = 'none';
+      pacienteSeleccionadoLab = null;
+    }
+
+    function toggleLabItem(lab) {
+      if (selectedLabsMap.has(lab.id)) {
+        selectedLabsMap.delete(lab.id);
+        document.getElementById('btn-lab-' + lab.id)?.classList.remove('selected');
+      } else {
+        selectedLabsMap.set(lab.id, lab.desglose);
+        document.getElementById('btn-lab-' + lab.id)?.classList.add('selected');
+      }
+      actualizarRutinaBotonStatus();
+      actualizarPreviewTexto();
+    }
+
+    function toggleRutina() {
+      const todos = RUTINA_IDS.every(id => selectedLabsMap.has(id));
+      RUTINA_IDS.forEach(id => {
+        const lab = LABS_CONFIG.find(l => l.id === id);
+        const btn = document.getElementById('btn-lab-' + id);
+        if (todos) {
+          selectedLabsMap.delete(id);
+          btn?.classList.remove('selected');
+        } else {
+          selectedLabsMap.set(id, lab.desglose);
+          btn?.classList.add('selected');
+        }
+      });
+      actualizarRutinaBotonStatus();
+      actualizarPreviewTexto();
+    }
+
+    function actualizarRutinaBotonStatus() {
+      const todos = RUTINA_IDS.every(id => selectedLabsMap.has(id));
+      const btn = document.getElementById('btnPerfilRutina');
+      if (todos) btn?.classList.add('btn-rutina-active');
+      else btn?.classList.remove('btn-rutina-active');
+    }
+
+    function actualizarPreviewTexto() {
+      document.getElementById('txtEstudiosSolicitados').value = Array.from(selectedLabsMap.values()).join(', ');
+    }
+
+    function limpiarSeleccionLabs() {
+      selectedLabsMap.clear();
+      document.querySelectorAll('.btn-lab-item').forEach(b => b.classList.remove('selected'));
+      document.getElementById('btnPerfilRutina')?.classList.remove('btn-rutina-active');
+      document.getElementById('txtEstudiosSolicitados').value = '';
+    }
+
+    function imprimirSolicitudISSSTE() {
+      const textoEstudios = document.getElementById('txtEstudiosSolicitados').value.trim();
+      if (!textoEstudios) { alert("Selecciona al menos un estudio."); return; }
+      const p = pacienteSeleccionadoLab || {};
+      const fecha = new Date();
+      const dia = String(fecha.getDate()).padStart(2, '0');
+      const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+      const anio = String(fecha.getFullYear()).slice(-2);
+      const exp = p.expediente || (p.nss_base ? (p.nss_dig ? p.nss_base + '/' + p.nss_dig : p.nss_base) : (p.nss || ''));
+      const cama = p.cama || p.maquina || 'S/C';
+      const medico = (p.elaboro || (typeof nombreQuienElabora === 'function' && nombreQuienElabora())) ? (p.elaboro || nombreQuienElabora()) : 'Dr. Emmanuel Sánchez Álvarez';
+
+      const plantillaTanto = '<div class="form-tanto">' +
+        '<div class="issste-header"><div class="issste-brand"><strong>ISSSTE</strong><br><div class="issste-sub">Instituto de Seguridad y Servicios Sociales de los Trabajadores del Estado</div><strong>DELEGACIÓN PUEBLA</strong><br><strong>HOSPITAL REGIONAL PUEBLA</strong></div><div class="issste-meta">FR-HRP-LB-19 v4 01/07/2022<br>COPIA CONTROLADA</div></div>' +
+        '<div class="doc-banner">SOLICITUD DE ANÁLISIS CLÍNICOS</div>' +
+        '<table class="issste-grid-table">' +
+        '<tr><td colspan="2" style="width:55%;"><span class="label-cell">APELLIDO(S) Y NOMBRE(S) DEL PACIENTE</span><span class="value-cell">' + (p.nombre || '') + '</span></td><td style="width:20%;"><span class="label-cell">NUMERO DE EXPEDIENTE</span><span class="value-cell">' + exp + '</span></td><td style="width:25%;"><span class="label-cell">FECHA</span><span class="value-cell">DÍA: <u>' + dia + '</u> MES: <u>' + mes + '</u> AÑO: <u>' + anio + '</u></span></td></tr>' +
+        '<tr><td><span class="label-cell">CLAVE</span><span class="value-cell">00902235</span></td><td><span class="label-cell">CLAVE DE LA UNIDAD</span><span class="value-cell">02118</span></td><td><span class="label-cell">SEXO</span><span class="value-cell">' + (p.sexo || '-') + '</span></td><td><span class="label-cell">EDAD</span><span class="value-cell">' + (p.edad ? p.edad + ' AÑOS' : '-') + '</span></td></tr>' +
+        '<tr><td colspan="2"><span class="label-cell">SERVICIO</span><span class="value-cell">NEFROLOGIA</span></td><td colspan="2"><span class="label-cell">CAMA</span><span class="value-cell">' + cama + '</span></td></tr>' +
+        '<tr><td colspan="4"><span class="label-cell">DIAGNÓSTICO PRESUNTIVO</span><span class="value-cell">' + (p.diagnostico || 'ERC EN HD') + '</span></td></tr>' +
+        '<tr><td colspan="4" class="analisis-box"><span class="label-cell">ANÁLISIS SOLICITADO</span><div class="analisis-content">' + textoEstudios + '</div></td></tr>' +
+        '<tr><td colspan="2" style="width:45%;"><span class="label-cell">MÉDICO TRATANTE</span><div class="firma-area"></div><div class="firma-sub">' + medico + ' / NEFROLOGÍA</div></td><td colspan="2" style="width:55%;"><div class="consentimiento-text">En plena capacidad de mis facultades como paciente y bajo protesta de decir la verdad, declaro que me ha sido INFORMADO y entiendo las posibles complicaciones que se pueden presentar durante y posteriores a la toma de muestra sanguinea (Dolor, enrojecimiento, hematoma de la zona).</div><div class="firma-area" style="height:18px;"></div><div class="firma-sub">Nombre y firma del paciente o familiar que acepta el procedimiento</div></td></tr>' +
+        '</table><div class="compromiso-tag">NUESTRO COMPROMISO: "SERVICIOS CON CALIDAD"</div></div>';
+
+      const area = document.getElementById('printableArea');
+      area.innerHTML = '<div class="solicitud-print-page">' + plantillaTanto + plantillaTanto + '</div>';
+      area.style.display = 'block';
+      window.print();
+      setTimeout(() => { area.style.display = 'none'; cerrarModalLabs(); }, 500);
+    }
+
+    async function abrirModalBusquedaSolicitud() {
+      document.getElementById('inputBuscarModalSolicitud').value = '';
+      if (window.db) {
+        try {
+          const snap = await window.fsGetDocs(window.fsCollection(window.db, "pacientes"));
+          let all = [];
+          snap.forEach(docSnap => {
+            const d = { id: docSnap.id, ...docSnap.data() };
+            if (!d.eliminado && !d.fusionadoEn) all.push(d);
+          });
+          todosLosPacientesDirectorio = all;
+        } catch(e) {}
+      }
+      buscarPacientesEnModalSolicitud();
+      document.getElementById('modalBusquedaTopSolicitud').style.display = 'flex';
+    }
+
+    function cerrarModalBusquedaSolicitud() {
+      document.getElementById('modalBusquedaTopSolicitud').style.display = 'none';
+    }
+
+    function buscarPacientesEnModalSolicitud() {
+      const q = document.getElementById('inputBuscarModalSolicitud').value.toLowerCase().trim();
+      const listDiv = document.getElementById('listaResultadosModalSolicitud');
+      listDiv.innerHTML = '';
+
+      let basePool = (todosLosPacientesDirectorio && todosLosPacientesDirectorio.length > 0) ? todosLosPacientesDirectorio : currentPatients;
+      const mapUnicos = new Map();
+      pacientesNefrocenso.forEach(p => mapUnicos.set(p.nombre.toUpperCase(), p));
+      (basePool || []).forEach(p => { if (!p.eliminado && !p.fusionadoEn) mapUnicos.set((p.nombre || '').toUpperCase(), p); });
+
+      const combinados = Array.from(mapUnicos.values());
+      const filtrados = combinados.filter(p => 
+        !q || (p.nombre && p.nombre.toLowerCase().includes(q)) ||
+        (p.maquina && String(p.maquina).toLowerCase().includes(q)) ||
+        (p.cama && String(p.cama).toLowerCase().includes(q)) ||
+        (p.expediente && String(p.expediente).toLowerCase().includes(q)) ||
+        (p.nss && String(p.nss).toLowerCase().includes(q))
+      );
+
+      if (filtrados.length === 0) {
+        listDiv.innerHTML = '<div style="padding: 10px; color: #94a3b8; text-align: center; font-size: 12px;">No se encontraron coincidencias.</div>';
+        return;
+      }
+
+      filtrados.forEach(p => {
+        const esCenso = p.origen === 'Censo Drive' || (!p.dias || p.dias.length === 0);
+        const tag = esCenso ? '<span style="background:#fef3c7; color:#b45309; font-size:10px; font-weight:800; padding:2px 5px; border-radius:4px; margin-left:5px;">HOSPITALIZADO (CENSO)</span>' : '<span style="background:#dbeafe; color:#1e40af; font-size:10px; font-weight:800; padding:2px 5px; border-radius:4px; margin-left:5px;">HEMODIÁLISIS</span>';
+        const item = document.createElement('div');
+        item.style.cssText = 'padding: 8px 10px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; cursor: pointer;';
+        item.innerHTML = '<div><strong style="font-size: 12.5px; color: #1e3a8a;">' + p.nombre + '</strong>' + tag + '<br><small style="color: #64748b; font-size: 11px;">Cama/Máq: <strong>' + (p.cama || p.maquina || 'S/C') + '</strong> &bull; Exp: ' + (p.expediente || p.nss_base || p.nss || 'S/E') + '</small></div><button type="button" class="btn-save" style="padding: 4px 10px; font-size: 11px; background: #0284c7;">Solicitar Lab</button>';
+        item.onclick = () => {
+          cerrarModalBusquedaSolicitud();
+          abrirModalSolicitudLab(p);
+        };
+        listDiv.appendChild(item);
+      });
+    }
+
+    function cambiarANuevoPacienteParaSolicitud() {
+      cerrarModalBusquedaSolicitud();
+      openAddPatientModal();
+    }
+
+    document.addEventListener('DOMContentLoaded', renderizarBotonesLabs);
   </script>
 </body>
 </html>
