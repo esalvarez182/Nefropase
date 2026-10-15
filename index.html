@@ -6683,7 +6683,7 @@ function detectarYMostrarDuplicados() {
         }
 
         const { PDFDocument, StandardFonts, rgb } = PDFLib;
-        const pdfDoc = await PDFDocument.load(bytesPlantilla);
+        const pdfDoc = await PDFDocument.load(bytesPlantilla, { ignoreEncryption: true });
         const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
         const page = pdfDoc.getPages()[0];
 
