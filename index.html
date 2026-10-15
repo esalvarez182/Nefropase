@@ -6210,7 +6210,6 @@ function detectarYMostrarDuplicados() {
     }
   </script>
 
-  <!-- MODAL: SELECCIONADOR DE LABORATORIOS Y VERIFICACIÓN DE DATOS -->
   <div id="modalSolicitudLabs" class="modal-overlay" style="z-index: 5500;">
     <div class="modal-card" style="max-width: 780px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 2px solid #0284c7; padding-bottom: 8px;">
@@ -6283,7 +6282,6 @@ function detectarYMostrarDuplicados() {
     </div>
   </div>
 
-  <!-- MODAL: BUSCADOR DE PACIENTES -->
   <div id="modalBusquedaTopSolicitud" class="modal-overlay" style="z-index: 5500;">
     <div class="modal-card" style="max-width: 560px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 2px solid #ff9800; padding-bottom: 8px;">
@@ -6530,7 +6528,6 @@ function detectarYMostrarDuplicados() {
       document.getElementById('txtEstudiosSolicitados').value = '';
     }
 
-    // Imprime el formato exacto de Laboratorios.pdf superponiendo los textos en sus coordenadas exactas sin usar PDFDocument.load encriptado
     function generarOrdenEnFormatoExacto() {
       const textoEstudios = document.getElementById('txtEstudiosSolicitados').value.trim();
       if (!textoEstudios) {
@@ -6569,29 +6566,23 @@ function detectarYMostrarDuplicados() {
       const anio = anioFull ? anioFull : String(new Date().getFullYear());
       const medico = 'DR. EMMANUEL SÁNCHEZ ÁLVAREZ';
 
-      // Función que genera la capa de textos en porcentajes milimétricos sobre la hoja carta oficial (612 x 792 pt)
       function capaDatos(offsetPctY) {
         return `
-          <!-- FECHA: DIA MES AÑO (Arriba a la derecha) -->
-          <div class="field" style="left: 84.4%; top: ${(12.8 + offsetPctY).toFixed(2)}%; width: 3.2%; text-align: center;">${dia || ''}</div>
-          <div class="field" style="left: 87.6%; top: ${(12.8 + offsetPctY).toFixed(2)}%; width: 3.2%; text-align: center;">${mes || ''}</div>
-          <div class="field" style="left: 91.0%; top: ${(12.8 + offsetPctY).toFixed(2)}%; width: 4.5%; text-align: center;">${anio || ''}</div>
+          <div class="field" style="left: 84.4%; top: ${(13.2 + offsetPctY).toFixed(2)}%; width: 3.2%; text-align: center;">${dia || ''}</div>
+          <div class="field" style="left: 87.6%; top: ${(13.2 + offsetPctY).toFixed(2)}%; width: 3.2%; text-align: center;">${mes || ''}</div>
+          <div class="field" style="left: 91.0%; top: ${(13.2 + offsetPctY).toFixed(2)}%; width: 4.5%; text-align: center;">${anio || ''}</div>
 
-          <!-- FILA PACIENTE: APELLIDOS, NOMBRES, EXPEDIENTE, SEXO, EDAD -->
-          <div class="field" style="left: 7.5%; top: ${(17.8 + offsetPctY).toFixed(2)}%; width: 22.5%; overflow: hidden;">${apellidos}</div>
-          <div class="field" style="left: 30.5%; top: ${(17.8 + offsetPctY).toFixed(2)}%; width: 21.0%; overflow: hidden;">${nombres}</div>
-          <div class="field" style="left: 54.5%; top: ${(17.8 + offsetPctY).toFixed(2)}%; width: 15.0%; text-align: center; font-size: 8.5pt;">${expediente}</div>
-          <div class="field" style="left: 72.0%; top: ${(17.8 + offsetPctY).toFixed(2)}%; width: 5.8%; text-align: center;">${sexo}</div>
-          <div class="field" style="left: 81.3%; top: ${(17.8 + offsetPctY).toFixed(2)}%; width: 13.0%; text-align: center;">${edad}</div>
+          <div class="field" style="left: 9.0%; top: ${(19.2 + offsetPctY).toFixed(2)}%; width: 21.0%; overflow: hidden;">${apellidos}</div>
+          <div class="field" style="left: 31.0%; top: ${(19.2 + offsetPctY).toFixed(2)}%; width: 20.5%; overflow: hidden;">${nombres}</div>
+          <div class="field" style="left: 55.2%; top: ${(19.2 + offsetPctY).toFixed(2)}%; width: 14.5%; text-align: center; font-size: 8.5pt;">${expediente}</div>
+          <div class="field" style="left: 72.0%; top: ${(19.2 + offsetPctY).toFixed(2)}%; width: 5.8%; text-align: center;">${sexo}</div>
+          <div class="field" style="left: 81.3%; top: ${(19.2 + offsetPctY).toFixed(2)}%; width: 13.0%; text-align: center;">${edad}</div>
 
-          <!-- ANÁLISIS SOLICITADO (Sobre las líneas horizontales) -->
-          <div class="field-box" style="left: 29.0%; top: ${(22.8 + offsetPctY).toFixed(2)}%; width: 65.5%; height: 6.5%; line-height: 1.55;">${textoEstudios.toUpperCase()}</div>
+          <div class="field-box" style="left: 6.8%; top: ${(24.1 + offsetPctY).toFixed(2)}%; width: 87.8%; height: 6.2%; text-indent: 22.2%; line-height: 1.62;">${textoEstudios.toUpperCase()}</div>
 
-          <!-- CAMA (Al lado de NEFROLOGIA) -->
-          <div class="field" style="left: 80.5%; top: ${(30.8 + offsetPctY).toFixed(2)}%; width: 9.0%; text-align: center; font-size: 10.5pt;">${cama}</div>
+          <div class="field" style="left: 79.8%; top: ${(30.4 + offsetPctY).toFixed(2)}%; width: 9.0%; text-align: center; font-size: 10.5pt;">${cama}</div>
 
-          <!-- MÉDICO (En el recuadro inferior izquierdo) -->
-          <div class="field" style="left: 20.0%; top: ${(37.0 + offsetPctY).toFixed(2)}%; font-size: 8.5pt;">${medico}</div>
+          <div class="field" style="left: 21.5%; top: ${(36.2 + offsetPctY).toFixed(2)}%; font-size: 8.5pt;">${medico}</div>
         `;
       }
 
@@ -6607,13 +6598,13 @@ function detectarYMostrarDuplicados() {
             body { width: 215.9mm; height: 279.4mm; position: relative; font-family: Arial, Helvetica, sans-serif; overflow: hidden; }
             .bg-pdf { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
             .field { position: absolute; z-index: 2; font-weight: bold; font-size: 9.5pt; color: #000; white-space: nowrap; }
-            .field-box { position: absolute; z-index: 2; font-weight: bold; font-size: 9.5pt; color: #000; line-height: 1.25; white-space: normal; word-wrap: break-word; }
+            .field-box { position: absolute; z-index: 2; font-weight: bold; font-size: 9pt; color: #000; white-space: normal; word-wrap: break-word; }
           </style>
         </head>
         <body>
           <img class="bg-pdf" src="${PLANTILLA_ISSSTE_DATAURL}" />
           ${capaDatos(0)}
-          ${capaDatos(51.8)}
+          ${capaDatos(53.3)}
           <script>
             window.onload = function() {
               setTimeout(function() { window.focus(); window.print(); }, 350);
