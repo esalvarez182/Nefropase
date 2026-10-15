@@ -438,30 +438,6 @@
     .btn-lab-item:hover { background: #e2e8f0; border-color: #94a3b8; }
     .btn-lab-item.selected { background: #0284c7 !important; color: #ffffff !important; border-color: #0369a1 !important; box-shadow: 0 2px 4px rgba(2,132,199,0.3); }
     .btn-rutina-active { background: linear-gradient(135deg, #15803d, #16a34a) !important; color: white !important; }
-    @media print {
-      body * { visibility: hidden !important; }
-      #printableArea, #printableArea * { visibility: visible !important; }
-      #printableArea { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; display: block !important; margin: 0 !important; padding: 0 !important; }
-      @page { size: letter portrait; margin: 8mm 12mm; }
-    }
-    .solicitud-print-page { font-family: Arial, Helvetica, sans-serif; color: #000; display: flex; flex-direction: column; gap: 12mm; }
-    .form-tanto { border: 1.8px solid #000; padding: 7px 10px; box-sizing: border-box; background: #fff; page-break-inside: avoid; }
-    .issste-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1.5px solid #000; padding-bottom: 3px; margin-bottom: 3px; }
-    .issste-brand { font-size: 10.5px; line-height: 1.15; }
-    .issste-brand strong { font-size: 12px; font-weight: 900; }
-    .issste-sub { font-size: 8.5px; text-transform: uppercase; font-weight: bold; }
-    .issste-meta { text-align: right; font-size: 8px; line-height: 1.2; font-weight: bold; }
-    .doc-banner { text-align: center; font-size: 11.5px; font-weight: 900; letter-spacing: 0.5px; margin: 3px 0 5px 0; text-transform: uppercase; }
-    .issste-grid-table { width: 100%; border-collapse: collapse; font-size: 9px; }
-    .issste-grid-table td { border: 1px solid #000; padding: 3px 5px; vertical-align: top; }
-    .label-cell { font-size: 7.5px; font-weight: bold; color: #000; text-transform: uppercase; display: block; margin-bottom: 1px; }
-    .value-cell { font-size: 9.5px; font-weight: bold; }
-    .analisis-box { height: 90px; vertical-align: top; }
-    .analisis-content { font-size: 9.5px; font-weight: bold; line-height: 1.25; margin-top: 3px; text-transform: uppercase; }
-    .consentimiento-text { font-size: 7px; line-height: 1.15; text-align: justify; }
-    .firma-area { height: 32px; border-bottom: 1px solid #000; margin-bottom: 2px; }
-    .firma-sub { font-size: 7.5px; text-align: center; font-weight: bold; }
-    .compromiso-tag { font-size: 7.5px; font-weight: bold; text-align: center; margin-top: 3px; letter-spacing: 0.5px; }
   </style>
 
   <!-- Firebase SDKs -->
@@ -593,6 +569,7 @@
       }
     });
   </script>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 </head>
 <body>
 
@@ -1549,7 +1526,7 @@ function cerrarModalNotificaciones() {
           allPatients.push({ id: docSnap.id, ...docSnap.data() });
         });
         
-        currentPatients = allPatients.filter(p => !p.eliminado && !p.fusionadoEn && p.origen !== "Censo Drive" && p.dias && p.dias.includes(selectedDay));
+        currentPatients = allPatients.filter(p => !p.eliminado && !p.fusionadoEn && p.origen !== "nefrocenso" && p.origen !== "Censo Drive" && p.dias && p.dias.includes(selectedDay));
         
         const sessionRef = window.fsDoc(window.db, "sesiones", dateKey);
         const sessionSnap = await window.fsGetDoc(sessionRef);
@@ -6234,50 +6211,105 @@ function detectarYMostrarDuplicados() {
     }
   </script>
 
-  <!-- MODALES DE SOLICITUD DE LABORATORIO ISSSTE -->
+  <!-- MODAL: SELECCIONADOR DE LABORATORIOS Y VERIFICACIÓN DE DATOS -->
   <div id="modalSolicitudLabs" class="modal-overlay" style="z-index: 5500;">
     <div class="modal-card" style="max-width: 780px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 2px solid #0284c7; padding-bottom: 8px;">
-        <h3 id="modalSolicitudLabsTitulo" style="font-size: 16.5px; color: #0369a1; display: flex; align-items: center; gap: 6px;">📋 Solicitud de Análisis Clínicos (ISSSTE)</h3>
+        <h3 id="modalSolicitudLabsTitulo" style="font-size: 16px; color: #0369a1; display: flex; align-items: center; gap: 6px;">📋 Solicitud de Análisis Clínicos (Formato Oficial ISSSTE)</h3>
         <button onclick="cerrarModalLabs()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #64748b;">&times;</button>
       </div>
-      <div style="margin-bottom: 12px;">
-        <button type="button" id="btnPerfilRutina" onclick="toggleRutina()" style="width: 100%; background: linear-gradient(135deg, #0d47a1, #1976d2); color: white; padding: 10px 12px; border: none; border-radius: 8px; font-size: 13px; font-weight: 800; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px;">
+
+      <!-- Barra obligatoria para confirmar/editar Sexo, Edad, Cama y Fecha antes de imprimir -->
+      <div style="background: #eff6ff; border: 1.5px solid #93c5fd; border-radius: 8px; padding: 10px; margin-bottom: 12px;">
+        <div style="font-size: 11.5px; font-weight: 800; color: #1e3a8a; margin-bottom: 6px;">
+          ✏️ VERIFICA O COMPLETA LOS DATOS DEL PACIENTE ANTES DE IMPRIMIR:
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px;">
+          <div>
+            <label style="font-size: 11px; font-weight: 700; color: #334155; display: block; margin-bottom: 2px;">Apellidos:</label>
+            <input type="text" id="solInputApellidos" style="width: 100%; padding: 5px 7px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 12px; font-weight: 700; text-transform: uppercase;">
+          </div>
+          <div>
+            <label style="font-size: 11px; font-weight: 700; color: #334155; display: block; margin-bottom: 2px;">Nombre(s):</label>
+            <input type="text" id="solInputNombres" style="width: 100%; padding: 5px 7px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 12px; font-weight: 700; text-transform: uppercase;">
+          </div>
+          <div>
+            <label style="font-size: 11px; font-weight: 700; color: #334155; display: block; margin-bottom: 2px;">Expediente / NSS:</label>
+            <input type="text" id="solInputExpediente" style="width: 100%; padding: 5px 7px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 12px; font-weight: 700; text-transform: uppercase;">
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 8px;">
+          <div>
+            <label style="font-size: 11px; font-weight: 800; color: #b45309; display: block; margin-bottom: 2px;">Sexo (M / F) *:</label>
+            <select id="solInputSexo" style="width: 100%; padding: 5px 7px; border: 1.5px solid #f59e0b; border-radius: 5px; font-size: 12px; font-weight: 700; background: #fff;">
+              <option value="">-- Seleccionar --</option>
+              <option value="M">M (Masculino)</option>
+              <option value="F">F (Femenino)</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 11px; font-weight: 800; color: #b45309; display: block; margin-bottom: 2px;">Edad (Años) *:</label>
+            <input type="text" id="solInputEdad" placeholder="Ej. 59" style="width: 100%; padding: 5px 7px; border: 1.5px solid #f59e0b; border-radius: 5px; font-size: 12px; font-weight: 700; background: #fff;">
+          </div>
+          <div>
+            <label style="font-size: 11px; font-weight: 800; color: #b45309; display: block; margin-bottom: 2px;">Cama *:</label>
+            <input type="text" id="solInputCama" placeholder="Ej. 501" style="width: 100%; padding: 5px 7px; border: 1.5px solid #f59e0b; border-radius: 5px; font-size: 12px; font-weight: 700; background: #fff;">
+          </div>
+          <div>
+            <label style="font-size: 11px; font-weight: 800; color: #0369a1; display: block; margin-bottom: 2px;">Fecha Solicitud:</label>
+            <input type="date" id="solInputFecha" style="width: 100%; padding: 5px 7px; border: 1.5px solid #38bdf8; border-radius: 5px; font-size: 12px; font-weight: 700; background: #fff;">
+          </div>
+        </div>
+      </div>
+
+      <!-- Botón Perfil RUTINA -->
+      <div style="margin-bottom: 10px;">
+        <button type="button" id="btnPerfilRutina" onclick="toggleRutina()" style="width: 100%; background: linear-gradient(135deg, #0d47a1, #1976d2); color: white; padding: 9px 12px; border: none; border-radius: 8px; font-size: 12.5px; font-weight: 800; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px;">
           ★ PERFIL RUTINA (BH, Qs, Es, Alb, Ac úrico, Hb1Ac, Tiempos, PFH, Lípidos, Tiroideo, PCR, Cinética Fe, PTHi, Ferritina, DHL, FA)
         </button>
       </div>
-      <div id="contenedorBotonesLabs" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px;"></div>
-      <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px; margin-bottom: 12px;">
-        <label style="font-size: 11.5px; font-weight: 800; color: #334155; text-transform: uppercase; display: block; margin-bottom: 4px;">Estudios desglosados para la solicitud oficial:</label>
-        <textarea id="txtEstudiosSolicitados" rows="3" style="width: 100%; border: 1px solid #94a3b8; border-radius: 6px; padding: 6px 8px; font-size: 12px; font-weight: 600; color: #0f172a;" placeholder="Selecciona los botones de arriba o escribe estudios adicionales..."></textarea>
+
+      <!-- Catálogo de Botones -->
+      <div id="contenedorBotonesLabs" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(125px, 1fr)); gap: 7px; margin-bottom: 10px;"></div>
+
+      <!-- Desglose editable -->
+      <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 8px 10px; margin-bottom: 12px;">
+        <label style="font-size: 11px; font-weight: 800; color: #334155; text-transform: uppercase; display: block; margin-bottom: 3px;">Análisis Solicitado (se imprimirá en el recuadro de estudios):</label>
+        <textarea id="txtEstudiosSolicitados" rows="2" style="width: 100%; border: 1px solid #94a3b8; border-radius: 6px; padding: 6px 8px; font-size: 12px; font-weight: 600; color: #0f172a;" placeholder="Selecciona los estudios arriba..."></textarea>
       </div>
+
+      <!-- Selector opcional si Laboratorios.pdf no está en la raíz -->
+      <input type="file" id="pdfTemplateFallback" accept="application/pdf" style="display:none" onchange="onPdfTemplateSelected(event)">
+
       <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
-        <button class="btn-light" onclick="limpiarSeleccionLabs()">Limpiar</button>
+        <button class="btn-light" onclick="limpiarSeleccionLabs()">Limpiar Estudios</button>
         <div style="display: flex; gap: 8px;">
           <button class="btn-light" onclick="cerrarModalLabs()">Cancelar</button>
-          <button class="btn-save" style="background: #0284c7;" onclick="imprimirSolicitudISSSTE()">🖨️ Generar e Imprimir Solicitud</button>
+          <button class="btn-save" style="background: #0284c7;" onclick="generarPDFOficialISSSTE()">🖨️ Llenar e Imprimir PDF Oficial</button>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- MODAL: BUSCADOR DE PACIENTES (HEMODIÁLISIS + NEFROCENSO COMPLETO) -->
   <div id="modalBusquedaTopSolicitud" class="modal-overlay" style="z-index: 5500;">
-    <div class="modal-card" style="max-width: 520px;">
+    <div class="modal-card" style="max-width: 560px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 2px solid #ff9800; padding-bottom: 8px;">
-        <h3 style="font-size: 16px; color: #b45309;">📋 Nueva Solicitud de Laboratorios</h3>
+        <h3 style="font-size: 16px; color: #b45309;">📋 Solicitud de Laboratorio - Buscar Paciente</h3>
         <button onclick="cerrarModalBusquedaSolicitud()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #64748b;">&times;</button>
       </div>
       <div style="margin-bottom: 12px;">
-        <label style="font-size: 12px; font-weight: 700; color: #334155; display: block; margin-bottom: 4px;">Buscar paciente (Hemodiálisis o Censo Hospitalizados):</label>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <label style="font-size: 12px; font-weight: 700; color: #334155;">Pacientes (Hemodiálisis + Nefrocenso antes de EXTERNOS):</label>
+          <span id="estadoSyncCenso" style="font-size: 10.5px; color: #0284c7; font-weight: 700;">🔄 Sincronizado</span>
+        </div>
         <input type="text" id="inputBuscarModalSolicitud" placeholder="Escribe nombre, cama o expediente..." oninput="buscarPacientesEnModalSolicitud()" style="width: 100%; padding: 8px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none;">
-        <div id="listaResultadosModalSolicitud" style="max-height: 240px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; margin-top: 6px; background: #f8fafc;"></div>
+        <div id="listaResultadosModalSolicitud" style="max-height: 280px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; margin-top: 6px; background: #f8fafc;"></div>
       </div>
-      <div style="text-align: center; margin: 12px 0; color: #64748b; font-size: 11px; font-weight: 800;">── O REGISTRAR NUEVO PACIENTE ──</div>
-      <button type="button" class="btn-light" style="width: 100%; padding: 8px; border: 1.5px dashed #0284c7; color: #0284c7; background: #f0f9ff; font-weight: 700; justify-content: center;" onclick="cambiarANuevoPacienteParaSolicitud()">+ Registrar Nuevo Paciente</button>
+      <div style="text-align: center; margin: 10px 0; color: #64748b; font-size: 11px; font-weight: 800;">── O REGISTRAR UN PACIENTE NUEVO ──</div>
+      <button type="button" class="btn-light" style="width: 100%; padding: 9px; border: 1.5px dashed #0284c7; color: #0284c7; background: #f0f9ff; font-weight: 700; justify-content: center;" onclick="abrirSolicitudPacienteEnBlanco()">+ Llenar Solicitud para Paciente Nuevo / No Registrado</button>
     </div>
   </div>
-
-  <div id="printableArea" style="display: none;"></div>
 
   <script>
     const LABS_CONFIG = [
@@ -6310,18 +6342,93 @@ function detectarYMostrarDuplicados() {
     ];
     const RUTINA_IDS = ['bh','qs','es','alb','au','hba1c','tiempos','pfh','lipidos','tiroideo','pcr','fe','pthi','ferritina','dhl','fa'];
 
-    // Censo Hospitalizados (Nefrocenso antes de EXTERNOS): exclusivos para buscador de solicitudes
+    // Todos los pacientes del Nefrocenso desde la fila CAMA hasta antes de EXTERNOS (incluyendo Manejo Conjunto, Trasplante y Urgencias)
     let pacientesNefrocenso = [
-      { id: 'censo_501', cama: '501', maquina: '501', nombre: 'AGUILERA MORA ROBERTO', expediente: 'PORD690819/40', edad: '59', sexo: 'M', diagnostico: 'PO TNK 10/10 + ERC EN DP + DT2 + HAS', origen: 'Censo Drive' },
-      { id: 'censo_502', cama: '502', maquina: '502', nombre: 'JUAREZ GONZALEZ JUVENTINA', expediente: 'RAJD970222/60', edad: '53', sexo: 'M', diagnostico: 'DERRAME PLEURAL BILATERAL + ERC EN DP + HAS + DT2', origen: 'Censo Drive' },
-      { id: 'censo_503', cama: '503', maquina: '503', nombre: 'BARBOSA CORTEZ GUADALUPE', expediente: 'BACG730114/20', edad: '53', sexo: 'F', diagnostico: 'ERC KDIGO G5 + PO COLOCACIÓN DE TNK + DT2 + HAS', origen: 'Censo Drive' },
-      { id: 'censo_504', cama: '504', maquina: '504', nombre: 'GONZALEZ DOMINGUEZ IGNACIO', expediente: 'GOOF790630/50', edad: '75', sexo: 'M', diagnostico: 'ERC EN HD DE RESCATE + PO TNK + HAS + ICC FEVI REDUCIDA', origen: 'Censo Drive' },
-      { id: 'censo_505', cama: '505', maquina: '505', nombre: 'LOPEZ QUIROZ JESUS', expediente: 'LOZZ960527/50', edad: '63', sexo: 'M', diagnostico: 'SEPSIS SEC A INFECCIÓN ANGIOACCESO + ERC EN HD + HAS', origen: 'Censo Drive' },
-      { id: 'censo_506', cama: '506', maquina: '506', nombre: 'LOPEZ RINCON MAGALY DEL CARMEN', expediente: 'LORM750919/20', edad: '51', sexo: 'F', diagnostico: 'ERC EN HD + SX DE VENA CAVA', origen: 'Censo Drive' }
+      { id: 'nc_501', cama: '501', nombre: 'AGUILERA MORA ROBERTO', expediente: 'PORD690819/40', edad: '59', sexo: 'M', origen: 'nefrocenso' },
+      { id: 'nc_502', cama: '502', nombre: 'JUAREZ GONZALEZ JUVENTINA', expediente: 'RAJD970222/60', edad: '53', sexo: 'M', origen: 'nefrocenso' },
+      { id: 'nc_503', cama: '503', nombre: 'BARBOSA CORTEZ GUADALUPE', expediente: 'BACG730114/20', edad: '53', sexo: 'F', origen: 'nefrocenso' },
+      { id: 'nc_504', cama: '504', nombre: 'GONZALEZ DOMINGUEZ IGNACIO', expediente: 'GOOF790630/50', edad: '75', sexo: 'M', origen: 'nefrocenso' },
+      { id: 'nc_505', cama: '505', nombre: 'LOPEZ QUIROZ JESUS', expediente: 'LOZZ960527/50', edad: '63', sexo: 'M', origen: 'nefrocenso' },
+      { id: 'nc_506', cama: '506', nombre: 'LOPEZ RINCON MAGALY DEL CARMEN', expediente: 'LORM750919/20', edad: '51', sexo: 'F', origen: 'nefrocenso' },
+      { id: 'nc_507', cama: '507', nombre: 'BARBOSA GUTIERREZ MARIA DEL CARMEN YOLANDA', expediente: 'BAGM470716/20', edad: '79', sexo: 'F', origen: 'nefrocenso' },
+      { id: 'nc_508', cama: '508', nombre: 'ROJAS CRUZ REFUGIO CARMEN', expediente: 'ROCC490704/20', edad: '77', sexo: 'F', origen: 'nefrocenso' },
+      { id: 'nc_524', cama: '524', nombre: 'HERNANDEZ APARICIO CLAUDIO', expediente: 'HEAC470323/10', edad: '79', sexo: 'M', origen: 'nefrocenso' },
+      { id: 'nc_527', cama: '527', nombre: 'SANTA MARIA RAMOS MARIA JOSEFA', expediente: 'SARM520319/20', edad: '74', sexo: 'F', origen: 'nefrocenso' },
+      { id: 'nc_528', cama: '528', nombre: 'CRUZ DANIEL CIRILO', expediente: 'CUDC520709/10', edad: '74', sexo: 'M', origen: 'nefrocenso' },
+      { id: 'nc_533', cama: '533', nombre: 'CHAVEZ RAMOS MIGUEL DE JESUS', expediente: 'CARM530929/10', edad: '73', sexo: 'M', origen: 'nefrocenso' },
+      { id: 'nc_538', cama: '538', nombre: 'FLORES AVILA JACQUELINE', expediente: 'FOAJ980727/20', edad: '28', sexo: 'F', origen: 'nefrocenso' },
+      { id: 'nc_urg15', cama: 'URG 15', nombre: 'HERNANDEZ CISNEROS LUCIA', expediente: 'SAHL630225/20', edad: '63', sexo: 'F', origen: 'nefrocenso' }
     ];
+
+    // Sincronización en tiempo real desde el archivo Nefrocenso de Google Drive (1U4W-TNJ1wNBJ45ofxjzpjRIXTGR3ulHR)
+    // Lee desde la fila "CAMA" hasta antes de "EXTERNOS", extrayendo solo CAMA, PACIENTE, EXPEDIENTE, EDAD, SEXO
+    async function sincronizarNefrocensoEnTiempoReal() {
+      const statusEl = document.getElementById('estadoSyncCenso');
+      if (statusEl) statusEl.innerText = '🔄 Actualizando desde Drive...';
+      try {
+        const sheetId = '1U4W-TNJ1wNBJ45ofxjzpjRIXTGR3ulHR';
+        const url = 'https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json';
+        const resp = await fetch(url);
+        const text = await resp.text();
+        const jsonStr = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+        const data = JSON.parse(jsonStr);
+        const rows = data.table.rows || [];
+
+        let nuevos = [];
+        let leyendo = false;
+
+        for (let i = 0; i < rows.length; i++) {
+          const c = rows[i].c || [];
+          const val0 = c[0] && (c[0].f || c[0].v) ? String(c[0].f || c[0].v).trim() : '';
+          const val1 = c[1] && (c[1].f || c[1].v) ? String(c[1].f || c[1].v).trim() : '';
+          const val2 = c[2] && (c[2].f || c[2].v) ? String(c[2].f || c[2].v).trim() : '';
+          const val3 = c[3] && (c[3].f || c[3].v) ? String(c[3].f || c[3].v).trim() : '';
+          const val4 = c[4] && (c[4].f || c[4].v) ? String(c[4].f || c[4].v).trim() : '';
+
+          const filaUpper = (val0 + ' ' + val1).toUpperCase();
+
+          // Detectar inicio en fila "CAMA"
+          if (val0.toUpperCase() === 'CAMA' || val1.toUpperCase() === 'PACIENTE') {
+            leyendo = true;
+            continue;
+          }
+          // Detenerse inmediatamente al llegar a "EXTERNOS"
+          if (filaUpper.includes('EXTERNO')) {
+            break;
+          }
+          if (!leyendo) continue;
+
+          // Saltar filas divisorias como MANEJO CONJUNTO, TRASPLANTE, URGENCIAS o filas sin nombre de paciente
+          if (!val1 || val1.toUpperCase().includes('MANEJO CONJUNTO') || val1.toUpperCase().includes('TRASPLANTE') || val1.toUpperCase().includes('URGENCIAS')) {
+            continue;
+          }
+
+          nuevos.push({
+            id: 'nc_' + i,
+            cama: val0 || 'S/C',
+            nombre: val1.toUpperCase(),
+            expediente: val2.toUpperCase(),
+            edad: val3,
+            sexo: val4.toUpperCase(),
+            origen: 'nefrocenso'
+          });
+        }
+
+        if (nuevos.length > 0) {
+          pacientesNefrocenso = nuevos;
+          if (statusEl) statusEl.innerText = '✅ Drive en tiempo real (' + nuevos.length + ' pac.)';
+          buscarPacientesEnModalSolicitud();
+        } else {
+          if (statusEl) statusEl.innerText = '✅ Censo activo (' + pacientesNefrocenso.length + ' pac.)';
+        }
+      } catch (e) {
+        if (statusEl) statusEl.innerText = '✅ Censo local (' + pacientesNefrocenso.length + ' pac.)';
+      }
+    }
 
     let pacienteSeleccionadoLab = null;
     let selectedLabsMap = new Map();
+    let pdfTemplateBytesCache = null;
 
     function renderizarBotonesLabs() {
       const cont = document.getElementById('contenedorBotonesLabs');
@@ -6338,6 +6445,18 @@ function detectarYMostrarDuplicados() {
       });
     }
 
+    function separarApellidosYNombres(nombreCompleto) {
+      const limpio = String(nombreCompleto || '').trim().replace(/s+/g, ' ');
+      if (!limpio) return { apellidos: '', nombres: '' };
+      const partes = limpio.split(' ');
+      if (partes.length === 1) return { apellidos: partes[0], nombres: '' };
+      if (partes.length === 2) return { apellidos: partes[0], nombres: partes[1] };
+      return {
+        apellidos: partes.slice(0, 2).join(' '),
+        nombres: partes.slice(2).join(' ')
+      };
+    }
+
     function abrirModalSolicitudLabPorId(patientId) {
       let p = (currentPatients || []).find(item => item.id === patientId) ||
               (todosLosPacientesDirectorio || []).find(item => item.id === patientId) ||
@@ -6347,10 +6466,32 @@ function detectarYMostrarDuplicados() {
     }
 
     function abrirModalSolicitudLab(paciente) {
-      pacienteSeleccionadoLab = paciente;
-      document.getElementById('modalSolicitudLabsTitulo').innerText = '📋 Solicitud: ' + paciente.nombre + ' (Cama ' + (paciente.cama || paciente.maquina || 'S/C') + ')';
+      pacienteSeleccionadoLab = paciente || {};
+      const sep = separarApellidosYNombres(pacienteSeleccionadoLab.nombre || '');
+      const exp = pacienteSeleccionadoLab.expediente ||
+                  (pacienteSeleccionadoLab.nss_base ? (pacienteSeleccionadoLab.nss_dig ? pacienteSeleccionadoLab.nss_base + '/' + pacienteSeleccionadoLab.nss_dig : pacienteSeleccionadoLab.nss_base) : (pacienteSeleccionadoLab.nss || ''));
+
+      document.getElementById('solInputApellidos').value = sep.apellidos;
+      document.getElementById('solInputNombres').value = sep.nombres;
+      document.getElementById('solInputExpediente').value = exp;
+      document.getElementById('solInputSexo').value = (pacienteSeleccionadoLab.sexo === 'M' || pacienteSeleccionadoLab.sexo === 'F') ? pacienteSeleccionadoLab.sexo : '';
+      document.getElementById('solInputEdad').value = pacienteSeleccionadoLab.edad || '';
+      document.getElementById('solInputCama').value = pacienteSeleccionadoLab.cama || pacienteSeleccionadoLab.maquina || '';
+
+      const hoy = new Date();
+      const yyyy = hoy.getFullYear();
+      const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+      const dd = String(hoy.getDate()).padStart(2, '0');
+      document.getElementById('solInputFecha').value = yyyy + '-' + mm + '-' + dd;
+
+      document.getElementById('modalSolicitudLabsTitulo').innerText = '📋 Solicitud: ' + (pacienteSeleccionadoLab.nombre || 'Nuevo Paciente');
       limpiarSeleccionLabs();
       document.getElementById('modalSolicitudLabs').style.display = 'flex';
+    }
+
+    function abrirSolicitudPacienteEnBlanco() {
+      cerrarModalBusquedaSolicitud();
+      abrirModalSolicitudLab({ nombre: '', expediente: '', edad: '', sexo: '', cama: '' });
     }
 
     function cerrarModalLabs() {
@@ -6405,52 +6546,160 @@ function detectarYMostrarDuplicados() {
       document.getElementById('txtEstudiosSolicitados').value = '';
     }
 
-    function imprimirSolicitudISSSTE() {
+    // Divide un texto largo en líneas para que quepa perfectamente en el recuadro de ANÁLISIS SOLICITADO del PDF
+    function dividirTextoEnLineas(texto, maxCaracteresPorLinea) {
+      const palabras = texto.split(/s+/);
+      const lineas = [];
+      let actual = '';
+      palabras.forEach(pal => {
+        if ((actual + ' ' + pal).trim().length <= maxCaracteresPorLinea) {
+          actual = (actual + ' ' + pal).trim();
+        } else {
+          if (actual) lineas.push(actual);
+          actual = pal;
+        }
+      });
+      if (actual) lineas.push(actual);
+      return lineas;
+    }
+
+    async function obtenerBytesPlantillaPDF() {
+      if (pdfTemplateBytesCache) return pdfTemplateBytesCache;
+      try {
+        const resp = await fetch('./Laboratorios.pdf');
+        if (resp.ok) {
+          pdfTemplateBytesCache = await resp.arrayBuffer();
+          return pdfTemplateBytesCache;
+        }
+      } catch (e) {}
+      return null;
+    }
+
+    function onPdfTemplateSelected(ev) {
+      const f = ev.target.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = async function(e) {
+        pdfTemplateBytesCache = e.target.result;
+        await generarPDFOficialISSSTE();
+      };
+      r.readAsArrayBuffer(f);
+    }
+
+    // Llena directamente el archivo Laboratorios.pdf original sin modificar su formato
+    async function generarPDFOficialISSSTE() {
       const textoEstudios = document.getElementById('txtEstudiosSolicitados').value.trim();
-      if (!textoEstudios) { alert("Selecciona al menos un estudio."); return; }
-      const p = pacienteSeleccionadoLab || {};
-      const fecha = new Date();
-      const dia = String(fecha.getDate()).padStart(2, '0');
-      const mes = String(fecha.getMonth() + 1).padStart(2, '0');
-      const anio = String(fecha.getFullYear()).slice(-2);
-      const exp = p.expediente || (p.nss_base ? (p.nss_dig ? p.nss_base + '/' + p.nss_dig : p.nss_base) : (p.nss || ''));
-      const cama = p.cama || p.maquina || 'S/C';
-      const medico = (p.elaboro || (typeof nombreQuienElabora === 'function' && nombreQuienElabora())) ? (p.elaboro || nombreQuienElabora()) : 'Dr. Emmanuel Sánchez Álvarez';
+      if (!textoEstudios) {
+        alert("Selecciona al menos un estudio de laboratorio.");
+        return;
+      }
 
-      const plantillaTanto = '<div class="form-tanto">' +
-        '<div class="issste-header"><div class="issste-brand"><strong>ISSSTE</strong><br><div class="issste-sub">Instituto de Seguridad y Servicios Sociales de los Trabajadores del Estado</div><strong>DELEGACIÓN PUEBLA</strong><br><strong>HOSPITAL REGIONAL PUEBLA</strong></div><div class="issste-meta">FR-HRP-LB-19 v4 01/07/2022<br>COPIA CONTROLADA</div></div>' +
-        '<div class="doc-banner">SOLICITUD DE ANÁLISIS CLÍNICOS</div>' +
-        '<table class="issste-grid-table">' +
-        '<tr><td colspan="2" style="width:55%;"><span class="label-cell">APELLIDO(S) Y NOMBRE(S) DEL PACIENTE</span><span class="value-cell">' + (p.nombre || '') + '</span></td><td style="width:20%;"><span class="label-cell">NUMERO DE EXPEDIENTE</span><span class="value-cell">' + exp + '</span></td><td style="width:25%;"><span class="label-cell">FECHA</span><span class="value-cell">DÍA: <u>' + dia + '</u> MES: <u>' + mes + '</u> AÑO: <u>' + anio + '</u></span></td></tr>' +
-        '<tr><td><span class="label-cell">CLAVE</span><span class="value-cell">00902235</span></td><td><span class="label-cell">CLAVE DE LA UNIDAD</span><span class="value-cell">02118</span></td><td><span class="label-cell">SEXO</span><span class="value-cell">' + (p.sexo || '-') + '</span></td><td><span class="label-cell">EDAD</span><span class="value-cell">' + (p.edad ? p.edad + ' AÑOS' : '-') + '</span></td></tr>' +
-        '<tr><td colspan="2"><span class="label-cell">SERVICIO</span><span class="value-cell">NEFROLOGIA</span></td><td colspan="2"><span class="label-cell">CAMA</span><span class="value-cell">' + cama + '</span></td></tr>' +
-        '<tr><td colspan="4"><span class="label-cell">DIAGNÓSTICO PRESUNTIVO</span><span class="value-cell">' + (p.diagnostico || 'ERC EN HD') + '</span></td></tr>' +
-        '<tr><td colspan="4" class="analisis-box"><span class="label-cell">ANÁLISIS SOLICITADO</span><div class="analisis-content">' + textoEstudios + '</div></td></tr>' +
-        '<tr><td colspan="2" style="width:45%;"><span class="label-cell">MÉDICO TRATANTE</span><div class="firma-area"></div><div class="firma-sub">' + medico + ' / NEFROLOGÍA</div></td><td colspan="2" style="width:55%;"><div class="consentimiento-text">En plena capacidad de mis facultades como paciente y bajo protesta de decir la verdad, declaro que me ha sido INFORMADO y entiendo las posibles complicaciones que se pueden presentar durante y posteriores a la toma de muestra sanguinea (Dolor, enrojecimiento, hematoma de la zona).</div><div class="firma-area" style="height:18px;"></div><div class="firma-sub">Nombre y firma del paciente o familiar que acepta el procedimiento</div></td></tr>' +
-        '</table><div class="compromiso-tag">NUESTRO COMPROMISO: "SERVICIOS CON CALIDAD"</div></div>';
+      let apellidos = document.getElementById('solInputApellidos').value.trim().toUpperCase();
+      let nombres = document.getElementById('solInputNombres').value.trim().toUpperCase();
+      let expediente = document.getElementById('solInputExpediente').value.trim().toUpperCase();
+      let sexo = document.getElementById('solInputSexo').value.trim().toUpperCase();
+      let edad = document.getElementById('solInputEdad').value.trim();
+      let cama = document.getElementById('solInputCama').value.trim().toUpperCase();
+      let fechaVal = document.getElementById('solInputFecha').value;
 
-      const area = document.getElementById('printableArea');
-      area.innerHTML = '<div class="solicitud-print-page">' + plantillaTanto + plantillaTanto + '</div>';
-      area.style.display = 'block';
-      window.print();
-      setTimeout(() => { area.style.display = 'none'; cerrarModalLabs(); }, 500);
+      // Preguntar explícitamente si falta Sexo, Edad o Cama
+      if (!sexo) {
+        const respSexo = prompt("Confirma el SEXO del paciente (M o F):", "M");
+        if (respSexo === null) return;
+        sexo = respSexo.trim().toUpperCase();
+        document.getElementById('solInputSexo').value = (sexo === 'F') ? 'F' : 'M';
+      }
+      if (!edad) {
+        const respEdad = prompt("Confirma la EDAD del paciente (en años):", "");
+        if (respEdad === null) return;
+        edad = respEdad.trim();
+        document.getElementById('solInputEdad').value = edad;
+      }
+      if (!cama) {
+        const respCama = prompt("Confirma la CAMA del paciente:", "");
+        if (respCama === null) return;
+        cama = respCama.trim().toUpperCase();
+        document.getElementById('solInputCama').value = cama;
+      }
+
+      const [anioFull, mes, dia] = (fechaVal || '').split('-');
+      const anio = anioFull ? anioFull : String(new Date().getFullYear());
+
+      const bytesPlantilla = await obtenerBytesPlantillaPDF();
+      if (!bytesPlantilla) {
+        alert("Para llenar por primera vez el formato idéntico, selecciona tu archivo 'Laboratorios.pdf' original (o súbelo junto a index.html en tu repositorio de GitHub).");
+        document.getElementById('pdfTemplateFallback').click();
+        return;
+      }
+
+      const { PDFDocument, StandardFonts, rgb } = PDFLib;
+      const pdfDoc = await PDFDocument.load(bytesPlantilla);
+      const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      const page = pdfDoc.getPages()[0];
+
+      const medico = 'DR. EMMANUEL SÁNCHEZ ÁLVAREZ';
+      const colorTexto = rgb(0, 0, 0);
+
+      // Función que estampa los datos en las coordenadas exactas del formato superior e inferior de Laboratorios.pdf
+      // El formato superior e inferior tienen un desplazamiento vertical exacto de 387.3 puntos.
+      function estamparTanto(offsetY) {
+        // Apellidos y Nombres
+        page.drawText(apellidos, { x: 162, y: 706 - offsetY, size: 9.5, font: fontBold, color: colorTexto });
+        page.drawText(nombres,   { x: 315, y: 706 - offsetY, size: 9.5, font: fontBold, color: colorTexto });
+
+        // Sexo, Edad y Número de Expediente
+        page.drawText(sexo,       { x: 458, y: 706 - offsetY, size: 9.5, font: fontBold, color: colorTexto });
+        page.drawText(edad,       { x: 486, y: 706 - offsetY, size: 9.5, font: fontBold, color: colorTexto });
+        page.drawText(expediente, { x: 512, y: 706 - offsetY, size: 8.5, font: fontBold, color: colorTexto });
+
+        // Cama (NEFROLOGIA ya viene impreso en el PDF)
+        page.drawText(cama,       { x: 545, y: 660 - offsetY, size: 10, font: fontBold, color: colorTexto });
+
+        // Día, Mes, Año
+        page.drawText(dia || '',  { x: 368, y: 515 - offsetY, size: 9, font: fontBold, color: colorTexto });
+        page.drawText(mes || '',  { x: 396, y: 515 - offsetY, size: 9, font: fontBold, color: colorTexto });
+        page.drawText(anio || '', { x: 423, y: 515 - offsetY, size: 9, font: fontBold, color: colorTexto });
+
+        // Médico
+        page.drawText(medico,     { x: 92,  y: 515 - offsetY, size: 8.5, font: fontBold, color: colorTexto });
+
+        // Análisis Solicitado (multilínea dentro del recuadro)
+        const lineas = dividirTextoEnLineas(textoEstudios.toUpperCase(), 78);
+        lineas.slice(0, 7).forEach((linea, idx) => {
+          page.drawText(linea, {
+            x: 42,
+            y: (628 - (idx * 12)) - offsetY,
+            size: 9.5,
+            font: fontBold,
+            color: colorTexto
+          });
+        });
+      }
+
+      // Estampar formato superior (offsetY = 0) y formato inferior (offsetY = 387.3)
+      estamparTanto(0);
+      estamparTanto(387.3);
+
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const blobUrl = URL.createObjectURL(blob);
+
+      // Abrir en pestaña lista para imprimir en tamaño exacto
+      const win = window.open(blobUrl, '_blank');
+      if (!win) {
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = 'Solicitud_Lab_' + (apellidos || 'Paciente') + '.pdf';
+        link.click();
+      }
+      cerrarModalLabs();
     }
 
     async function abrirModalBusquedaSolicitud() {
       document.getElementById('inputBuscarModalSolicitud').value = '';
-      if (window.db) {
-        try {
-          const snap = await window.fsGetDocs(window.fsCollection(window.db, "pacientes"));
-          let all = [];
-          snap.forEach(docSnap => {
-            const d = { id: docSnap.id, ...docSnap.data() };
-            if (!d.eliminado && !d.fusionadoEn) all.push(d);
-          });
-          todosLosPacientesDirectorio = all;
-        } catch(e) {}
-      }
-      buscarPacientesEnModalSolicitud();
       document.getElementById('modalBusquedaTopSolicitud').style.display = 'flex';
+      buscarPacientesEnModalSolicitud();
+      sincronizarNefrocensoEnTiempoReal();
     }
 
     function cerrarModalBusquedaSolicitud() {
@@ -6463,41 +6712,49 @@ function detectarYMostrarDuplicados() {
       listDiv.innerHTML = '';
 
       let basePool = (todosLosPacientesDirectorio && todosLosPacientesDirectorio.length > 0) ? todosLosPacientesDirectorio : currentPatients;
-      const mapUnicos = new Map();
-      pacientesNefrocenso.forEach(p => mapUnicos.set(p.nombre.toUpperCase(), p));
-      (basePool || []).forEach(p => { if (!p.eliminado && !p.fusionadoEn) mapUnicos.set((p.nombre || '').toUpperCase(), p); });
+      const listaCombinada = [];
 
-      const combinados = Array.from(mapUnicos.values());
-      const filtrados = combinados.filter(p => 
+      // 1. Agregar todos los pacientes del Nefrocenso (desde CAMA hasta EXTERNOS)
+      pacientesNefrocenso.forEach(p => listaCombinada.push(p));
+
+      // 2. Agregar pacientes registrados en Hemodiálisis
+      (basePool || []).forEach(p => {
+        if (!p.eliminado && !p.fusionadoEn && p.origen !== 'nefrocenso') {
+          listaCombinada.push(p);
+        }
+      });
+
+      const filtrados = listaCombinada.filter(p => 
         !q || (p.nombre && p.nombre.toLowerCase().includes(q)) ||
-        (p.maquina && String(p.maquina).toLowerCase().includes(q)) ||
         (p.cama && String(p.cama).toLowerCase().includes(q)) ||
+        (p.maquina && String(p.maquina).toLowerCase().includes(q)) ||
         (p.expediente && String(p.expediente).toLowerCase().includes(q)) ||
         (p.nss && String(p.nss).toLowerCase().includes(q))
       );
 
       if (filtrados.length === 0) {
-        listDiv.innerHTML = '<div style="padding: 10px; color: #94a3b8; text-align: center; font-size: 12px;">No se encontraron coincidencias.</div>';
+        listDiv.innerHTML = '<div style="padding: 12px; color: #94a3b8; text-align: center; font-size: 12px;">No se encontraron pacientes con ese criterio.</div>';
         return;
       }
 
       filtrados.forEach(p => {
-        const esCenso = p.origen === 'Censo Drive' || (!p.dias || p.dias.length === 0);
-        const tag = esCenso ? '<span style="background:#fef3c7; color:#b45309; font-size:10px; font-weight:800; padding:2px 5px; border-radius:4px; margin-left:5px;">HOSPITALIZADO (CENSO)</span>' : '<span style="background:#dbeafe; color:#1e40af; font-size:10px; font-weight:800; padding:2px 5px; border-radius:4px; margin-left:5px;">HEMODIÁLISIS</span>';
+        const esNefrocenso = (p.origen === 'nefrocenso');
+        const tag = esNefrocenso
+          ? '<span style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-size:10px; font-weight:800; padding:1px 6px; border-radius:4px; margin-left:6px;">NEFROCENSO CAMA ' + (p.cama || 'S/C') + '</span>'
+          : '<span style="background:#dbeafe; color:#1e40af; font-size:10px; font-weight:800; padding:1px 6px; border-radius:4px; margin-left:6px;">HEMODIÁLISIS</span>';
+
+        const expInfo = p.expediente || (p.nss_base ? (p.nss_dig ? p.nss_base + '/' + p.nss_dig : p.nss_base) : (p.nss || 'S/E'));
+        const metaExtra = esNefrocenso ? (' &bull; Edad: <b>' + (p.edad || '-') + '</b> &bull; Sexo: <b>' + (p.sexo || '-') + '</b>') : '';
+
         const item = document.createElement('div');
         item.style.cssText = 'padding: 8px 10px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; cursor: pointer;';
-        item.innerHTML = '<div><strong style="font-size: 12.5px; color: #1e3a8a;">' + p.nombre + '</strong>' + tag + '<br><small style="color: #64748b; font-size: 11px;">Cama/Máq: <strong>' + (p.cama || p.maquina || 'S/C') + '</strong> &bull; Exp: ' + (p.expediente || p.nss_base || p.nss || 'S/E') + '</small></div><button type="button" class="btn-save" style="padding: 4px 10px; font-size: 11px; background: #0284c7;">Solicitar Lab</button>';
+        item.innerHTML = '<div><strong style="font-size: 12.5px; color: #0f172a;">' + p.nombre + '</strong>' + tag + '<br><small style="color: #475569; font-size: 11px;">Exp: <b>' + expInfo + '</b>' + metaExtra + '</small></div><button type="button" class="btn-save" style="padding: 5px 10px; font-size: 11px; background: #0284c7;">Seleccionar</button>';
         item.onclick = () => {
           cerrarModalBusquedaSolicitud();
           abrirModalSolicitudLab(p);
         };
         listDiv.appendChild(item);
       });
-    }
-
-    function cambiarANuevoPacienteParaSolicitud() {
-      cerrarModalBusquedaSolicitud();
-      openAddPatientModal();
     }
 
     document.addEventListener('DOMContentLoaded', renderizarBotonesLabs);
