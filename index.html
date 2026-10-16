@@ -445,7 +445,8 @@
       justify-content: center !important;
       line-height: 1 !important;
       gap: 0 !important;
-      margin-right: 4px;
+      margin-right: 2px;
+      flex-shrink: 0;
     }
     .brand-main {
       font-size: 16px;
@@ -456,7 +457,7 @@
     }
     .brand-cloud {
       font-family: 'Dancing Script', 'Brush Script MT', cursive !important;
-      font-size: 18.5px;
+      font-size: 18px;
       font-weight: 700;
       color: #93c5fd;
       margin-top: -2px;
@@ -465,18 +466,40 @@
     }
 
     @media (max-width: 600px) {
-      .app-header { padding: 8px 10px !important; gap: 6px !important; }
-      #btnTopSolicitud {
-        padding: 6px 10px !important;
-        font-size: 11px !important;
-        white-space: nowrap !important;
-        border-radius: 16px !important;
+      .app-header {
+        padding: 8px 8px !important;
+        gap: 4px !important;
       }
-      .status-pill span#cloudStatus { display: none; }
-      .status-pill { padding: 5px !important; border-radius: 50% !important; }
+      .brand-main { font-size: 14px !important; }
+      .brand-cloud { font-size: 15.5px !important; }
+      .app-header > div {
+        gap: 5px !important;
+        flex-shrink: 1 !important;
+        min-width: 0 !important;
+      }
+      #btnTopSolicitud {
+        padding: 5px 8px !important;
+        font-size: 10.5px !important;
+        white-space: nowrap !important;
+        border-radius: 14px !important;
+        gap: 3px !important;
+      }
+      #btnTopSolicitud .txt-largo { display: none !important; }
+      #btnAccesos, #btnSalir, #btnDriveCfg, #btnNotif {
+        width: 29px !important;
+        height: 29px !important;
+        font-size: 14px !important;
+        flex-shrink: 0 !important;
+      }
+      #iconNotif { font-size: 15px !important; }
+      .status-pill span#cloudStatus { display: none !important; }
+      .status-pill {
+        padding: 4px !important;
+        border-radius: 50% !important;
+        flex-shrink: 0 !important;
+      }
     }
 
-    /* Evitar desbordamiento de inputs en celular */
     .field-item { min-width: 0 !important; }
     .field-item input, .field-item select {
       width: 100% !important;
@@ -484,7 +507,6 @@
       box-sizing: border-box !important;
     }
 
-    /* Cuadrícula ordenada para los botones de cada tarjeta */
     .card-actions {
       display: grid !important;
       grid-template-columns: repeat(2, 1fr) !important;
@@ -693,7 +715,7 @@
   <header class="app-header">
     <h1 class="brand-logo" onclick="goHome()" title="Volver al día actual"><span class="brand-main">🩺 NefroPase</span><span class="brand-cloud">Cloud</span></h1>
     <div style="display: flex; align-items: center; gap: 12px;">
-      <button id="btnTopSolicitud" title="Generar Solicitud de Laboratorios ISSSTE" style="background: #ff9800; color: #ffffff; border: none; border-radius: 18px; padding: 6px 12px; font-weight: 700; font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer; white-space: nowrap; transition: all 0.2s;" onclick="abrirModalBusquedaSolicitud()">📋 + Solicitud Lab</button>
+      <button id="btnTopSolicitud" title="Generar Solicitud de Laboratorios ISSSTE" style="background: #ff9800; color: #ffffff; border: none; border-radius: 18px; padding: 6px 12px; font-weight: 700; font-size: 12px; display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; transition: all 0.2s;" onclick="abrirModalBusquedaSolicitud()">📋 + <span class="txt-largo">Solicitud </span>Lab</button>
       <button id="btnAccesos" hidden title="Administrar accesos" style="background: rgba(255,255,255,0.2); border: none; border-radius: 50%; width: 34px; height: 34px; align-items: center; justify-content: center; cursor: pointer; font-size: 16px;" onclick="abrirAccesos()">🔐</button>
       <button id="btnSalir" title="Cerrar sesión" style="background: rgba(255,255,255,0.2); border: none; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px;" onclick="if (confirm('¿Cerrar sesión en este equipo?')) npSalir()">🚪</button>
       <button id="btnDriveCfg" title="Enviar notas a Google Docs al dar Guardar" style="background: rgba(255,255,255,0.2); border: none; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 17px;" onclick="configurarDrive()">📄</button>
@@ -6410,7 +6432,6 @@ function detectarYMostrarDuplicados() {
     ];
     const RUTINA_IDS = ['bh','qs','es','alb','au','hba1c','tiempos','pfh','lipidos','tiroideo','pcr','fe','pthi','ferritina','dhl','fa'];
 
-    // CERO DATOS PRECARGADOS: Se alimenta estricta y exclusivamente en tiempo real desde Firestore ('nefrocenso_hospital')
     let pacientesNefrocenso = [];
     let unsubNefrocenso = null;
 
