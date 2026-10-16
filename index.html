@@ -6672,6 +6672,7 @@ function detectarYMostrarDuplicados() {
       function generarHtmlMitad(tipo, esInferior) {
       if (tipo === 'BLANCO') return '';
 
+      // LABORATORIOS: Se mantiene intacto, ya está perfecto.
       if (tipo === 'LAB') {
         const offsetPctY = esInferior ? 52.7 : 0;
         const clipRule = esInferior ? 'clip-path: inset(48.5% 0 0 0);' : 'clip-path: inset(0 0 48.5% 0);';
@@ -6692,6 +6693,7 @@ function detectarYMostrarDuplicados() {
         `;
       }
 
+      // PANEL VIRAL: Coordenadas ajustadas hacia abajo basándome en la imagen
       if (tipo === 'VIRAL') {
         const offsetPctY = esInferior ? 47.4 : 0;
         const clipRule = esInferior ? 'clip-path: inset(48.5% 0 0 0);' : 'clip-path: inset(0 0 51.5% 0);';
@@ -6699,21 +6701,23 @@ function detectarYMostrarDuplicados() {
 
         return `
           <img class="bg-pdf" style="${clipRule}" src="${DATAURL_VIRAL}" />
-          <!-- CALIBRACIÓN EXACTA PANEL VIRAL (Subimos todo ~5% en el eje Y) -->
-          <div class="field autofit" style="left: 25.0%; top: ${(11.3 + offsetPctY).toFixed(2)}%; width: 62.0%;">${nombreCompleto}</div>
-          <div class="field" style="left: 88.0%; top: ${(13.6 + offsetPctY).toFixed(2)}%; width: 10.0%; font-size: 9.5pt;">${cama}</div>
-          <div class="field autofit" style="left: 9.0%; top: ${(18.5 + offsetPctY).toFixed(2)}%; width: 49.0%;">ENFERMEDAD RENAL CRÓNICA</div>
-          <div class="field" style="left: ${leftCirculoSexo}; top: ${(18.3 + offsetPctY).toFixed(2)}%; width: 15px; height: 15px; border: 2px solid #000; border-radius: 50%; text-align: center; line-height: 12px; font-size: 8.5pt;">✕</div>
-          <div class="field" style="left: 83.2%; top: ${(18.5 + offsetPctY).toFixed(2)}%; width: 9.0%;">${edad} AÑOS</div>
-          <div class="field autofit" style="left: 22.0%; top: ${(21.0 + offsetPctY).toFixed(2)}%; width: 27.0%; font-size: 9.5pt;">${expediente}</div>
-          <div class="field" style="left: 66.8%; top: ${(21.0 + offsetPctY).toFixed(2)}%; width: 22.0%;">${fechaFormateada}</div>
-          <div class="field" style="left: 20.2%; top: ${(28.6 + offsetPctY).toFixed(2)}%; width: 5.0%; text-align: center; font-size: 12pt; font-weight: 900;">X</div>
-          <div class="field" style="left: 48.1%; top: ${(28.6 + offsetPctY).toFixed(2)}%; width: 5.0%; text-align: center; font-size: 12pt; font-weight: 900;">X</div>
-          <div class="field" style="left: 48.1%; top: ${(32.0 + offsetPctY).toFixed(2)}%; width: 5.0%; text-align: center; font-size: 12pt; font-weight: 900;">X</div>
-          <div class="field autofit" style="left: 46.5%; top: ${(38.3 + offsetPctY).toFixed(2)}%; width: 38.0%; text-align: center; font-size: 8.5pt;">${medico}</div>
+          <!-- Se ajustó 'top' hacia abajo para alinear con las líneas -->
+          <div class="field autofit" style="left: 25.0%; top: ${(20.5 + offsetPctY).toFixed(2)}%; width: 62.0%;">${nombreCompleto}</div>
+          <div class="field" style="left: 81.0%; top: ${(23.0 + offsetPctY).toFixed(2)}%; width: 10.0%; font-size: 9.5pt;">${cama}</div>
+          <div class="field autofit" style="left: 9.0%; top: ${(29.0 + offsetPctY).toFixed(2)}%; width: 49.0%;">ENFERMEDAD RENAL CRÓNICA</div>
+          <div class="field" style="left: ${leftCirculoSexo}; top: ${(28.8 + offsetPctY).toFixed(2)}%; width: 15px; height: 15px; border: 2px solid #000; border-radius: 50%; text-align: center; line-height: 12px; font-size: 8.5pt;">✕</div>
+          <div class="field" style="left: 83.2%; top: ${(29.0 + offsetPctY).toFixed(2)}%; width: 9.0%;">${edad} AÑOS</div>
+          <div class="field autofit" style="left: 22.0%; top: ${(31.5 + offsetPctY).toFixed(2)}%; width: 27.0%; font-size: 9.5pt;">${expediente}</div>
+          <div class="field" style="left: 66.8%; top: ${(31.5 + offsetPctY).toFixed(2)}%; width: 22.0%;">${fechaFormateada}</div>
+          <!-- Se ajustaron las posiciones de las X para que caigan dentro de los recuadros -->
+          <div class="field" style="left: 20.2%; top: ${(38.0 + offsetPctY).toFixed(2)}%; width: 5.0%; text-align: center; font-size: 12pt; font-weight: 900;">X</div>
+          <div class="field" style="left: 48.1%; top: ${(38.0 + offsetPctY).toFixed(2)}%; width: 5.0%; text-align: center; font-size: 12pt; font-weight: 900;">X</div>
+          <div class="field" style="left: 48.1%; top: ${(41.5 + offsetPctY).toFixed(2)}%; width: 5.0%; text-align: center; font-size: 12pt; font-weight: 900;">X</div>
+          <div class="field autofit" style="left: 46.5%; top: ${(47.5 + offsetPctY).toFixed(2)}%; width: 38.0%; text-align: center; font-size: 8.5pt;">${medico}</div>
         `;
       }
 
+      // RADIOLOGÍA: Se mantiene intacto, ya está perfecto.
       if (tipo === 'RX') {
         const offsetPctY = esInferior ? 47.9 : 0;
         const clipRule = esInferior ? 'clip-path: inset(48.5% 0 0 0);' : 'clip-path: inset(0 0 51.5% 0);';
@@ -6722,14 +6726,12 @@ function detectarYMostrarDuplicados() {
 
         return `
           <img class="bg-pdf" style="${clipRule}" src="${DATAURL_RX}" />
-          <!-- CALIBRACIÓN RADIOLOGÍA -->
           <div class="field autofit" style="left: 13.0%; top: ${(18.2 + offsetPctY).toFixed(2)}%; width: 47.0%;">${nombreCompleto}</div>
           <div class="field autofit" style="left: 22.8%; top: ${(20.1 + offsetPctY).toFixed(2)}%; width: 37.0%;">NEFROLOGÍA / CAMA ${cama}</div>
           <div class="field" style="left: 10.8%; top: ${(22.0 + offsetPctY).toFixed(2)}%; width: 14.0%;">${edad} AÑOS</div>
           <div class="field" style="left: 66.5%; top: ${(22.0 + offsetPctY).toFixed(2)}%; width: 15.0%;">${sexo}</div>
           <div class="field autofit" style="left: 45.8%; top: ${(23.9 + offsetPctY).toFixed(2)}%; width: 15.5%; font-size: 9pt;">${expediente}</div>
           <div class="field autofit" style="left: 24.0%; top: ${(27.6 + offsetPctY).toFixed(2)}%; width: 68.0%;">${estudioInputVal}</div>
-          <!-- Se movió el margen izquierdo a 36.0% para que escriba DESPUÉS de la palabra "CLÍNICA:" -->
           <div class="field-box" style="left: 36.0%; top: ${(29.5 + offsetPctY).toFixed(2)}%; width: 56.0%; height: 4.2%; line-height: 1.55;">${dxFinal}</div>
           <div class="field" style="left: 11.8%; top: ${(37.0 + offsetPctY).toFixed(2)}%; width: 20.0%;">${fechaFormateada}</div>
           <div class="field autofit" style="left: 64.5%; top: ${(33.5 + offsetPctY).toFixed(2)}%; width: 29.0%; text-align: center; font-size: 8.5pt;">${medico}</div>
