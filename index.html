@@ -6611,7 +6611,6 @@ function detectarYMostrarDuplicados() {
       let cama = document.getElementById('solInputCama').value.trim().toUpperCase();
       let fechaVal = document.getElementById('solInputFecha').value;
 
-      // Validar contenido antes de continuar
       if (tipoSup === 'LAB' && !document.getElementById('txtEstudiosSup').value.trim()) {
         alert("Selecciona al menos un laboratorio para la Mitad Superior.");
         return;
@@ -6650,7 +6649,6 @@ function detectarYMostrarDuplicados() {
         document.getElementById('solInputCama').value = cama;
       }
 
-      // Si cualquiera de las dos mitades es Radiología, pedir el Diagnóstico en ventana emergente
       let dxRxSup = '';
       let dxRxInf = '';
       const dxSugerido = (pacienteActualModal && pacienteActualModal.diagnostico) ? pacienteActualModal.diagnostico : 'ENFERMEDAD RENAL CRÓNICA';
@@ -6671,8 +6669,6 @@ function detectarYMostrarDuplicados() {
       const fechaFormateada = (dia && mes && anio) ? (dia + '/' + mes + '/' + anio) : '';
       const medico = 'DR. EMMANUEL SÁNCHEZ ÁLVAREZ';
 
-      // IMPORTANTE: Las imágenes de fondo se mantienen al 100% de la hoja carta (width: 100%, height: 100%)
-      // y se recortan con clip-path: inset(...) para que JAMÁS se deformen ni se descuadren las coordenadas.
       function generarHtmlMitad(tipo, esInferior) {
         if (tipo === 'BLANCO') return '';
 
@@ -6686,11 +6682,11 @@ function detectarYMostrarDuplicados() {
             <div class="field" style="left: 84.4%; top: ${(13.2 + offsetPctY).toFixed(2)}%; width: 3.2%; text-align: center;">${dia || ''}</div>
             <div class="field" style="left: 87.6%; top: ${(13.2 + offsetPctY).toFixed(2)}%; width: 3.2%; text-align: center;">${mes || ''}</div>
             <div class="field" style="left: 91.0%; top: ${(13.2 + offsetPctY).toFixed(2)}%; width: 4.5%; text-align: center;">${anio || ''}</div>
-            <div class="field autofit" style="left: 7.5%; top: ${(19.0 + offsetPctY).toFixed(2)}%; width: 22.5%;">${apellidos}</div>
-            <div class="field autofit" style="left: 30.5%; top: ${(19.0 + offsetPctY).toFixed(2)}%; width: 23.3%;">${nombres}</div>
-            <div class="field autofit" style="left: 55.2%; top: ${(19.0 + offsetPctY).toFixed(2)}%; width: 14.5%; text-align: center; font-size: 8.5pt;">${expediente}</div>
-            <div class="field" style="left: 72.0%; top: ${(19.0 + offsetPctY).toFixed(2)}%; width: 5.8%; text-align: center;">${sexo}</div>
-            <div class="field" style="left: 81.3%; top: ${(19.0 + offsetPctY).toFixed(2)}%; width: 13.0%; text-align: center;">${edad}</div>
+            <!-- Nombre completo corrido y centrado de forma uniforme -->
+            <div class="field autofit" style="left: 8.5%; top: ${(18.8 + offsetPctY).toFixed(2)}%; width: 44.5%; text-align: center;">${nombreCompleto}</div>
+            <div class="field autofit" style="left: 55.2%; top: ${(18.8 + offsetPctY).toFixed(2)}%; width: 14.5%; text-align: center; font-size: 8.5pt;">${expediente}</div>
+            <div class="field" style="left: 72.0%; top: ${(18.8 + offsetPctY).toFixed(2)}%; width: 5.8%; text-align: center;">${sexo}</div>
+            <div class="field" style="left: 81.3%; top: ${(18.8 + offsetPctY).toFixed(2)}%; width: 13.0%; text-align: center;">${edad}</div>
             <div class="field-box" style="left: 6.8%; top: ${(23.9 + offsetPctY).toFixed(2)}%; width: 87.8%; height: 6.2%; text-indent: 22.2%; line-height: 1.62;">${textoUsar.toUpperCase()}</div>
             <div class="field" style="left: 79.8%; top: ${(30.2 + offsetPctY).toFixed(2)}%; width: 9.0%; text-align: center; font-size: 10.5pt;">${cama}</div>
             <div class="field" style="left: 21.5%; top: ${(36.2 + offsetPctY).toFixed(2)}%; font-size: 8.5pt;">${medico}</div>
@@ -6698,23 +6694,23 @@ function detectarYMostrarDuplicados() {
         }
 
         if (tipo === 'VIRAL') {
-          const offsetPctY = esInferior ? 47.43 : 0;
-          const clipRule = esInferior ? 'clip-path: inset(47.4% 0 0 0);' : 'clip-path: inset(0 0 51.5% 0);';
-          const leftCirculoSexo = (sexo === 'F') ? '70.3%' : '73.2%';
+          const offsetPctY = esInferior ? 50.0 : 0;
+          const clipRule = esInferior ? 'clip-path: inset(49.2% 0 0 0);' : 'clip-path: inset(0 0 50.8% 0);';
+          const leftCirculoSexo = (sexo === 'F') ? '67.4%' : '69.3%';
 
           return `
             <img class="bg-pdf" style="${clipRule}" src="${DATAURL_VIRAL}" />
-            <div class="field autofit" style="left: 21.5%; top: ${(12.2 + offsetPctY).toFixed(2)}%; width: 32.0%;">${nombreCompleto}</div>
-            <div class="field autofit" style="left: 71.0%; top: ${(12.2 + offsetPctY).toFixed(2)}%; width: 22.0%; font-size: 9pt;">${expediente}</div>
-            <div class="field" style="left: 65.0%; top: ${(14.5 + offsetPctY).toFixed(2)}%; width: 20.0%;">${fechaFormateada}</div>
-            <div class="field" style="left: 28.5%; top: ${(16.6 + offsetPctY).toFixed(2)}%; width: 14.0%; font-size: 10pt;">${cama}</div>
-            <div class="field" style="left: ${leftCirculoSexo}; top: ${(16.3 + offsetPctY).toFixed(2)}%; width: 18px; height: 18px; border: 2px solid #000; border-radius: 50%; text-align: center; line-height: 15px; font-size: 10pt;">✕</div>
-            <div class="field" style="left: 83.5%; top: ${(16.6 + offsetPctY).toFixed(2)}%; width: 10.0%;">${edad} AÑOS</div>
-            <div class="field autofit" style="left: 11.2%; top: ${(18.7 + offsetPctY).toFixed(2)}%; width: 42.0%;">ENFERMEDAD RENAL CRÓNICA</div>
-            <div class="field" style="left: 24.1%; top: ${(26.1 + offsetPctY).toFixed(2)}%; font-size: 12pt; font-weight: 900;">X</div>
-            <div class="field" style="left: 48.0%; top: ${(26.1 + offsetPctY).toFixed(2)}%; font-size: 12pt; font-weight: 900;">X</div>
-            <div class="field" style="left: 48.0%; top: ${(29.8 + offsetPctY).toFixed(2)}%; font-size: 12pt; font-weight: 900;">X</div>
-            <div class="field autofit" style="left: 33.0%; top: ${(38.8 + offsetPctY).toFixed(2)}%; width: 35.0%; text-align: center; font-size: 9pt;">${medico}</div>
+            <div class="field autofit" style="left: 26.8%; top: ${(15.6 + offsetPctY).toFixed(2)}%; width: 63.0%;">${nombreCompleto}</div>
+            <div class="field" style="left: 80.2%; top: ${(18.1 + offsetPctY).toFixed(2)}%; width: 10.0%; font-size: 10pt;">${cama}</div>
+            <div class="field autofit" style="left: 11.8%; top: ${(24.4 + offsetPctY).toFixed(2)}%; width: 47.0%;">ENFERMEDAD RENAL CRÓNICA</div>
+            <div class="field" style="left: ${leftCirculoSexo}; top: ${(24.2 + offsetPctY).toFixed(2)}%; width: 16px; height: 16px; border: 2px solid #000; border-radius: 50%; text-align: center; line-height: 13px; font-size: 9pt;">✕</div>
+            <div class="field" style="left: 78.5%; top: ${(24.4 + offsetPctY).toFixed(2)}%; width: 12.0%;">${edad} AÑOS</div>
+            <div class="field autofit" style="left: 23.5%; top: ${(27.1 + offsetPctY).toFixed(2)}%; width: 34.0%; font-size: 9.5pt;">${expediente}</div>
+            <div class="field" style="left: 69.5%; top: ${(27.1 + offsetPctY).toFixed(2)}%; width: 20.0%;">${fechaFormateada}</div>
+            <div class="field" style="left: 34.8%; top: ${(36.2 + offsetPctY).toFixed(2)}%; width: 5.5%; text-align: center; font-size: 12pt; font-weight: 900;">X</div>
+            <div class="field" style="left: 51.8%; top: ${(36.2 + offsetPctY).toFixed(2)}%; width: 5.5%; text-align: center; font-size: 12pt; font-weight: 900;">X</div>
+            <div class="field" style="left: 51.8%; top: ${(39.2 + offsetPctY).toFixed(2)}%; width: 5.5%; text-align: center; font-size: 12pt; font-weight: 900;">X</div>
+            <div class="field autofit" style="left: 48.0%; top: ${(42.6 + offsetPctY).toFixed(2)}%; width: 42.0%; text-align: center; font-size: 8.5pt;">${medico}</div>
           `;
         }
 
