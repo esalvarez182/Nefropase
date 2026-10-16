@@ -6839,5 +6839,189 @@ function detectarYMostrarDuplicados() {
 
     document.addEventListener('DOMContentLoaded', renderizarBotonesDobleOrden);
   </script>
+  <!-- MODAL UNIFICADO DE SOLICITUDES ISSSTE -->
+  <div id="modalSolicitudLabs" class="modal-overlay" style="z-index: 5500; display: none;">
+    <div class="modal-card" style="max-width: 760px; background: #fff; padding: 20px; border-radius: 12px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 2px solid #0284c7; padding-bottom: 8px;">
+        <h3 style="font-size: 16px; color: #0369a1; margin: 0;">📋 Generador de Órdenes Oficiales ISSSTE</h3>
+        <button onclick="cerrarModalLabs()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #64748b;">&times;</button>
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+        <button type="button" id="tabTipoLab" class="tab-tipo-orden active" onclick="cambiarTipoOrden('LAB')" style="flex:1; padding:8px; font-weight:bold; cursor:pointer;">🧪 Laboratorios</button>
+        <button type="button" id="tabTipoViral" class="tab-tipo-orden" onclick="cambiarTipoOrden('VIRAL')" style="flex:1; padding:8px; font-weight:bold; cursor:pointer;">🦠 Panel Viral</button>
+        <button type="button" id="tabTipoRx" class="tab-tipo-orden" onclick="cambiarTipoOrden('RX')" style="flex:1; padding:8px; font-weight:bold; cursor:pointer;">🩻 Radiología</button>
+      </div>
+
+      <div style="background: #eff6ff; border: 1.5px solid #93c5fd; border-radius: 8px; padding: 10px; margin-bottom: 12px;">
+        <div style="font-size: 11.5px; font-weight: 800; color: #1e3a8a; margin-bottom: 6px;">✏️ DATOS DEL PACIENTE:</div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px;">
+          <input type="text" id="solInputApellidos" placeholder="Apellidos" style="padding: 6px; font-size: 12px; text-transform: uppercase;">
+          <input type="text" id="solInputNombres" placeholder="Nombre(s)" style="padding: 6px; font-size: 12px; text-transform: uppercase;">
+          <input type="text" id="solInputExpediente" placeholder="Expediente / NSS" style="padding: 6px; font-size: 12px; text-transform: uppercase;">
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+          <select id="solInputSexo" style="padding: 6px; font-size: 12px;"><option value="">Sexo</option><option value="M">M</option><option value="F">F</option></select>
+          <input type="text" id="solInputEdad" placeholder="Edad" style="padding: 6px; font-size: 12px;">
+          <input type="text" id="solInputCama" placeholder="Cama" style="padding: 6px; font-size: 12px;">
+          <input type="date" id="solInputFecha" style="padding: 6px; font-size: 12px;">
+        </div>
+      </div>
+
+      <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+        <div id="panelFormLab">
+          <label style="font-size: 12px; font-weight: bold; display: block; margin-bottom: 4px;">Estudios de Laboratorio:</label>
+          <textarea id="txtEstudiosSolicitados" rows="3" style="width: 100%; padding: 6px; font-size: 12px;" placeholder="Escribe o selecciona estudios..."></textarea>
+        </div>
+        <div id="panelFormViral" style="display: none; font-size: 13px; color: #14532d; background: #f0fdf4; padding: 10px; border-radius: 6px;">
+          <b>🦠 Panel Viral seleccionado:</b> Se marcarán automáticamente <b>VIH, Hepatitis B y Hepatitis C</b> con diagnóstico de Enfermedad Renal Crónica.
+        </div>
+        <div id="panelFormRx" style="display: none;">
+          <label style="font-size: 12px; font-weight: bold; display: block; margin-bottom: 4px;">Estudio Radiológico Solicitado:</label>
+          <input type="text" id="inputEstudioRx" placeholder="Ej. TELE DE TÓRAX PA" style="width: 100%; padding: 6px; font-size: 12px; text-transform: uppercase;">
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button type="button" onclick="cerrarModalLabs()" style="padding: 8px 14px; cursor: pointer;">Cancelar</button>
+        <button type="button" onclick="generarOrdenDirecta()" style="background: #0284c7; color: #fff; border: none; padding: 8px 16px; font-weight: bold; border-radius: 6px; cursor: pointer;">🖨️ Imprimir Orden</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let tipoOrdenActual = 'LAB';
+
+    function cambiarTipoOrden(tipo) {
+      tipoOrdenActual = tipo;
+      document.getElementById('tabTipoLab').style.background = (tipo === 'LAB') ? '#0284c7' : '#f8fafc';
+      document.getElementById('tabTipoLab').style.color = (tipo === 'LAB') ? '#fff' : '#334155';
+      document.getElementById('tabTipoViral').style.background = (tipo === 'VIRAL') ? '#0284c7' : '#f8fafc';
+      document.getElementById('tabTipoViral').style.color = (tipo === 'VIRAL') ? '#fff' : '#334155';
+      document.getElementById('tabTipoRx').style.background = (tipo === 'RX') ? '#0284c7' : '#f8fafc';
+      document.getElementById('tabTipoRx').style.color = (tipo === 'RX') ? '#fff' : '#334155';
+
+      document.getElementById('panelFormLab').style.display = (tipo === 'LAB') ? 'block' : 'none';
+      document.getElementById('panelFormViral').style.display = (tipo === 'VIRAL') ? 'block' : 'none';
+      document.getElementById('panelFormRx').style.display = (tipo === 'RX') ? 'block' : 'none';
+    }
+
+    function abrirModalSolicitudLabPorId(patientId) {
+      let p = (typeof currentPatients !== 'undefined' ? currentPatients : []).find(item => item.id === patientId) || {};
+      document.getElementById('solInputApellidos').value = p.nombre ? p.nombre.split(' ')[0] : '';
+      document.getElementById('solInputNombres').value = p.nombre ? p.nombre.split(' ').slice(1).join(' ') : '';
+      document.getElementById('solInputExpediente').value = p.expediente || p.nss || '';
+      document.getElementById('solInputSexo').value = p.sexo || 'M';
+      document.getElementById('solInputEdad').value = p.edad || '';
+      document.getElementById('solInputCama').value = p.cama || '';
+      
+      const hoy = new Date().toISOString().split('T')[0];
+      document.getElementById('solInputFecha').value = hoy;
+      
+      document.getElementById('modalSolicitudLabs').style.display = 'flex';
+    }
+
+    function cerrarModalLabs() {
+      document.getElementById('modalSolicitudLabs').style.display = 'none';
+    }
+
+    function generarOrdenDirecta() {
+      let apellidos = document.getElementById('solInputApellidos').value.trim().toUpperCase();
+      let nombres = document.getElementById('solInputNombres').value.trim().toUpperCase();
+      let nombreCompleto = (apellidos + ' ' + nombres).trim();
+      let expediente = document.getElementById('solInputExpediente').value.trim().toUpperCase();
+      let sexo = document.getElementById('solInputSexo').value.trim().toUpperCase();
+      let edad = document.getElementById('solInputEdad').value.trim();
+      let cama = document.getElementById('solInputCama').value.trim().toUpperCase();
+      let fechaVal = document.getElementById('solInputFecha').value;
+
+      if (!nombreCompleto) {
+        alert("Escribe el nombre del paciente.");
+        return;
+      }
+
+      let dxRx = '';
+      if (tipoOrdenActual === 'RX') {
+        const rDx = prompt("Ingresa el DIAGNÓSTICO O IMPRESIÓN CLÍNICA para Radiología:", "ENFERMEDAD RENAL CRÓNICA");
+        if (rDx === null) return;
+        dxRx = rDx.trim().toUpperCase();
+      }
+
+      const [anioFull, mes, dia] = (fechaVal || '').split('-');
+      const anio = anioFull || String(new Date().getFullYear());
+      const fechaFormateada = (dia && mes && anio) ? (dia + '/' + mes + '/' + anio) : '';
+      const medico = 'DR. EMMANUEL SÁNCHEZ ÁLVAREZ';
+
+      let htmlCampos = '';
+      if (tipoOrdenActual === 'LAB') {
+        let textoEstudios = document.getElementById('txtEstudiosSolicitados').value.trim().toUpperCase();
+        htmlCampos = `
+          <div class="field" style="left: 84.4%; top: 13.2%; width: 3.2%; text-align: center;">${dia || ''}</div>
+          <div class="field" style="left: 87.6%; top: 13.2%; width: 3.2%; text-align: center;">${mes || ''}</div>
+          <div class="field" style="left: 91.0%; top: 13.2%; width: 4.5%; text-align: center;">${anio || ''}</div>
+          <div class="field" style="left: 8.5%; top: 18.8%; width: 44.5%; text-align: center;">${nombreCompleto}</div>
+          <div class="field" style="left: 55.2%; top: 18.8%; width: 14.5%; text-align: center;">${expediente}</div>
+          <div class="field" style="left: 72.0%; top: 18.8%; width: 5.8%; text-align: center;">${sexo}</div>
+          <div class="field" style="left: 81.3%; top: 18.8%; width: 13.0%; text-align: center;">${edad}</div>
+          <div class="field-box" style="left: 6.8%; top: 23.9%; width: 87.8%; height: 6.2%;">${textoEstudios}</div>
+          <div class="field" style="left: 79.8%; top: 30.2%; width: 9.0%; text-align: center;">${cama}</div>
+          <div class="field" style="left: 21.5%; top: 36.2%;">${medico}</div>
+        `;
+      } else if (tipoOrdenActual === 'VIRAL') {
+        const leftCirculoSexo = (sexo === 'F') ? '67.8%' : '70.7%';
+        htmlCampos = `
+          <div class="field" style="left: 28.5%; top: 15.8%; width: 62.0%;">${nombreCompleto}</div>
+          <div class="field" style="left: 88.2%; top: 18.0%; width: 8.0%;">${cama}</div>
+          <div class="field" style="left: 9.0%; top: 23.9%; width: 49.0%;">ENFERMEDAD RENAL CRÓNICA</div>
+          <div class="field" style="left: ${leftCirculoSexo}; top: 23.7%; width: 15px; height: 15px; border: 2px solid #000; border-radius: 50%; text-align: center;">✕</div>
+          <div class="field" style="left: 83.2%; top: 23.9%; width: 9.0%;">${edad} AÑOS</div>
+          <div class="field" style="left: 25.0%; top: 26.2%; width: 27.0%;">${expediente}</div>
+          <div class="field" style="left: 66.8%; top: 26.2%; width: 22.0%;">${fechaFormateada}</div>
+          <div class="field" style="left: 19.8%; top: 34.8%; font-weight: 900;">X</div>
+          <div class="field" style="left: 47.7%; top: 34.8%; font-weight: 900;">X</div>
+          <div class="field" style="left: 47.7%; top: 38.2%; font-weight: 900;">X</div>
+          <div class="field" style="left: 46.5%; top: 44.2%; width: 38.0%; text-align: center;">${medico}</div>
+        `;
+      } else if (tipoOrdenActual === 'RX') {
+        const estudioRxVal = document.getElementById('inputEstudioRx').value.trim().toUpperCase();
+        htmlCampos = `
+          <div class="field" style="left: 13.0%; top: 18.2%; width: 47.0%;">${nombreCompleto}</div>
+          <div class="field" style="left: 22.8%; top: 20.1%; width: 37.0%;">NEFROLOGÍA / CAMA ${cama}</div>
+          <div class="field" style="left: 10.8%; top: 22.0%; width: 14.0%;">${edad} AÑOS</div>
+          <div class="field" style="left: 66.5%; top: 22.0%; width: 15.0%;">${sexo}</div>
+          <div class="field" style="left: 45.8%; top: 23.9%; width: 15.5%;">${expediente}</div>
+          <div class="field" style="left: 24.0%; top: 27.6%; width: 68.0%;">${estudioRxVal}</div>
+          <div class="field-box" style="left: 5.8%; top: 29.5%; width: 86.5%; height: 4.2%;">${dxRx}</div>
+          <div class="field" style="left: 11.8%; top: 37.0%; width: 20.0%;">${fechaFormateada}</div>
+          <div class="field" style="left: 64.5%; top: 33.5%; width: 29.0%; text-align: center;">${medico}</div>
+        `;
+      }
+
+      const printWin = window.open('', '_blank');
+      printWin.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Orden_${tipoOrdenActual}</title>
+          <style>
+            @page { size: letter portrait; margin: 0; }
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { width: 215.9mm; height: 279.4mm; position: relative; font-family: Arial, sans-serif; overflow: hidden; background: #fff; }
+            .field { position: absolute; z-index: 2; font-weight: bold; font-size: 9.5pt; color: #000; white-space: nowrap; }
+            .field-box { position: absolute; z-index: 2; font-weight: bold; font-size: 9pt; color: #000; white-space: normal; }
+          </style>
+        </head>
+        <body>
+          ${htmlCampos}
+          <script>
+            window.onload = function() { setTimeout(() => { window.focus(); window.print(); }, 300); };
+          <\/script>
+        </body>
+        </html>
+      `);
+      printWin.document.close();
+      cerrarModalLabs();
+    }
+  </script>
 </body>
 </html>
