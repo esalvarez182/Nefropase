@@ -6611,21 +6611,26 @@ function detectarYMostrarDuplicados() {
       let cama = document.getElementById('solInputCama').value.trim().toUpperCase();
       let fechaVal = document.getElementById('solInputFecha').value;
 
-      if (tipoSup === 'LAB' && !document.getElementById('txtEstudiosSup').value.trim()) {
-        alert("Selecciona al menos un laboratorio para la Mitad Superior.");
+      if (tipoSup === 'BLANCO' && tipoInf === 'BLANCO') {
+        alert("Selecciona al menos una orden (Superior o Inferior) para imprimir.");
         return;
       }
-      if (tipoSup === 'RX' && !document.getElementById('inputEstudioSupRx').value.trim()) {
-        alert("Escribe el estudio radiológico para la Mitad Superior.");
-        document.getElementById('inputEstudioSupRx').focus();
+
+      if (tipoSup === 'LAB' && !document.getElementById('txtEstudiosSup').value.trim()) {
+        alert("Por favor selecciona estudios de laboratorio para la Mitad Superior.");
         return;
       }
       if (tipoInf === 'LAB' && !document.getElementById('txtEstudiosInf').value.trim()) {
-        alert("Selecciona al menos un laboratorio para la Mitad Inferior (o elige 'En Blanco').");
+        alert("Por favor selecciona estudios de laboratorio para la Mitad Inferior.");
+        return;
+      }
+      if (tipoSup === 'RX' && !document.getElementById('inputEstudioSupRx').value.trim()) {
+        alert("Por favor escribe el estudio radiológico de la Mitad Superior.");
+        document.getElementById('inputEstudioSupRx').focus();
         return;
       }
       if (tipoInf === 'RX' && !document.getElementById('inputEstudioInfRx').value.trim()) {
-        alert("Escribe el estudio radiológico para la Mitad Inferior (o elige 'En Blanco').");
+        alert("Por favor escribe el estudio radiológico de la Mitad Inferior.");
         document.getElementById('inputEstudioInfRx').focus();
         return;
       }
@@ -6654,12 +6659,12 @@ function detectarYMostrarDuplicados() {
       const dxSugerido = (pacienteActualModal && pacienteActualModal.diagnostico) ? pacienteActualModal.diagnostico : 'ENFERMEDAD RENAL CRÓNICA';
 
       if (tipoSup === 'RX') {
-        const rDx1 = prompt("Ingresa el DIAGNÓSTICO O IMPRESIÓN CLÍNICA para la orden de Radiología (Mitad Superior):", dxSugerido);
-        if (rDx1 === null) return;
-        dxRxSup = (rDx1.trim() || dxSugerido).toUpperCase();
+        const rDx = prompt("Diagnóstico o Impresión Clínica para Radiología (Mitad Superior):", dxSugerido);
+        if (rDx === null) return;
+        dxRxSup = (rDx.trim() || dxSugerido).toUpperCase();
       }
       if (tipoInf === 'RX') {
-        const rDx2 = prompt("Ingresa el DIAGNÓSTICO O IMPRESIÓN CLÍNICA para la orden de Radiología (Mitad Inferior):", dxRxSup || dxSugerido);
+        const rDx2 = prompt("Diagnóstico o Impresión Clínica para Radiología (Mitad Inferior):", dxRxSup || dxSugerido);
         if (rDx2 === null) return;
         dxRxInf = (rDx2.trim() || dxSugerido).toUpperCase();
       }
@@ -6670,97 +6675,152 @@ function detectarYMostrarDuplicados() {
       const medico = 'DR. EMMANUEL SÁNCHEZ ÁLVAREZ';
 
       function generarHtmlMitad(tipo, esInferior) {
-      if (tipo === 'BLANCO') return '';
+        if (tipo === 'BLANCO') return '';
 
-      // LABORATORIOS: Se mantiene intacto, ya está perfecto.
-      if (tipo === 'LAB') {
-        const offsetPctY = esInferior ? 52.7 : 0;
-        const clipRule = esInferior ? 'clip-path: inset(48.5% 0 0 0);' : 'clip-path: inset(0 0 48.5% 0);';
-        const textoUsar = esInferior ? document.getElementById('txtEstudiosInf').value.trim() : document.getElementById('txtEstudiosSup').value.trim();
+        // 1. LABORATORIOS (Intacto)
+        if (tipo === 'LAB') {
+          const offsetPctY = esInferior ? 52.7 : 0;
+          const clipRule = esInferior ? 'clip-path: inset(48.5% 0 0 0);' : 'clip-path: inset(0 0 48.5% 0);';
+          const textoUsar = esInferior ? document.getElementById('txtEstudiosInf').value.trim() : document.getElementById('txtEstudiosSup').value.trim();
 
-        return `
-          <img class="bg-pdf" style="${clipRule}" src="${DATAURL_LAB}" />
-          <div class="field" style="left: 84.4%; top: ${(13.2 + offsetPctY).toFixed(2)}%; width: 3.2%; text-align: center;">${dia || ''}</div>
-          <div class="field" style="left: 87.6%; top: ${(13.2 + offsetPctY).toFixed(2)}%; width: 3.2%; text-align: center;">${mes || ''}</div>
-          <div class="field" style="left: 91.0%; top: ${(13.2 + offsetPctY).toFixed(2)}%; width: 4.5%; text-align: center;">${anio || ''}</div>
-          <div class="field autofit" style="left: 8.5%; top: ${(18.8 + offsetPctY).toFixed(2)}%; width: 44.5%; text-align: center;">${nombreCompleto}</div>
-          <div class="field autofit" style="left: 55.2%; top: ${(18.8 + offsetPctY).toFixed(2)}%; width: 14.5%; text-align: center; font-size: 8.5pt;">${expediente}</div>
-          <div class="field" style="left: 72.0%; top: ${(18.8 + offsetPctY).toFixed(2)}%; width: 5.8%; text-align: center;">${sexo}</div>
-          <div class="field" style="left: 81.3%; top: ${(18.8 + offsetPctY).toFixed(2)}%; width: 13.0%; text-align: center;">${edad}</div>
-          <div class="field-box" style="left: 6.8%; top: ${(23.9 + offsetPctY).toFixed(2)}%; width: 87.8%; height: 6.2%; text-indent: 22.2%; line-height: 1.62;">${textoUsar.toUpperCase()}</div>
-          <div class="field" style="left: 79.8%; top: ${(30.2 + offsetPctY).toFixed(2)}%; width: 9.0%; text-align: center; font-size: 10.5pt;">${cama}</div>
-          <div class="field" style="left: 21.5%; top: ${(36.2 + offsetPctY).toFixed(2)}%; font-size: 8.5pt;">${medico}</div>
-        `;
+          return `
+            <img class="bg-pdf" style="${clipRule}" src="${DATAURL_LAB}" />
+            <div class="field" style="left: 84.4%; top: ${(13.2 + offsetPctY).toFixed(2)}%; width: 3.2%; text-align: center;">${dia || ''}</div>
+            <div class="field" style="left: 87.6%; top: ${(13.2 + offsetPctY).toFixed(2)}%; width: 3.2%; text-align: center;">${mes || ''}</div>
+            <div class="field" style="left: 91.0%; top: ${(13.2 + offsetPctY).toFixed(2)}%; width: 4.5%; text-align: center;">${anio || ''}</div>
+            <div class="field autofit" style="left: 8.5%; top: ${(18.8 + offsetPctY).toFixed(2)}%; width: 44.5%; text-align: center;">${nombreCompleto}</div>
+            <div class="field autofit" style="left: 55.2%; top: ${(18.8 + offsetPctY).toFixed(2)}%; width: 14.5%; text-align: center; font-size: 8.5pt;">${expediente}</div>
+            <div class="field" style="left: 72.0%; top: ${(18.8 + offsetPctY).toFixed(2)}%; width: 5.8%; text-align: center;">${sexo}</div>
+            <div class="field" style="left: 81.3%; top: ${(18.8 + offsetPctY).toFixed(2)}%; width: 13.0%; text-align: center;">${edad}</div>
+            <div class="field-box" style="left: 6.8%; top: ${(23.9 + offsetPctY).toFixed(2)}%; width: 87.8%; height: 6.2%; text-indent: 22.2%; line-height: 1.62;">${textoUsar.toUpperCase()}</div>
+            <div class="field" style="left: 79.8%; top: ${(30.2 + offsetPctY).toFixed(2)}%; width: 9.0%; text-align: center; font-size: 10.5pt;">${cama}</div>
+            <div class="field" style="left: 21.5%; top: ${(36.2 + offsetPctY).toFixed(2)}%; font-size: 8.5pt;">${medico}</div>
+          `;
+        }
+
+        // 2. PANEL VIRAL (Calibrado por interpolación exacta entre tus 2 capturas)
+        if (tipo === 'VIRAL') {
+          const offsetPctY = esInferior ? 47.4 : 0;
+          const clipRule = esInferior ? 'clip-path: inset(48.5% 0 0 0);' : 'clip-path: inset(0 0 51.5% 0);';
+          const leftCirculoSexo = (sexo === 'F') ? '68.3%' : '70.8%';
+
+          return `
+            <img class="bg-pdf" style="${clipRule}" src="${DATAURL_VIRAL}" />
+            <div class="field autofit" style="left: 28.0%; top: ${(12.2 + offsetPctY).toFixed(2)}%; width: 60.0%;">${nombreCompleto}</div>
+            <div class="field" style="left: 88.0%; top: ${(14.1 + offsetPctY).toFixed(2)}%; width: 9.0%; font-size: 9.5pt;">${cama}</div>
+            <div class="field autofit" style="left: 9.5%; top: ${(19.5 + offsetPctY).toFixed(2)}%; width: 49.0%;">ENFERMEDAD RENAL CRÓNICA</div>
+            <div class="field" style="left: ${leftCirculoSexo}; top: ${(19.3 + offsetPctY).toFixed(2)}%; width: 15px; height: 15px; border: 2px solid #000; border-radius: 50%; text-align: center; line-height: 12px; font-size: 8.5pt;">✕</div>
+            <div class="field" style="left: 83.0%; top: ${(19.5 + offsetPctY).toFixed(2)}%; width: 9.0%;">${edad} AÑOS</div>
+            <div class="field autofit" style="left: 24.5%; top: ${(21.6 + offsetPctY).toFixed(2)}%; width: 27.0%; font-size: 9.5pt;">${expediente}</div>
+            <div class="field" style="left: 66.8%; top: ${(21.6 + offsetPctY).toFixed(2)}%; width: 22.0%;">${fechaFormateada}</div>
+            <div class="field" style="left: 16.5%; top: ${(29.5 + offsetPctY).toFixed(2)}%; width: 5.0%; text-align: center; font-size: 12pt; font-weight: 900;">X</div>
+            <div class="field" style="left: 46.5%; top: ${(29.5 + offsetPctY).toFixed(2)}%; width: 5.0%; text-align: center; font-size: 12pt; font-weight: 900;">X</div>
+            <div class="field" style="left: 46.5%; top: ${(32.5 + offsetPctY).toFixed(2)}%; width: 5.0%; text-align: center; font-size: 12pt; font-weight: 900;">X</div>
+            <div class="field autofit" style="left: 46.5%; top: ${(39.8 + offsetPctY).toFixed(2)}%; width: 38.0%; text-align: center; font-size: 8.5pt;">${medico}</div>
+          `;
+        }
+
+        // 3. RADIOLOGÍA (Intacto)
+        if (tipo === 'RX') {
+          const offsetPctY = esInferior ? 47.9 : 0;
+          const clipRule = esInferior ? 'clip-path: inset(48.5% 0 0 0);' : 'clip-path: inset(0 0 51.5% 0);';
+          const estudioInputVal = esInferior ? document.getElementById('inputEstudioInfRx').value.trim().toUpperCase() : document.getElementById('inputEstudioSupRx').value.trim().toUpperCase();
+          const dxFinal = esInferior ? dxRxInf : dxRxSup;
+
+          return `
+            <img class="bg-pdf" style="${clipRule}" src="${DATAURL_RX}" />
+            <div class="field autofit" style="left: 13.0%; top: ${(18.2 + offsetPctY).toFixed(2)}%; width: 47.0%;">${nombreCompleto}</div>
+            <div class="field autofit" style="left: 22.8%; top: ${(20.1 + offsetPctY).toFixed(2)}%; width: 37.0%;">NEFROLOGÍA / CAMA ${cama}</div>
+            <div class="field" style="left: 10.8%; top: ${(22.0 + offsetPctY).toFixed(2)}%; width: 14.0%;">${edad} AÑOS</div>
+            <div class="field" style="left: 66.5%; top: ${(22.0 + offsetPctY).toFixed(2)}%; width: 15.0%;">${sexo}</div>
+            <div class="field autofit" style="left: 45.8%; top: ${(23.9 + offsetPctY).toFixed(2)}%; width: 15.5%; font-size: 9pt;">${expediente}</div>
+            <div class="field autofit" style="left: 24.0%; top: ${(27.6 + offsetPctY).toFixed(2)}%; width: 68.0%;">${estudioInputVal}</div>
+            <div class="field-box" style="left: 36.0%; top: ${(29.5 + offsetPctY).toFixed(2)}%; width: 56.0%; height: 4.2%; line-height: 1.55;">${dxFinal}</div>
+            <div class="field" style="left: 11.8%; top: ${(37.0 + offsetPctY).toFixed(2)}%; width: 20.0%;">${fechaFormateada}</div>
+            <div class="field autofit" style="left: 64.5%; top: ${(33.5 + offsetPctY).toFixed(2)}%; width: 29.0%; text-align: center; font-size: 8.5pt;">${medico}</div>
+          `;
+        }
+        return '';
       }
 
-      // PANEL VIRAL: Coordenadas ajustadas hacia abajo basándome en la imagen
-      if (tipo === 'VIRAL') {
-        const offsetPctY = esInferior ? 47.4 : 0;
-        const clipRule = esInferior ? 'clip-path: inset(48.5% 0 0 0);' : 'clip-path: inset(0 0 51.5% 0);';
-        const leftCirculoSexo = (sexo === 'F') ? '67.8%' : '70.8%';
-
-        return `
-          <img class="bg-pdf" style="${clipRule}" src="${DATAURL_VIRAL}" />
-          <!-- Se ajustó 'top' hacia abajo para alinear con las líneas -->
-          <div class="field autofit" style="left: 25.0%; top: ${(20.5 + offsetPctY).toFixed(2)}%; width: 62.0%;">${nombreCompleto}</div>
-          <div class="field" style="left: 81.0%; top: ${(23.0 + offsetPctY).toFixed(2)}%; width: 10.0%; font-size: 9.5pt;">${cama}</div>
-          <div class="field autofit" style="left: 9.0%; top: ${(29.0 + offsetPctY).toFixed(2)}%; width: 49.0%;">ENFERMEDAD RENAL CRÓNICA</div>
-          <div class="field" style="left: ${leftCirculoSexo}; top: ${(28.8 + offsetPctY).toFixed(2)}%; width: 15px; height: 15px; border: 2px solid #000; border-radius: 50%; text-align: center; line-height: 12px; font-size: 8.5pt;">✕</div>
-          <div class="field" style="left: 83.2%; top: ${(29.0 + offsetPctY).toFixed(2)}%; width: 9.0%;">${edad} AÑOS</div>
-          <div class="field autofit" style="left: 22.0%; top: ${(31.5 + offsetPctY).toFixed(2)}%; width: 27.0%; font-size: 9.5pt;">${expediente}</div>
-          <div class="field" style="left: 66.8%; top: ${(31.5 + offsetPctY).toFixed(2)}%; width: 22.0%;">${fechaFormateada}</div>
-          <!-- Se ajustaron las posiciones de las X para que caigan dentro de los recuadros -->
-          <div class="field" style="left: 20.2%; top: ${(38.0 + offsetPctY).toFixed(2)}%; width: 5.0%; text-align: center; font-size: 12pt; font-weight: 900;">X</div>
-          <div class="field" style="left: 48.1%; top: ${(38.0 + offsetPctY).toFixed(2)}%; width: 5.0%; text-align: center; font-size: 12pt; font-weight: 900;">X</div>
-          <div class="field" style="left: 48.1%; top: ${(41.5 + offsetPctY).toFixed(2)}%; width: 5.0%; text-align: center; font-size: 12pt; font-weight: 900;">X</div>
-          <div class="field autofit" style="left: 46.5%; top: ${(47.5 + offsetPctY).toFixed(2)}%; width: 38.0%; text-align: center; font-size: 8.5pt;">${medico}</div>
-        `;
-      }
-
-      // RADIOLOGÍA: Se mantiene intacto, ya está perfecto.
-      if (tipo === 'RX') {
-        const offsetPctY = esInferior ? 47.9 : 0;
-        const clipRule = esInferior ? 'clip-path: inset(48.5% 0 0 0);' : 'clip-path: inset(0 0 51.5% 0);';
-        const estudioInputVal = esInferior ? document.getElementById('inputEstudioInfRx').value.trim().toUpperCase() : document.getElementById('inputEstudioSupRx').value.trim().toUpperCase();
-        const dxFinal = esInferior ? dxRxInf : dxRxSup;
-
-        return `
-          <img class="bg-pdf" style="${clipRule}" src="${DATAURL_RX}" />
-          <div class="field autofit" style="left: 13.0%; top: ${(18.2 + offsetPctY).toFixed(2)}%; width: 47.0%;">${nombreCompleto}</div>
-          <div class="field autofit" style="left: 22.8%; top: ${(20.1 + offsetPctY).toFixed(2)}%; width: 37.0%;">NEFROLOGÍA / CAMA ${cama}</div>
-          <div class="field" style="left: 10.8%; top: ${(22.0 + offsetPctY).toFixed(2)}%; width: 14.0%;">${edad} AÑOS</div>
-          <div class="field" style="left: 66.5%; top: ${(22.0 + offsetPctY).toFixed(2)}%; width: 15.0%;">${sexo}</div>
-          <div class="field autofit" style="left: 45.8%; top: ${(23.9 + offsetPctY).toFixed(2)}%; width: 15.5%; font-size: 9pt;">${expediente}</div>
-          <div class="field autofit" style="left: 24.0%; top: ${(27.6 + offsetPctY).toFixed(2)}%; width: 68.0%;">${estudioInputVal}</div>
-          <div class="field-box" style="left: 36.0%; top: ${(29.5 + offsetPctY).toFixed(2)}%; width: 56.0%; height: 4.2%; line-height: 1.55;">${dxFinal}</div>
-          <div class="field" style="left: 11.8%; top: ${(37.0 + offsetPctY).toFixed(2)}%; width: 20.0%;">${fechaFormateada}</div>
-          <div class="field autofit" style="left: 64.5%; top: ${(33.5 + offsetPctY).toFixed(2)}%; width: 29.0%; text-align: center; font-size: 8.5pt;">${medico}</div>
-        `;
-      }
-      return '';
-    }
       const htmlSup = generarHtmlMitad(tipoSup, false);
       const htmlInf = generarHtmlMitad(tipoInf, true);
 
       const printWin = window.open('', '_blank');
       printWin.document.write(`
         <!DOCTYPE html>
-        <html>
+        <html lang="es">
         <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Ordenes_${apellidos || 'ISSSTE'}</title>
           <style>
             @page { size: letter portrait; margin: 0; }
             * { box-sizing: border-box; margin: 0; padding: 0; }
-            body { width: 215.9mm; height: 279.4mm; position: relative; font-family: Arial, Helvetica, sans-serif; overflow: hidden; background: #fff; }
+            body { width: 215.9mm; height: 279.4mm; position: relative; font-family: Arial, Helvetica, sans-serif; overflow-x: auto; background: #fff; }
             .bg-pdf { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
             .field { position: absolute; z-index: 2; font-weight: bold; font-size: 9.5pt; color: #000; white-space: nowrap; }
             .field-box { position: absolute; z-index: 2; font-weight: bold; font-size: 9pt; color: #000; white-space: normal; word-wrap: break-word; }
+            
+            /* Barra flotante para regresar en celular (se oculta automáticamente al imprimir) */
+            .mobile-nav-bar {
+              position: fixed;
+              top: 0;
+              left: 0;
+              right: 0;
+              background: rgba(15, 23, 42, 0.95);
+              padding: 12px 16px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              z-index: 99999;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            }
+            .btn-back-app {
+              background: #ef4444;
+              color: #ffffff;
+              border: none;
+              padding: 10px 16px;
+              border-radius: 8px;
+              font-size: 14px;
+              font-weight: 800;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              gap: 6px;
+            }
+            .btn-reprint {
+              background: #0284c7;
+              color: #ffffff;
+              border: none;
+              padding: 10px 16px;
+              border-radius: 8px;
+              font-size: 14px;
+              font-weight: 800;
+              cursor: pointer;
+            }
+            @media print {
+              .mobile-nav-bar { display: none !important; }
+              body { overflow: hidden; }
+            }
           </style>
         </head>
         <body>
+          <div class="mobile-nav-bar">
+            <button class="btn-back-app" onclick="cerrarYVolver()">⬅️ Cerrar y Volver a NefroPase</button>
+            <button class="btn-reprint" onclick="window.print()">🖨️ Imprimir</button>
+          </div>
           ${htmlSup}
           ${htmlInf}
           <script>
+            function cerrarYVolver() {
+              window.close();
+              setTimeout(function() {
+                if (!window.closed && window.history.length > 1) {
+                  window.history.back();
+                }
+              }, 150);
+            }
             function autoFitTexts() {
               document.querySelectorAll('.autofit').forEach(function(el) {
                 var size = parseFloat(window.getComputedStyle(el).fontSize);
@@ -6770,6 +6830,9 @@ function detectarYMostrarDuplicados() {
                 }
               });
             }
+            window.onafterprint = function() {
+              setTimeout(function() { window.close(); }, 300);
+            };
             window.onload = function() {
               autoFitTexts();
               setTimeout(function() { window.focus(); window.print(); }, 350);
