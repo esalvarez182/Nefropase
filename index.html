@@ -434,6 +434,82 @@
     }
 
   
+    @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap');
+
+    .brand-logo {
+      cursor: pointer;
+      user-select: none;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      justify-content: center !important;
+      line-height: 1 !important;
+      gap: 0 !important;
+      margin-right: 4px;
+    }
+    .brand-main {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      white-space: nowrap;
+      color: #ffffff;
+    }
+    .brand-cloud {
+      font-family: 'Dancing Script', 'Brush Script MT', cursive !important;
+      font-size: 18.5px;
+      font-weight: 700;
+      color: #93c5fd;
+      margin-top: -2px;
+      text-align: center;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+    }
+
+    @media (max-width: 600px) {
+      .app-header { padding: 8px 10px !important; gap: 6px !important; }
+      #btnTopSolicitud {
+        padding: 6px 10px !important;
+        font-size: 11px !important;
+        white-space: nowrap !important;
+        border-radius: 16px !important;
+      }
+      .status-pill span#cloudStatus { display: none; }
+      .status-pill { padding: 5px !important; border-radius: 50% !important; }
+    }
+
+    /* Evitar desbordamiento de inputs en celular */
+    .field-item { min-width: 0 !important; }
+    .field-item input, .field-item select {
+      width: 100% !important;
+      min-width: 0 !important;
+      box-sizing: border-box !important;
+    }
+
+    /* Cuadrícula ordenada para los botones de cada tarjeta */
+    .card-actions {
+      display: grid !important;
+      grid-template-columns: repeat(2, 1fr) !important;
+      gap: 8px !important;
+      margin-top: 12px !important;
+    }
+    .card-actions button {
+      width: 100% !important;
+      justify-content: center !important;
+      padding: 9px 8px !important;
+      font-size: 12px !important;
+      margin: 0 !important;
+    }
+    .card-actions button:last-child:nth-child(odd) {
+      grid-column: span 2 !important;
+    }
+    @media (min-width: 640px) {
+      .card-actions {
+        grid-template-columns: repeat(3, 1fr) !important;
+      }
+      .card-actions button:last-child:nth-child(odd) {
+        grid-column: auto !important;
+      }
+    }
+
     .btn-lab-item { background: #f1f5f9; border: 1px solid #cbd5e1; color: #334155; padding: 7px 6px; border-radius: 6px; font-size: 11.5px; font-weight: 700; cursor: pointer; text-align: center; transition: all 0.15s ease; user-select: none; }
     .btn-lab-item:hover { background: #e2e8f0; border-color: #94a3b8; }
     .btn-lab-item.selected { background: #0284c7 !important; color: #ffffff !important; border-color: #0369a1 !important; box-shadow: 0 2px 4px rgba(2,132,199,0.3); }
@@ -615,9 +691,9 @@
   <div id="topMenuContainer" style="position: fixed; top: 0; left: 0; right: 0; width: 100%; z-index: 2000; box-shadow: 0 4px 10px rgba(0,0,0,0.15); transition: top 0.3s ease-in-out; background: #f8fafc;">
   <!-- Header -->
   <header class="app-header">
-    <h1 style="cursor: pointer; user-select: none;" onclick="goHome()" title="Volver al día actual">🩺 NefroPase Cloud</h1>
+    <h1 class="brand-logo" onclick="goHome()" title="Volver al día actual"><span class="brand-main">🩺 NefroPase</span><span class="brand-cloud">Cloud</span></h1>
     <div style="display: flex; align-items: center; gap: 12px;">
-      <button id="btnTopSolicitud" title="Generar Solicitud de Laboratorios ISSSTE" style="background: #ff9800; color: #ffffff; border: none; border-radius: 18px; padding: 6px 12px; font-weight: 700; font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer; transition: all 0.2s;" onclick="abrirModalBusquedaSolicitud()">📋 + Solicitud Lab</button>
+      <button id="btnTopSolicitud" title="Generar Solicitud de Laboratorios ISSSTE" style="background: #ff9800; color: #ffffff; border: none; border-radius: 18px; padding: 6px 12px; font-weight: 700; font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer; white-space: nowrap; transition: all 0.2s;" onclick="abrirModalBusquedaSolicitud()">📋 + Solicitud Lab</button>
       <button id="btnAccesos" hidden title="Administrar accesos" style="background: rgba(255,255,255,0.2); border: none; border-radius: 50%; width: 34px; height: 34px; align-items: center; justify-content: center; cursor: pointer; font-size: 16px;" onclick="abrirAccesos()">🔐</button>
       <button id="btnSalir" title="Cerrar sesión" style="background: rgba(255,255,255,0.2); border: none; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px;" onclick="if (confirm('¿Cerrar sesión en este equipo?')) npSalir()">🚪</button>
       <button id="btnDriveCfg" title="Enviar notas a Google Docs al dar Guardar" style="background: rgba(255,255,255,0.2); border: none; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 17px;" onclick="configurarDrive()">📄</button>
@@ -6290,8 +6366,8 @@ function detectarYMostrarDuplicados() {
       </div>
       <div style="margin-bottom: 12px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-          <label style="font-size: 12px; font-weight: 700; color: #334155;">Pacientes (Hemodiálisis + Nefrocenso antes de EXTERNOS):</label>
-          <span id="estadoSyncCenso" style="font-size: 10.5px; color: #0284c7; font-weight: 700;">🔄 Sincronizado</span>
+          <label style="font-size: 12px; font-weight: 700; color: #334155;">Pacientes (Hemodiálisis + Nefrocenso en Tiempo Real):</label>
+          <span id="estadoSyncCenso" style="font-size: 10.5px; color: #0284c7; font-weight: 700;">🔄 Conectando...</span>
         </div>
         <input type="text" id="inputBuscarModalSolicitud" placeholder="Escribe nombre, cama o expediente..." oninput="buscarPacientesEnModalSolicitud()" style="width: 100%; padding: 8px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none;">
         <div id="listaResultadosModalSolicitud" style="max-height: 280px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; margin-top: 6px; background: #f8fafc;"></div>
@@ -6334,80 +6410,63 @@ function detectarYMostrarDuplicados() {
     ];
     const RUTINA_IDS = ['bh','qs','es','alb','au','hba1c','tiempos','pfh','lipidos','tiroideo','pcr','fe','pthi','ferritina','dhl','fa'];
 
-    let pacientesNefrocenso = [
-      { id: 'nc_501', cama: '501', nombre: 'AGUILERA MORA ROBERTO', expediente: 'PORD690819/40', edad: '59', sexo: 'M', origen: 'nefrocenso' },
-      { id: 'nc_502', cama: '502', nombre: 'JUAREZ GONZALEZ JUVENTINA', expediente: 'RAJD970222/60', edad: '53', sexo: 'M', origen: 'nefrocenso' },
-      { id: 'nc_503', cama: '503', nombre: 'BARBOSA CORTEZ GUADALUPE', expediente: 'BACG730114/20', edad: '53', sexo: 'F', origen: 'nefrocenso' },
-      { id: 'nc_504', cama: '504', nombre: 'GONZALEZ DOMINGUEZ IGNACIO', expediente: 'GOOF790630/50', edad: '75', sexo: 'M', origen: 'nefrocenso' },
-      { id: 'nc_505', cama: '505', nombre: 'LOPEZ QUIROZ JESUS', expediente: 'LOZZ960527/50', edad: '63', sexo: 'M', origen: 'nefrocenso' },
-      { id: 'nc_506', cama: '506', nombre: 'LOPEZ RINCON MAGALY DEL CARMEN', expediente: 'LORM750919/20', edad: '51', sexo: 'F', origen: 'nefrocenso' },
-      { id: 'nc_507', cama: '507', nombre: 'BARBOSA GUTIERREZ MARIA DEL CARMEN YOLANDA', expediente: 'BAGM470716/20', edad: '79', sexo: 'F', origen: 'nefrocenso' },
-      { id: 'nc_508', cama: '508', nombre: 'ROJAS CRUZ REFUGIO CARMEN', expediente: 'ROCC490704/20', edad: '77', sexo: 'F', origen: 'nefrocenso' },
-      { id: 'nc_524', cama: '524', nombre: 'HERNANDEZ APARICIO CLAUDIO', expediente: 'HEAC470323/10', edad: '79', sexo: 'M', origen: 'nefrocenso' },
-      { id: 'nc_527', cama: '527', nombre: 'SANTA MARIA RAMOS MARIA JOSEFA', expediente: 'SARM520319/20', edad: '74', sexo: 'F', origen: 'nefrocenso' },
-      { id: 'nc_528', cama: '528', nombre: 'CRUZ DANIEL CIRILO', expediente: 'CUDC520709/10', edad: '74', sexo: 'M', origen: 'nefrocenso' },
-      { id: 'nc_533', cama: '533', nombre: 'CHAVEZ RAMOS MIGUEL DE JESUS', expediente: 'CARM530929/10', edad: '73', sexo: 'M', origen: 'nefrocenso' },
-      { id: 'nc_538', cama: '538', nombre: 'FLORES AVILA JACQUELINE', expediente: 'FOAJ980727/20', edad: '28', sexo: 'F', origen: 'nefrocenso' },
-      { id: 'nc_urg15', cama: 'URG 15', nombre: 'HERNANDEZ CISNEROS LUCIA', expediente: 'SAHL630225/20', edad: '63', sexo: 'F', origen: 'nefrocenso' }
-    ];
+    // CERO DATOS PRECARGADOS: Se alimenta estricta y exclusivamente en tiempo real desde Firestore ('nefrocenso_hospital')
+    let pacientesNefrocenso = [];
+    let unsubNefrocenso = null;
 
-    async function sincronizarNefrocensoEnTiempoReal() {
+    function iniciarEscuchaEstrictaNefrocenso() {
+      if (!window.db || !window.fsOnSnapshot || !window.fsCollection) return;
+      if (unsubNefrocenso) return;
+
       const statusEl = document.getElementById('estadoSyncCenso');
-      if (statusEl) statusEl.innerText = '🔄 Actualizando desde Drive...';
+      if (statusEl) statusEl.innerText = '🔄 Conectando en tiempo real...';
+
       try {
-        const sheetId = '1U4W-TNJ1wNBJ45ofxjzpjRIXTGR3ulHR';
-        const url = 'https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json';
-        const resp = await fetch(url);
-        const text = await resp.text();
-        const jsonStr = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
-        const data = JSON.parse(jsonStr);
-        const rows = data.table.rows || [];
-
-        let nuevos = [];
-        let leyendo = false;
-
-        for (let i = 0; i < rows.length; i++) {
-          const c = rows[i].c || [];
-          const val0 = c[0] && (c[0].f || c[0].v) ? String(c[0].f || c[0].v).trim() : '';
-          const val1 = c[1] && (c[1].f || c[1].v) ? String(c[1].f || c[1].v).trim() : '';
-          const val2 = c[2] && (c[2].f || c[2].v) ? String(c[2].f || c[2].v).trim() : '';
-          const val3 = c[3] && (c[3].f || c[3].v) ? String(c[3].f || c[3].v).trim() : '';
-          const val4 = c[4] && (c[4].f || c[4].v) ? String(c[4].f || c[4].v).trim() : '';
-
-          const filaUpper = (val0 + ' ' + val1).toUpperCase();
-          if (val0.toUpperCase() === 'CAMA' || val1.toUpperCase() === 'PACIENTE') {
-            leyendo = true;
-            continue;
-          }
-          if (filaUpper.includes('EXTERNO')) break;
-          if (!leyendo) continue;
-
-          if (!val1 || val1.toUpperCase().includes('MANEJO CONJUNTO') || val1.toUpperCase().includes('TRASPLANTE') || val1.toUpperCase().includes('URGENCIAS')) {
-            continue;
-          }
-
-          nuevos.push({
-            id: 'nc_' + i,
-            cama: val0 || 'S/C',
-            nombre: val1.toUpperCase(),
-            expediente: val2.toUpperCase(),
-            edad: val3,
-            sexo: val4.toUpperCase(),
-            origen: 'nefrocenso'
+        const colRef = window.fsCollection(window.db, "nefrocenso_hospital");
+        unsubNefrocenso = window.fsOnSnapshot(colRef, (snapshot) => {
+          const listaReal = [];
+          snapshot.forEach(docSnap => {
+            const d = docSnap.data();
+            if (d && d.nombre) {
+              listaReal.push({
+                id: docSnap.id,
+                orden: typeof d.orden === 'number' ? d.orden : 999,
+                cama: String(d.cama || '').trim(),
+                nombre: String(d.nombre || '').trim(),
+                expediente: String(d.expediente || '').trim(),
+                edad: String(d.edad || '').trim(),
+                sexo: String(d.sexo || '').trim(),
+                origen: 'nefrocenso'
+              });
+            }
           });
-        }
 
-        if (nuevos.length > 0) {
-          pacientesNefrocenso = nuevos;
-          if (statusEl) statusEl.innerText = '✅ Drive en tiempo real (' + nuevos.length + ' pac.)';
-          buscarPacientesEnModalSolicitud();
-        } else {
-          if (statusEl) statusEl.innerText = '✅ Censo activo (' + pacientesNefrocenso.length + ' pac.)';
-        }
+          listaReal.sort((a, b) => a.orden - b.orden);
+          pacientesNefrocenso = listaReal;
+
+          if (statusEl) {
+            statusEl.innerText = listaReal.length > 0
+              ? '🟢 En tiempo real (' + listaReal.length + ' hospitalizados)'
+              : '⚠️ Sin pacientes en nefrocenso_hospital';
+          }
+
+          if (document.getElementById('modalBusquedaTopSolicitud')?.style.display === 'flex') {
+            buscarPacientesEnModalSolicitud();
+          }
+        }, (err) => {
+          console.error("Error en escucha de nefrocenso_hospital:", err);
+          if (statusEl) statusEl.innerText = '🔴 Error de conexión con Firestore';
+        });
       } catch (e) {
-        if (statusEl) statusEl.innerText = '✅ Censo local (' + pacientesNefrocenso.length + ' pac.)';
+        console.error(e);
       }
     }
+
+    async function sincronizarNefrocensoEnTiempoReal() {
+      iniciarEscuchaEstrictaNefrocenso();
+    }
+
+    window.addEventListener('firebase-ready', iniciarEscuchaEstrictaNefrocenso);
 
     let pacienteSeleccionadoLab = null;
     let selectedLabsMap = new Map();
@@ -6428,7 +6487,7 @@ function detectarYMostrarDuplicados() {
     }
 
     function separarApellidosYNombres(nombreCompleto) {
-      const limpio = String(nombreCompleto || '').trim().replace(/s+/g, ' ');
+      const limpio = String(nombreCompleto || '').trim().replace(/\s+/g, ' ');
       if (!limpio) return { apellidos: '', nombres: '' };
       const partes = limpio.split(' ');
       if (partes.length === 1) return { apellidos: partes[0], nombres: '' };
@@ -6572,15 +6631,15 @@ function detectarYMostrarDuplicados() {
           <div class="field" style="left: 87.6%; top: ${(13.2 + offsetPctY).toFixed(2)}%; width: 3.2%; text-align: center;">${mes || ''}</div>
           <div class="field" style="left: 91.0%; top: ${(13.2 + offsetPctY).toFixed(2)}%; width: 4.5%; text-align: center;">${anio || ''}</div>
 
-          <div class="field" style="left: 9.0%; top: ${(19.2 + offsetPctY).toFixed(2)}%; width: 21.0%; overflow: hidden;">${apellidos}</div>
-          <div class="field" style="left: 31.0%; top: ${(19.2 + offsetPctY).toFixed(2)}%; width: 20.5%; overflow: hidden;">${nombres}</div>
-          <div class="field" style="left: 55.2%; top: ${(19.2 + offsetPctY).toFixed(2)}%; width: 14.5%; text-align: center; font-size: 8.5pt;">${expediente}</div>
-          <div class="field" style="left: 72.0%; top: ${(19.2 + offsetPctY).toFixed(2)}%; width: 5.8%; text-align: center;">${sexo}</div>
-          <div class="field" style="left: 81.3%; top: ${(19.2 + offsetPctY).toFixed(2)}%; width: 13.0%; text-align: center;">${edad}</div>
+          <div class="field autofit" style="left: 7.5%; top: ${(19.0 + offsetPctY).toFixed(2)}%; width: 22.5%;">${apellidos}</div>
+          <div class="field autofit" style="left: 30.5%; top: ${(19.0 + offsetPctY).toFixed(2)}%; width: 23.3%;">${nombres}</div>
+          <div class="field autofit" style="left: 55.2%; top: ${(19.0 + offsetPctY).toFixed(2)}%; width: 14.5%; text-align: center; font-size: 8.5pt;">${expediente}</div>
+          <div class="field" style="left: 72.0%; top: ${(19.0 + offsetPctY).toFixed(2)}%; width: 5.8%; text-align: center;">${sexo}</div>
+          <div class="field" style="left: 81.3%; top: ${(19.0 + offsetPctY).toFixed(2)}%; width: 13.0%; text-align: center;">${edad}</div>
 
-          <div class="field-box" style="left: 6.8%; top: ${(24.1 + offsetPctY).toFixed(2)}%; width: 87.8%; height: 6.2%; text-indent: 22.2%; line-height: 1.62;">${textoEstudios.toUpperCase()}</div>
+          <div class="field-box" style="left: 6.8%; top: ${(23.9 + offsetPctY).toFixed(2)}%; width: 87.8%; height: 6.2%; text-indent: 22.2%; line-height: 1.62;">${textoEstudios.toUpperCase()}</div>
 
-          <div class="field" style="left: 79.8%; top: ${(30.4 + offsetPctY).toFixed(2)}%; width: 9.0%; text-align: center; font-size: 10.5pt;">${cama}</div>
+          <div class="field" style="left: 79.8%; top: ${(30.2 + offsetPctY).toFixed(2)}%; width: 9.0%; text-align: center; font-size: 10.5pt;">${cama}</div>
 
           <div class="field" style="left: 21.5%; top: ${(36.2 + offsetPctY).toFixed(2)}%; font-size: 8.5pt;">${medico}</div>
         `;
@@ -6604,9 +6663,19 @@ function detectarYMostrarDuplicados() {
         <body>
           <img class="bg-pdf" src="${PLANTILLA_ISSSTE_DATAURL}" />
           ${capaDatos(0)}
-          ${capaDatos(53.3)}
+          ${capaDatos(52.7)}
           <script>
+            function autoFitTexts() {
+              document.querySelectorAll('.autofit').forEach(function(el) {
+                var size = parseFloat(window.getComputedStyle(el).fontSize);
+                while (el.scrollWidth > el.clientWidth && size > 6) {
+                  size -= 0.4;
+                  el.style.fontSize = size + 'px';
+                }
+              });
+            }
             window.onload = function() {
+              autoFitTexts();
               setTimeout(function() { window.focus(); window.print(); }, 350);
             };
           <\/script>
@@ -6620,8 +6689,8 @@ function detectarYMostrarDuplicados() {
     async function abrirModalBusquedaSolicitud() {
       document.getElementById('inputBuscarModalSolicitud').value = '';
       document.getElementById('modalBusquedaTopSolicitud').style.display = 'flex';
+      iniciarEscuchaEstrictaNefrocenso();
       buscarPacientesEnModalSolicitud();
-      sincronizarNefrocensoEnTiempoReal();
     }
 
     function cerrarModalBusquedaSolicitud() {
