@@ -5448,15 +5448,54 @@ function detectarYMostrarDuplicados() {
     abrirModalNotificaciones();
     showToast(`✓ Pendiente reprogramado para el ${nuevaFecha}`);
   }
+async function eliminarPendienteDesdeNotif(patientId, pendienteId) {
+      const conf = confirm("¿Deseas quitar este pendiente?");
+      if (!conf) return;
+      
+      try {
+        // Buscar al paciente ya sea en la lista global o actual
+        const pool = (typeof allPatients !== 'undefined' && Array.isArray(allPatients)) ? allPatients : (typeof currentPatients !== 'undefined' ? currentPatients : []);
+        let p = pool.find(item => item.id === patientId);
+        
+        if (p) {
+          // Limpiar propiedades del pendiente en memoria
+          p.pendiente = '';
+          p.pendientes = '';
+          p.nota_pendiente = '';
+          p.tiene_pendiente = false;
+          p.fecha_pendiente = '';
+          p.pendiente_programado = '';
+          p.alerta_pendiente = '';
+          
+          const updates = {
+            pendiente: '',
+            pendientes: '',
+            nota_pendiente: '',
+            tiene_pendiente: false,
+            fecha_pendiente: '',
+            pendiente_programado: '',
+            alerta_pendiente: ''
+          };
 
-  async function eliminarPendienteDesdeNotif(patientId, pendienteId) {
-    const conf = confirm("¿Deseas quitar este pendiente?");
-    if (!conf) return;
-    await eliminarPendiente(patientId, pendienteId);
-    abrirModalNotificaciones();
-  }
+          // Actualizar directamente en Firestore usando los SDKs nativos de Firebase
+          if (window.db && window.fsDoc && window.fsUpdateDoc) {
+            const ref = window.fsDoc(window.db, "pacientes", patientId);
+            await window.fsUpdateDoc(ref, updates);
+          }
+        } else {
+          // Fallback por si acaso usa la función auxiliar previa
+          if (typeof eliminarPendiente === 'function') {
+            await eliminarPendiente(patientId, pendienteId);
+          }
+        }
+      } catch (err) {
+        console.error("Error al eliminar pendiente:", err);
+      }
 
-
+      // Refrescar los modales abiertos para que la tarjeta desaparezca al instante
+      if (typeof abrirModalNotificaciones === 'function') abrirModalNotificaciones();
+      if (typeof renderPatients === 'function') renderPatients();
+    }
   // Observador universal de modales para bloquear scroll del fondo y eliminar desfase táctil en iOS
   document.addEventListener('DOMContentLoaded', () => {
     const modalObserver = new MutationObserver(() => {
