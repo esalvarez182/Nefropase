@@ -7090,5 +7090,128 @@ function detectarYMostrarDuplicados() {
       cerrarModalLabs();
     }
   </script>
+  <script>
+  // --- PARCHE DEFINITIVO PARA QUITAR / COMPLETAR PENDIENTES DE LA SEMANA ---
+  document.addEventListener('click', async function(e) {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+
+    const textoBtn = (btn.innerText || '').trim();
+    const esAccionPendiente = (
+      textoBtn === 'Quitar' || 
+      textoBtn.includes('Realizado') || 
+      textoBtn.includes('Tomado')
+    );
+
+    if (!esAccionPendiente) return;
+
+    // Verificar que el botón esté dentro de una tarjeta del modal de Pendientes de la Semana
+    const contenedorModal = btn.closest('.modal-card, .modal-content, [id*="Pendiente"], [id*="pendiente"], [id*="Notif"]');
+    if (!contenedorModal && !document.body.innerText.includes('Pendientes de la Semana')) return;
+
+    // Buscar la tarjeta individual del pendiente
+    const card = btn.closest('div[style*="border"], .pendiente-card, .notif-item') || btn.parentElement.parentElement;
+    if (!card) return;
+
+    // Extraer el nombre del paciente desde el título de la tarjeta
+    const textoTarjeta = card.innerText || '';
+    const esCultivo = textoTarjeta.includes('TOMA CULTIVO') || textoBtn.includes('Tomado');
+
+    // Buscar a qué paciente pertenece este pendiente dentro de todo el padrón (allPatients y currentPatients)
+    const pool = (typeof allPatients !== 'undefined' && Array.isArray(allPatients) && allPatients.length > 0)
+      ? allPatients
+      : (typeof currentPatients !== 'undefined' ? currentPatients : []);
+
+    let pacienteEncontrado = null;
+    for (const p of pool) {
+      if (p && p.nombre && textoTarjeta.toUpperCase().includes(p.nombre.trim().toUpperCase())) {
+        pacienteEncontrado = p;
+        break;
+      }
+    }
+
+    if (!pacienteEncontrado) return;
+
+    // Evitar que el evento original defectuoso bloquee el flujo si es necesario, o actuar inmediatamente después
+    setTimeout(async () => {
+      try {
+        btn.disabled = true;
+        btn.innerText = '⏳ Guardando...';
+
+        // 1. Limpiar los campos en el objeto del paciente
+        const updates = {};
+
+        if (esCultivo) {
+          // Si era alerta de cultivo (34 días de antibiótico / hemocultivo)
+          pacienteEncontrado.cultivo_pendiente = false;
+          pacienteEncontrado.requiere_cultivo = false;
+          pacienteEncontrado.alerta_cultivo = '';
+          pacienteEncontrado.fecha_cultivo_control = '';
+          pacienteEncontrado.cultivoTomado = true;
+          pacienteEncontrado.fecha_inicio_ab = ''; // Reinicia o marca tomado el ciclo de antibiótico
+          pacienteEncontrado.dias_antibiotico = '';
+
+          updates.cultivo_pendiente = false;
+          updates.requiere_cultivo = false;
+          updates.alerta_cultivo = '';
+          updates.fecha_cultivo_control = '';
+          updates.cultivoTomado = true;
+          updates.fecha_inicio_ab = '';
+          updates.dias_antibiotico = '';
+        } else {
+          // Si es un pendiente normal (ej. "Tomar BH + Procalcitonina")
+          pacienteEncontrado.pendiente = '';
+          pacienteEncontrado.pendientes = '';
+          pacienteEncontrado.nota_pendiente = '';
+          pacienteEncontrado.tiene_pendiente = false;
+          pacienteEncontrado.fecha_pendiente = '';
+          pacienteEncontrado.pendiente_programado = '';
+          pacienteEncontrado.alerta_pendiente = '';
+
+          updates.pendiente = '';
+          updates.pendientes = '';
+          updates.nota_pendiente = '';
+          updates.tiene_pendiente = false;
+          updates.fecha_pendiente = '';
+          updates.pendiente_programado = '';
+          updates.alerta_pendiente = '';
+        }
+
+        // 2. Sincronizar en currentPatients si el paciente también está en la vista actual
+        if (typeof currentPatients !== 'undefined' && Array.isArray(currentPatients)) {
+          const idx = currentPatients.findIndex(item => item.id === pacienteEncontrado.id);
+          if (idx !== -1) {
+            Object.assign(currentPatients[idx], updates);
+          }
+        }
+
+        // 3. Guardar directamente en Firebase Firestore
+        if (window.db && window.fsDoc && window.fsUpdateDoc) {
+          const ref = window.fsDoc(window.db, "pacientes", pacienteEncontrado.id);
+          await window.fsUpdateDoc(ref, updates);
+        } else if (typeof savePatient === 'function') {
+          await savePatient(pacienteEncontrado.id, updates);
+        }
+
+        // 4. Quitar visualmente la tarjeta del modal con animación suave
+        card.style.transition = 'all 0.25s ease';
+        card.style.opacity = '0';
+        card.style.transform = 'scale(0.95)';
+        setTimeout(() => {
+          card.remove();
+          // Actualizar contador inferior y badge de campana si existen
+          if (typeof actualizarNotificaciones === 'function') actualizarNotificaciones();
+          if (typeof checkNotifications === 'function') checkNotifications();
+          if (typeof renderPatients === 'function') renderPatients();
+        }, 250);
+
+      } catch (err) {
+        console.error("Error al quitar pendiente:", err);
+        btn.disabled = false;
+        btn.innerText = textoBtn;
+      }
+    }, 100);
+  }, true);
+</script>
 </body>
 </html>
