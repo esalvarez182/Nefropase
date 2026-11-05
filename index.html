@@ -5358,57 +5358,107 @@ function detectarYMostrarDuplicados() {
   }
 
 
+  // Buscador universal de paciente para modales y notificaciones globales
+  function buscarPacienteGlobal(id) {
+    if (typeof todosLosPacientesDirectorio !== 'undefined' && Array.isArray(todosLosPacientesDirectorio)) {
+      const p1 = todosLosPacientesDirectorio.find(item => item.id === id);
+      if (p1) return p1;
+    }
+    if (typeof currentPatients !== 'undefined' && Array.isArray(currentPatients)) {
+      const p2 = currentPatients.find(item => item.id === id);
+      if (p2) return p2;
+    }
+    if (typeof notificacionesSemanalesCache !== 'undefined' && Array.isArray(notificacionesSemanalesCache)) {
+      const n = notificacionesSemanalesCache.find(item => item.paciente && item.paciente.id === id);
+      if (n && n.paciente) return n.paciente;
+    }
+    return null;
+  }
+
   async function cancelarControlHemocultivo(id) {
     const conf = confirm("¿Deseas quitar esta notificación de hemocultivo de control para este paciente?");
     if (!conf) return;
 
-    const p = currentPatients.find(item => item.id === id);
-    if (!p) return;
+    const p = buscarPacienteGlobal(id);
+    if (p) {
+      if (!p.vigilanciaDatos) p.vigilanciaDatos = {};
+      if (!p.vigilanciaDatos.controlHemocultivo) p.vigilanciaDatos.controlHemocultivo = {};
+      p.vigilanciaDatos.controlHemocultivo.estado = 'cancelado';
+    }
 
-    if (!p.vigilanciaDatos) p.vigilanciaDatos = {};
-    if (!p.vigilanciaDatos.controlHemocultivo) p.vigilanciaDatos.controlHemocultivo = {};
-    p.vigilanciaDatos.controlHemocultivo.estado = 'cancelado';
-
-    if (window.db) {
+    if (window.db && window.fsDoc && window.fsUpdateDoc) {
       try {
-        const pRef = window.fsDoc(window.db, "pacientes", p.id);
-        await window.fsUpdateDoc(pRef, { vigilanciaDatos: p.vigilanciaDatos });
+        const pRef = window.fsDoc(window.db, "pacientes", id);
+        if (p && p.vigilanciaDatos) {
+          await window.fsUpdateDoc(pRef, { vigilanciaDatos: p.vigilanciaDatos });
+        } else {
+          await window.fsUpdateDoc(pRef, { "vigilanciaDatos.controlHemocultivo.estado": "cancelado" });
+        }
       } catch (err) {
         console.error("Error al cancelar control de hemocultivo:", err);
       }
     }
 
     renderCards();
-    abrirModalNotificaciones();
+    await abrirModalNotificaciones();
     showToast("✓ Notificación de hemocultivo removida");
   }
 
-  async function reprogramarControlHemocultivo(id) {
-    const p = currentPatients.find(item => item.id === id);
-    if (!p) return;
+  async function marcarControlHemocultivoTomado(id) {
+    const p = buscarPacienteGlobal(id);
+    const fechaInput = document.getElementById(`toma_ctrl_${id}`);
+    const fechaToma = fechaInput ? fechaInput.value : document.getElementById('sessionDate').value;
+    if (!fechaToma) { alert("Ingresa la fecha de toma."); return; }
 
+    if (p) {
+      if (!p.vigilanciaDatos) p.vigilanciaDatos = {};
+      p.vigilanciaDatos.controlHemocultivo = {
+        estado: 'pendiente_resultado',
+        fechaToma: fechaToma
+      };
+      if (!p.vigilanciaDatos.cultivos) p.vigilanciaDatos.cultivos = {};
+      p.vigilanciaDatos.cultivos.central = true;
+      p.vigilanciaDatos.cultivos.fecha = fechaToma;
+    }
+
+    if (window.db && window.fsDoc && window.fsUpdateDoc) {
+      try {
+        const pRef = window.fsDoc(window.db, "pacientes", id);
+        await window.fsUpdateDoc(pRef, { vigilanciaDatos: p.vigilanciaDatos });
+      } catch (err) { console.error(err); }
+    }
+
+    renderCards();
+    await abrirModalNotificaciones();
+    showToast(`✓ Toma registrada el ${fechaToma}. Pendiente recabar resultado.`);
+  }
+
+  async function reprogramarControlHemocultivo(id) {
+    const p = buscarPacienteGlobal(id);
     const fechaActual = document.getElementById('sessionDate').value;
     const nuevaFecha = prompt("Ingresa la nueva fecha para realizar el hemocultivo (AAAA-MM-DD):", fechaActual);
     if (!nuevaFecha) return;
 
-    if (!p.vigilanciaDatos) p.vigilanciaDatos = {};
-    if (!p.vigilanciaDatos.controlHemocultivo) p.vigilanciaDatos.controlHemocultivo = {};
-    p.vigilanciaDatos.controlHemocultivo.estado = 'reprogramado';
-    p.vigilanciaDatos.controlHemocultivo.fechaReprogramada = nuevaFecha;
+    if (p) {
+      if (!p.vigilanciaDatos) p.vigilanciaDatos = {};
+      if (!p.vigilanciaDatos.controlHemocultivo) p.vigilanciaDatos.controlHemocultivo = {};
+      p.vigilanciaDatos.controlHemocultivo.estado = 'reprogramado';
+      p.vigilanciaDatos.controlHemocultivo.fechaReprogramada = nuevaFecha;
 
-    if (!p.pendientes) p.pendientes = [];
-    p.pendientes.push({
-      id: 'pend_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-      texto: "Tomar Hemocultivo (Reprogramado)",
-      detalles: "Control de hemocultivo reprogramado desde la alerta de 14 días",
-      fecha: nuevaFecha,
-      resuelto: false,
-      creadoAt: Date.now()
-    });
+      if (!p.pendientes) p.pendientes = [];
+      p.pendientes.push({
+        id: 'pend_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+        texto: "Tomar Hemocultivo (Reprogramado)",
+        detalles: "Control de hemocultivo reprogramado desde la alerta de 14 días",
+        fecha: nuevaFecha,
+        resuelto: false,
+        creadoAt: Date.now()
+      });
+    }
 
-    if (window.db) {
+    if (window.db && window.fsDoc && window.fsUpdateDoc) {
       try {
-        const pRef = window.fsDoc(window.db, "pacientes", p.id);
+        const pRef = window.fsDoc(window.db, "pacientes", id);
         await window.fsUpdateDoc(pRef, { 
           vigilanciaDatos: p.vigilanciaDatos,
           pendientes: p.pendientes
@@ -5419,12 +5469,12 @@ function detectarYMostrarDuplicados() {
     }
 
     renderCards();
-    abrirModalNotificaciones();
+    await abrirModalNotificaciones();
     showToast(`✓ Hemocultivo reprogramado para el ${nuevaFecha}`);
   }
 
   async function reprogramarPendienteDesdeNotif(patientId, pendienteId) {
-    const p = currentPatients.find(item => item.id === patientId);
+    const p = buscarPacienteGlobal(patientId);
     if (!p || !p.pendientes) return;
 
     const item = p.pendientes.find(x => x.id === pendienteId);
@@ -5435,7 +5485,7 @@ function detectarYMostrarDuplicados() {
 
     item.fecha = nuevaFecha;
 
-    if (window.db) {
+    if (window.db && window.fsDoc && window.fsUpdateDoc) {
       try {
         const pRef = window.fsDoc(window.db, "pacientes", p.id);
         await window.fsUpdateDoc(pRef, { pendientes: p.pendientes });
@@ -5445,33 +5495,34 @@ function detectarYMostrarDuplicados() {
     }
 
     renderCards();
-    abrirModalNotificaciones();
+    await abrirModalNotificaciones();
     showToast(`✓ Pendiente reprogramado para el ${nuevaFecha}`);
   }
-async function eliminarPendienteDesdeNotif(patientId, pendienteId) {
-      const conf = confirm("¿Deseas quitar este pendiente?");
-      if (!conf) return;
-      
+
+  async function eliminarPendienteDesdeNotif(patientId, pendienteId) {
+    const conf = confirm("¿Deseas quitar este pendiente?");
+    if (!conf) return;
+
+    const p = buscarPacienteGlobal(patientId);
+    if (p && p.pendientes) {
+      p.pendientes = p.pendientes.filter(x => x.id !== pendienteId);
+    }
+
+    if (window.db && window.fsDoc && window.fsUpdateDoc) {
       try {
-        if (typeof db !== 'undefined' && typeof doc !== 'undefined' && typeof updateDoc !== 'undefined') {
-          await updateDoc(doc(db, "pacientes", patientId), {
-            pendiente: '',
-            pendientes: '',
-            nota_pendiente: '',
-            tiene_pendiente: false,
-            fecha_pendiente: '',
-            pendiente_programado: '',
-            alerta_pendiente: ''
-          });
+        const pRef = window.fsDoc(window.db, "pacientes", patientId);
+        if (p && p.pendientes) {
+          await window.fsUpdateDoc(pRef, { pendientes: p.pendientes });
         }
       } catch (err) {
         console.error("Error al eliminar pendiente:", err);
       }
-
-      if (typeof abrirModalNotificaciones === 'function') abrirModalNotificaciones();
-      if (typeof renderPatients === 'function') renderPatients();
     }
 
+    renderCards();
+    await abrirModalNotificaciones();
+    showToast("✓ Pendiente eliminado");
+  }
 
   // Observador universal de modales para bloquear scroll del fondo y eliminar desfase táctil en iOS
   document.addEventListener('DOMContentLoaded', () => {
