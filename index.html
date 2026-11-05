@@ -5453,12 +5453,10 @@ async function eliminarPendienteDesdeNotif(patientId, pendienteId) {
       if (!conf) return;
       
       try {
-        // Buscar al paciente ya sea en la lista global o actual
         const pool = (typeof allPatients !== 'undefined' && Array.isArray(allPatients)) ? allPatients : (typeof currentPatients !== 'undefined' ? currentPatients : []);
         let p = pool.find(item => item.id === patientId);
         
         if (p) {
-          // Limpiar propiedades del pendiente en memoria
           p.pendiente = '';
           p.pendientes = '';
           p.nota_pendiente = '';
@@ -5476,6 +5474,20 @@ async function eliminarPendienteDesdeNotif(patientId, pendienteId) {
             pendiente_programado: '',
             alerta_pendiente: ''
           };
+
+          if (typeof db !== 'undefined' && typeof doc !== 'undefined' && typeof updateDoc !== 'undefined') {
+            await updateDoc(doc(db, "pacientes", patientId), updates);
+          } else if (typeof savePatient === 'function') {
+            await savePatient(patientId, updates);
+          }
+        }
+      } catch (err) {
+        console.error("Error al eliminar pendiente:", err);
+      }
+
+      if (typeof abrirModalNotificaciones === 'function') abrirModalNotificaciones();
+      if (typeof renderPatients === 'function') renderPatients();
+    }
 
           // Actualizar directamente en Firestore usando los SDKs nativos de Firebase
           if (window.db && window.fsDoc && window.fsUpdateDoc) {
